@@ -431,4 +431,8 @@ class VerAlumnosCODDAAView(FormView):
     def get(self, request, *args, **kwargs):
         form = self.get_form()
         alumnos = Alumno.objects.all()  # por defecto muestra todos
-        return self.render_to_response(self.get_context_data(form=form, alumnos=alumnos))
+        return self.render_to_response(self.get_context_data(form=form, alumnos=alumnos));
+
+
+def comunicacion_masiva(request):
+    return render(request, 'Tutorias/comunicacionMasiva.html')

@@ -43,6 +43,8 @@ import re, docx, os
 from zipfile import ZipFile
 from io import BytesIO
 
+from django.views.generic import TemplateView
+
 #Funcion para descargar pdf
 def carta_tutorados_pdf(request):
     print(request)
@@ -1503,3 +1505,10 @@ class ExportarTutoriasAceptadasExcelView(CodaViewMixin, View):
 
         return response
 
+class ComunicacionMasivaTutoriasView(TemplateView):
+    template_name = 'Tutorias/comunicacionMasiva.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['header_footer'] = "Usuarios/base.html"
+        return context
