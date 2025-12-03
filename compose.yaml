@@ -2,7 +2,7 @@ services:
   db:
     image: postgres
     volumes:
-      - ./data/db:/var/lib/postgresql/data
+      - ./pgdata:/var/lib/postgresql
     environment:
       - POSTGRES_DB=coda
       - POSTGRES_USER=postgres
@@ -10,14 +10,12 @@ services:
   web:
     build: ./coda-src
     volumes:
-      - ./coda-src:/app
       - ./media:/app/media
       - ./coda-src/static:/app/static
     ports:
       - "8000:8000"
     environment:
-      - DJANGO_ENV=development
-      - DJANGO_SECRET_KEY=django-insecure-0ea983f4d69ba8061a684379fee776c5118e0a16aa305c153a
+      - DJANGO_SECRET_KEY=715c00f151ab251bc9b82fa18665b84d10b0dc49ac72d9d2fe0a8bcf654fdbb157bd865be9677b52b57dede8605ba8165c71083eca38445ff88d3183f12f6bf35d2d67bf188f7e19d86a489ee5cd51357c5e7661a70344b1469eb96287ff9c8e1c2c3fff
       - RDS_DB_NAME=coda
       - RDS_USERNAME=postgres
       - RDS_HOSTNAME=db

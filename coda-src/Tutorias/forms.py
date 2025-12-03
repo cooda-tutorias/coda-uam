@@ -1,7 +1,7 @@
 from django import forms
 from .models import Tutoria
-from Usuarios.models import Documento
-from .constants import TEMAS, ESTADO, ACEPTADO, PENDIENTE, DURACION_ASESORIA
+from Usuarios.models import Documento, Alumno
+from .constants import TEMAS, ESTADO, ACEPTADO, PENDIENTE, DURACION_ASESORIA, ROLES, CARRERAS
 
 class FormTutorias(forms.ModelForm):
 
@@ -159,3 +159,69 @@ class FormReporteDeTutorias(forms.ModelForm):
                 if tutor_instance.second_last_name:
                     full_name += f" {tutor_instance.second_last_name}"
                 self.fields['tutor'].initial = full_name
+
+
+class ComunicacionMasivaForm(forms.Form):
+
+    OPCIONES_CARRERA = [('', '--- Todas las carreras ---')] + list(CARRERAS)
+    
+    filtro_carrera = forms.ChoiceField(
+        choices=OPCIONES_CARRERA,
+        required=False,
+        label="Filtrar por Carrera",
+        widget=forms.Select(attrs={'class': 'form-select', 'id': 'id_filtro_carrera'})
+    )
+
+    OPCIONES_ASUNTO = [
+        ('', '--- Todos los asuntos ---'),
+        ('academico', 'Seguimiento Académico'),
+        ('administrativo', 'Trámites Administrativos'),
+        ('personal', 'Apoyo Personal'),
+        ('becas', 'Becas y Apoyos'),
+        ('otro', 'Otro'),
+    ]
+    
+    filtro_asunto_tutoria = forms.ChoiceField(
+        choices=OPCIONES_ASUNTO,
+        required=False,
+        label="Asunto de Tutoría (Categoría)",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    # --- 2. Destinatarios (Tutorados) ---
+    tutorados = forms.ModelMultipleChoiceField(
+        queryset=Alumno.objects.none(),  # Se inicia vacío, se llena en __init__
+        widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
+        label="Seleccionar Tutorados",
+        required=True
+    )
+
+    # --- 3. Contenido del Mensaje ---
+    asunto = forms.CharField(
+        max_length=200,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Asunto del correo'})
+    )
+
+    mensaje = forms.CharField(
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 5, 'placeholder': 'Escribe tu mensaje aquí...'})
+    )
+
+    # Permitir múltiples archivos
+    archivos = forms.FileField(
+        required=False,
+        widget=forms.FileInput(attrs={'class': 'form-control'}),
+        label="Adjuntar Archivos"
+    )
+
+    def __init__(self, *args, **kwargs):
+        # Extraemos el argumento 'tutor' que pasaremos desde la vista
+        tutor_actual = kwargs.pop('tutor', None)
+        super(ComunicacionMasivaForm, self).__init__(*args, **kwargs)
+
+        self.fields['archivos'].widget.attrs.update({'multiple': True})
+
+        if tutor_actual:
+            # Filtramos para mostrar solo los alumnos de ESTE tutor
+            # Asumo que tu modelo Alumno tiene un campo 'tutor' o similar. 
+            # Ajusta 'tutor_asignado' al nombre real de tu campo FK en el modelo Alumno.
+            self.fields['tutorados'].queryset = Alumno.objects.filter(tutor_asignado=tutor_actual)

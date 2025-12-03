@@ -12,14 +12,14 @@ from django.views.generic import View
 from django.urls import reverse_lazy
 from django.utils.text import slugify
 from django.core.exceptions import PermissionDenied
-from django.core.mail import send_mail
+from django.core.mail import send_mail, EmailMessage
 from django.contrib import messages
 from datetime import datetime, timedelta
 import pandas as pd
 from .constants import TEMAS
 
 from .models import Tutoria
-from .forms import FormTutorias, FormSeguimiento, FormReporte, FormCartasDeAsignacion, FormReporteDeTutorias
+from .forms import FormTutorias, FormSeguimiento, FormReporte, FormCartasDeAsignacion, FormReporteDeTutorias, ComunicacionMasivaForm
 # from .forms import FormSeguimiento # de nuevo, no estoy seguro, FormReporte
 from .constants import PENDIENTE, ACEPTADO, RECHAZADO, DURACION_ASESORIA, CANCELADO # de nuevo, no estoy seguro
 from Usuarios.constants import TUTOR, ALUMNO, COORDINADOR, TEMPLATES, CORREO
@@ -43,7 +43,7 @@ import re, docx, os
 from zipfile import ZipFile
 from io import BytesIO
 
-from django.views.generic import TemplateView
+from django.views.generic import TemplateView, FormView
 
 #Funcion para descargar pdf
 def carta_tutorados_pdf(request):
@@ -1505,10 +1505,26 @@ class ExportarTutoriasAceptadasExcelView(CodaViewMixin, View):
 
         return response
 
-class ComunicacionMasivaTutoriasView(TemplateView):
+
+class ComunicacionMasivaTutoriasView(FormView):
     template_name = 'Tutorias/comunicacionMasiva.html'
-    
+    form_class = ComunicacionMasivaForm
+    success_url = reverse_lazy('tutorias-comunicacion-masiva')
+
     def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['header_footer'] = "Usuarios/base.html"
-        return context
+        ctx = super().get_context_data(**kwargs)
+        ctx['header_footer'] = "Usuarios/base.html"
+        print("Contexto:", ctx)
+        return ctx
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['tutor'] = self.request.user  # IMPORTANTE
+        print("Tutor autenticado:", self.request.user)
+        print("Roles:", self.request.user.rol)
+        return kwargs
+
+    def form_valid(self, form):
+        # aquí procesas el envío del correo
+        # ...
+        return super().form_valid(form)
