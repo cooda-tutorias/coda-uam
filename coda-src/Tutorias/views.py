@@ -44,6 +44,7 @@ from zipfile import ZipFile
 from io import BytesIO
 
 from django.views.generic import TemplateView, FormView
+from django.conf import settings
 
 #Funcion para descargar pdf
 def carta_tutorados_pdf(request):
@@ -1517,14 +1518,63 @@ class ComunicacionMasivaTutoriasView(FormView):
         print("Contexto:", ctx)
         return ctx
 
+    
     def get_form_kwargs(self):
+        
         kwargs = super().get_form_kwargs()
-        kwargs['tutor'] = self.request.user  # IMPORTANTE
-        print("Tutor autenticado:", self.request.user)
-        print("Roles:", self.request.user.rol)
+        usuario_actual = self.request.user
+        
+        tutor_instance = None
+        if hasattr(usuario_actual, 'tutor'):
+            tutor_instance = usuario_actual.tutor 
+        else:
+            try:
+                tutor_instance = Tutor.objects.get(pk=usuario_actual.pk)
+            except Tutor.DoesNotExist:
+                print("El usuario logueado no es un Tutor válido")
+        
+        kwargs['tutor'] = tutor_instance
         return kwargs
 
     def form_valid(self, form):
-        # aquí procesas el envío del correo
-        # ...
+
+        asunto = form.cleaned_data['asunto']
+        mensaje = form.cleaned_data['mensaje']
+        tutorados = form.cleaned_data['tutorados'] # Esto es una lista de objetos Alumno
+        
+        lista_correos = [alumno.email for alumno in tutorados if alumno.email]
+        if lista_correos:
+            try:
+                # 3. Configurar el correo
+                email = EmailMessage(
+                    subject=asunto,
+                    body=mensaje,
+                    from_email=settings.DEFAULT_FROM_EMAIL, # Configurado en settings.py
+                    to=[self.request.user.email], # Se lo enviamos al Tutor (o a un correo dummy)
+                    bcc=lista_correos, # IMPORTANTE: Usar BCC para que los alumnos no vean los correos de los demás
+                )
+
+                # 4. Procesar Archivos Adjuntos (Si los hay)
+                archivos = self.request.FILES.getlist('archivos')
+                
+                for f in archivos:
+                    # attach(nombre_archivo, contenido, tipo_mime)
+                    email.attach(f.name, f.read(), f.content_type)
+
+                # 5. Enviar el correo
+                email.send(fail_silently=False)
+                
+                messages.success(self.request, f'Correo enviado exitosamente a {len(lista_correos)} tutorados.')
+
+            except Exception as e:
+                # Capturamos errores de SMTP para que la web no se rompa
+                messages.error(self.request, f'Ocurrió un error al enviar el correo: {str(e)}')
+                # Opcional: retornar form_invalid si quieres que corrijan algo
+                return super().form_invalid(form)
+        else:
+            messages.warning(self.request, 'No se seleccionaron alumnos con correo válido.')
+
+
+        messages.success(self.request, 'Mensaje enviado exitosamente.')
+
         return super().form_valid(form)

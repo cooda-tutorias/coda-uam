@@ -146,11 +146,25 @@ USE_I18N = True
 
 USE_TZ = True
 
+""" Configuracion para prod, con carrier SMTP de Gmail """
+""" EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_HOST_PASSWORD = os.environ['EMAIL_HOST_PASSWORD']
 EMAIL_HOST_USER = 'tutorias.beta.uamc@gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER """
+
+""" Configuracion para desarrollo, usando un SMTP fake para enviar y recibir correos """
+""" Ojo, el protocolo SMTP SÍ funciona, cuando digo fake, me refiero a que no es un carrier real que termina enviando correos a carriers reales """
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'sandbox.smtp.mailtrap.io'
+EMAIL_HOST_USER = 'ba65c0b6548e8b'
+EMAIL_HOST_PASSWORD = '****25f9'
+EMAIL_PORT = 2525
+EMAIL_USE_TLS = True
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.1/howto/static-files/

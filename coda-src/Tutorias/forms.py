@@ -110,7 +110,6 @@ class FormCartasDeAsignacion(forms.ModelForm):
         
         if tutor_instance:
             full_name = ""
-            # Llenamos el nombre del tutor.
             if tutor_instance.sexo:
                 if tutor_instance.sexo == "F":
                     full_name = "Dra."
@@ -148,7 +147,6 @@ class FormReporteDeTutorias(forms.ModelForm):
         super().__init__(*args, **kwargs)
         if tutor_instance:
                 full_name = ""
-                # Llenamos el nombre del tutor.
                 if tutor_instance.sexo:
                     if tutor_instance.sexo == "F":
                         full_name = "Dra."
@@ -160,6 +158,14 @@ class FormReporteDeTutorias(forms.ModelForm):
                     full_name += f" {tutor_instance.second_last_name}"
                 self.fields['tutor'].initial = full_name
 
+
+class AlumnoChoiceField(forms.ModelMultipleChoiceField):
+    def label_from_instance(self, obj):
+        nombres = f"{obj.first_name} {obj.last_name}"
+        if obj.second_last_name:
+            nombres += f" {obj.second_last_name}"
+        
+        return f"{nombres} ({obj.email})"
 
 class ComunicacionMasivaForm(forms.Form):
 
@@ -189,8 +195,8 @@ class ComunicacionMasivaForm(forms.Form):
     )
 
     # --- 2. Destinatarios (Tutorados) ---
-    tutorados = forms.ModelMultipleChoiceField(
-        queryset=Alumno.objects.none(),  # Se inicia vacío, se llena en __init__
+    tutorados = AlumnoChoiceField( 
+        queryset=Alumno.objects.none(),
         widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
         label="Seleccionar Tutorados",
         required=True
@@ -214,14 +220,12 @@ class ComunicacionMasivaForm(forms.Form):
     )
 
     def __init__(self, *args, **kwargs):
-        # Extraemos el argumento 'tutor' que pasaremos desde la vista
         tutor_actual = kwargs.pop('tutor', None)
         super(ComunicacionMasivaForm, self).__init__(*args, **kwargs)
 
         self.fields['archivos'].widget.attrs.update({'multiple': True})
 
         if tutor_actual:
-            # Filtramos para mostrar solo los alumnos de ESTE tutor
-            # Asumo que tu modelo Alumno tiene un campo 'tutor' o similar. 
-            # Ajusta 'tutor_asignado' al nombre real de tu campo FK en el modelo Alumno.
+
             self.fields['tutorados'].queryset = Alumno.objects.filter(tutor_asignado=tutor_actual)
+            print(f"Alumnos encontrados para {tutor_actual}: {self.fields['tutorados'].queryset.count()}")

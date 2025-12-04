@@ -9,11 +9,13 @@
 
     <div class="card p-3 mt-3">
 
-        {% if exito %}
-            <div class="alert alert-success alert-dismissible fade show">
-                Mensaje enviado exitosamente.
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
         {% endif %}
 
         <form method="POST" enctype="multipart/form-data" action="{% url 'tutorias-comunicacion-masiva' %}">
@@ -40,7 +42,14 @@
                 </div>
 
                 <div class="border rounded p-2 mt-2" style="max-height: 200px; overflow-y: auto;" id="lista-tutorados">
-                    {{ form.tutorados }}
+                    {% for checkbox in form.tutorados %}
+                        <div class="form-check item-tutorado">
+                            {{ checkbox.tag }} 
+                            <label class="form-check-label" for="{{ checkbox.id_for_label }}">
+                                {{ checkbox.choice_label }}
+                            </label>
+                        </div>
+                    {% endfor %}
                 </div>
                 <div class="text-danger">
                     {{ form.tutorados.errors }}
@@ -70,19 +79,17 @@
 </div>
 
 <script>
-    // Script para "Seleccionar Todos"
     document.getElementById('selectAll').addEventListener('change', function() {
+        
         let checkboxes = document.querySelectorAll('#lista-tutorados input[type="checkbox"]');
-        // Solo seleccionar los que son visibles (si implementas filtro visual)
+        
         checkboxes.forEach(cb => {
-             if(cb.closest('.item-tutorado').style.display !== 'none') {
-                 cb.checked = this.checked;
-             }
+            let contenedor = cb.closest('.item-tutorado');
+            if (contenedor && contenedor.style.display !== 'none') {
+                cb.checked = this.checked;
+            }
         });
     });
 
-    // OPCIONAL: Filtro visual simple por texto (Carrera)
-    // Esto asume que el nombre del alumno o el string del checkbox contiene la carrera.
-    // Si no, necesitarías agregar atributos data-carrera en el bucle for del HTML.
 </script>
 {% endblock %}
