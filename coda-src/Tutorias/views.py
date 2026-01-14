@@ -22,7 +22,7 @@ from .models import Tutoria
 from .forms import FormTutorias, FormSeguimiento, FormReporte, FormCartasDeAsignacion, FormReporteDeTutorias
 # from .forms import FormSeguimiento # de nuevo, no estoy seguro, FormReporte
 from .constants import PENDIENTE, ACEPTADO, RECHAZADO, DURACION_ASESORIA, CANCELADO # de nuevo, no estoy seguro
-from Usuarios.constants import TUTOR, ALUMNO, COORDINADOR, TEMPLATES, CORREO
+from Usuarios.constants import TUTOR, ALUMNO, COORDINADOR, TEMPLATES, CORREO, ESTADOS_ALUMNO
 from Usuarios.views import BaseAccessMixin, CodaViewMixin, TutorViewMixin, AlumnoViewMixin, CordinadorViewMixin
 from Usuarios.models import Tutor, Alumno, Cordinador, Coda
 from Usuarios.models import Documento
@@ -1503,3 +1503,83 @@ class ExportarTutoriasAceptadasExcelView(CodaViewMixin, View):
 
         return response
 
+
+class ReporteStatusAlumnoExcelView(CodaViewMixin, View):
+    """
+    Vista para generar reporte Excel con status de alumnos por tutor.
+    
+    Estructura:
+    - Una fila por cada Tutor
+    - Columnas: Tutor, Número Económico, Coordinación, Activos, No Reinscrito, Sin Carga, Total
+    
+    Solo usuarios CODA pueden acceder.
+    """
+
+    def get(self, request, *args, **kwargs):
+        # Diccionario de estados para referencia
+        estado_dict = dict(ESTADOS_ALUMNO)
+        
+        # Obtener todos los tutores con sus alumnos relacionados (prefetch para optimización)
+        tutores = Tutor.objects.prefetch_related('alumno_set').order_by('first_name', 'last_name')
+        
+        data = []
+        for tutor in tutores:
+            # Obtener alumnos del tutor
+            alumnos = tutor.alumno_set.all()
+            
+            # Contar alumnos por estado
+            activos = alumnos.filter(estado=1).count()
+            no_reinscrito = alumnos.filter(estado=2).count()
+            sin_carga = alumnos.filter(estado=10).count()
+            sin_estado = alumnos.filter(estado__isnull=True).count()
+            
+            # Calcular total
+            total = alumnos.count()
+            
+            # Nombre completo del tutor
+            nombre_tutor = f"{tutor.first_name} {tutor.last_name}"
+            if tutor.second_last_name:
+                nombre_tutor += f" {tutor.second_last_name}"
+            
+            # Agregar fila
+            data.append({
+                "Tutor": nombre_tutor,
+                "Número Económico": tutor.matricula,
+                "Coordinación": tutor.coordinacion,
+                "Activos": activos,
+                "No Reinscrito": no_reinscrito,
+                "Sin Carga Académica": sin_carga,
+                "Sin Estado Registrado": sin_estado,
+                "Total": total
+            })
+        
+        # Crear DataFrame
+        df = pd.DataFrame(data)
+        
+        # Crear respuesta HTTP con archivo Excel
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="reporte_status_alumnos.xlsx"'
+        
+        # Escribir DataFrame a Excel
+        with pd.ExcelWriter(response, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Status Alumnos por Tutor', index=False)
+            
+            # Obtener el worksheet para formateo
+            worksheet = writer.sheets['Status Alumnos por Tutor']
+            
+            # Auto-ajustar ancho de columnas
+            for column in worksheet.columns:
+                max_length = 0
+                column_letter = column[0].column_letter
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(cell.value)
+                    except:
+                        pass
+                adjusted_width = min(max_length + 2, 50)
+                worksheet.column_dimensions[column_letter].width = adjusted_width
+        
+        return response
