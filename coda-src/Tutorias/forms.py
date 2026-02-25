@@ -194,7 +194,6 @@ class ComunicacionMasivaForm(forms.Form):
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
-    # --- 2. Destinatarios (Tutorados) ---
     tutorados = AlumnoChoiceField( 
         queryset=Alumno.objects.none(),
         widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
@@ -202,7 +201,6 @@ class ComunicacionMasivaForm(forms.Form):
         required=True
     )
 
-    # --- 3. Contenido del Mensaje ---
     asunto = forms.CharField(
         max_length=200,
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Asunto del correo'})
@@ -212,7 +210,6 @@ class ComunicacionMasivaForm(forms.Form):
         widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 5, 'placeholder': 'Escribe tu mensaje aquí...'})
     )
 
-    # Permitir múltiples archivos
     archivos = forms.FileField(
         required=False,
         widget=forms.FileInput(attrs={'class': 'form-control'}),

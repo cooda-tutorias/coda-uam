@@ -1508,6 +1508,9 @@ class ExportarTutoriasAceptadasExcelView(CodaViewMixin, View):
 
 
 class ComunicacionMasivaTutoriasView(FormView):
+
+    print("Inicializando vista de comunicación masiva")
+    
     template_name = 'Tutorias/comunicacionMasiva.html'
     form_class = ComunicacionMasivaForm
     success_url = reverse_lazy('tutorias-comunicacion-masiva')
@@ -1537,44 +1540,38 @@ class ComunicacionMasivaTutoriasView(FormView):
         return kwargs
 
     def form_valid(self, form):
-
         asunto = form.cleaned_data['asunto']
         mensaje = form.cleaned_data['mensaje']
-        tutorados = form.cleaned_data['tutorados'] # Esto es una lista de objetos Alumno
+        tutorados = form.cleaned_data['tutorados']
         
         lista_correos = [alumno.email for alumno in tutorados if alumno.email]
         if lista_correos:
             try:
-                # 3. Configurar el correo
+                print(f"Preparando correo con asunto: {asunto}")
                 email = EmailMessage(
                     subject=asunto,
                     body=mensaje,
-                    from_email=settings.DEFAULT_FROM_EMAIL, # Configurado en settings.py
-                    to=[self.request.user.email], # Se lo enviamos al Tutor (o a un correo dummy)
-                    bcc=lista_correos, # IMPORTANTE: Usar BCC para que los alumnos no vean los correos de los demás
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    to=[self.request.user.email], 
+                    bcc=lista_correos
                 )
 
-                # 4. Procesar Archivos Adjuntos (Si los hay)
+                print(f"Enviando correo a: {lista_correos}")
+
                 archivos = self.request.FILES.getlist('archivos')
-                
                 for f in archivos:
-                    # attach(nombre_archivo, contenido, tipo_mime)
                     email.attach(f.name, f.read(), f.content_type)
 
-                # 5. Enviar el correo
                 email.send(fail_silently=False)
                 
-                messages.success(self.request, f'Correo enviado exitosamente a {len(lista_correos)} tutorados.')
+                cantidad = len(lista_correos)
+                destinatario_texto = "tutorado" if cantidad == 1 else "tutorados"
+                messages.success(self.request, f'Correo enviado a {cantidad} {destinatario_texto}.')
 
             except Exception as e:
-                # Capturamos errores de SMTP para que la web no se rompa
                 messages.error(self.request, f'Ocurrió un error al enviar el correo: {str(e)}')
-                # Opcional: retornar form_invalid si quieres que corrijan algo
                 return super().form_invalid(form)
         else:
-            messages.warning(self.request, 'No se seleccionaron alumnos con correo válido.')
-
-
-        messages.success(self.request, 'Mensaje enviado exitosamente.')
+            messages.warning(self.request, 'No alumnos con correo válido.')
 
         return super().form_valid(form)

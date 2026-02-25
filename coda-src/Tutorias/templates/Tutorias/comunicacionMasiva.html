@@ -2,8 +2,26 @@
 
 {% block title %} Comunicación masiva {% endblock %}
 
+{% block navbar %}
+<li class="nav-item">
+    <a class="nav-link text-primary" href="{% url 'Tutorias-tutor' %}">Tutorías asignadas</a>
+</li>
+<li class="nav-item">
+    <a class="nav-link text-primary" href="{% url 'Tutorias-historial' %}" >Historial de tutorías</a>
+</li>
+{% comment %} <li class="nav-item">
+    <a class="nav-link text-primary" href="{% url 'Tutorias-historial-generar' %}" >Generar historial tutoría</a>
+</li> {% endcomment %}
+<li class="nav-item">
+    <a class="nav-link text-primary" href="{% url 'Tutorados-tutor' %}">Lista de tutorados</a>
+</li>
+<li>
+    <a class="nav-link text-primary" href="{% url 'tutorias-comunicacion-masiva' %}">Comunicación masiva</a>
+</li>
+{% endblock %}
+
 {% block body %}
-<div class="container mt-4">
+<div class="container mt-4 mb-5">
     <h2>Comunicación masiva</h2>
     <p class="text-muted">Envía mensajes a tus tutorados asignadoooos.</p>
 
