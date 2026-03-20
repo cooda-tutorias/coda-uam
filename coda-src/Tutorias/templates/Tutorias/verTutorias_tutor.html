@@ -36,6 +36,7 @@
                     <th>Fecha</th>
                     <th>Hora</th>
                     <th>Tema</th>
+                    <th class="w-25">Descripción</th>
                     <th>Acciones</th>
                     <th>Estado</th>
                   </tr>
@@ -48,7 +49,8 @@
                     <td>{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}</td>
                     <td>{{ tutoria.fecha|date }}</td>
                     <td>{{ tutoria.fecha|date:"P" }}</td>
-                    <td>{{ tutoria.get_tema_display|join:", " }} </td>
+                    <td>{{ tutoria.get_tema_display|join:", " }}</td>
+                    <td class="w-25">{{ tutoria.descripcion|default:"-" }}</td>
                     <td class="text-body-bold">
                       {% if tutoria.asistencia or tutoria.estado == "REJ" or tutoria.estado == "CAN" %}
                       <p class="text-body-bold text-muted">Editar</p>
