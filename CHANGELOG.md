@@ -12,6 +12,7 @@ y el proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 - Unit Tests para FormSeguimiento
 - Unit Tests para CartaTutoradosPdf
 - Test Settings Configuration con soporte para SQLite testing
+- Visualización de la descripción de la tutoría en la lista de tutorías del tutor
 
 ### Fixed
 - Compatibilidad de ArrayField con SQLite mediante monkeypatch
