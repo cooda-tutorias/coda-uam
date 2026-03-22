@@ -16,7 +16,9 @@ y el proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 ### Fixed
 - Compatibilidad de ArrayField con SQLite mediante monkeypatch
 - Dependencias corregidas (python-docx, pandas, whitenoise, coverage)
+- Renombrado de "Seguimiento" a "Reporte" en el módulo de tutorías para mejorar claridad en la interfaz
 
 ### Initial Release
 - Estructura inicial del proyecto Django
 - Apps: Tutorias, Usuarios, Metricas
+
