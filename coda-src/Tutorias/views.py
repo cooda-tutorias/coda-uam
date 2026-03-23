@@ -303,13 +303,34 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
     model = Tutoria
     form_class = FormTutorias  # ← Usa tu formulario personalizado
     template_name = 'Tutorias/editarTutoria.html'
-    success_url = reverse_lazy('Tutorias-tutor')
+
+    def get_queryset(self) -> QuerySet[Any]:
+        queryset = super().get_queryset()
+
+        if self.request.user.has_role("TUT"):
+            return queryset.filter(tutor=self.request.user)
+
+        if self.request.user.has_role("ALU"):
+            return queryset.filter(alumno=self.request.user)
+
+        return queryset.none()
+
+    def get_success_url(self):
+        if self.request.user.has_role("ALU"):
+            return reverse_lazy('Tutorias-alumno')
+        return reverse_lazy('Tutorias-tutor')
 
     def form_valid(self, form: BaseModelForm) -> HttpResponse:
+        actor = self.request.user
+
         if self.request.user.has_role("TUT"):
-            tutor = Tutor.objects.get(pk=self.request.user)
-        recipient = Alumno.objects.filter(pk=self.get_object().alumno)
-        notify.send(tutor, recipient=recipient, verb='Tutoria Modificada')
+            recipient = Alumno.objects.filter(pk=self.get_object().alumno_id)
+        elif self.request.user.has_role("ALU"):
+            recipient = Tutor.objects.filter(pk=self.get_object().tutor_id)
+        else:
+            recipient = Tutor.objects.none()
+
+        notify.send(actor, recipient=recipient, verb='Tutoria Modificada')
         return super().form_valid(form)
     
     def editar_tutoria(request, pk):
