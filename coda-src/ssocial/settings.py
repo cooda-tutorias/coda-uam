@@ -32,7 +32,7 @@ SESSION_COOKIE_SECURE=False
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['127.0.0.1', os.environ['TUTORIAS_DOMINIO'], os.environ['IP_COMPUTADORA'], 'debian-rg']
+ALLOWED_HOSTS = ['127.0.0.1', os.environ['TUTORIAS_DOMINIO'], os.environ['IP_COMPUTADORA']]
 CSRF_TRUSTED_ORIGINS = ['http://'+os.environ['TUTORIAS_DOMINIO']]
 
 #Custom user model
