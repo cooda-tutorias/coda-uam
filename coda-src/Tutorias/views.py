@@ -278,6 +278,13 @@ def generar_archivo_txt(request,pk):
 def index(request):
     return HttpResponse("Tutorias app index placeholder")
 
+def normalizar_numero_oficio(oficio_ingresado, fecha_documento) -> str:
+    if oficio_ingresado in (None, ""):
+        return ""
+
+    anio = fecha_documento.year
+    return f"DCNI_CODDAA_{int(oficio_ingresado)}_{anio}"
+
 class AceptarTutoriaView(View):
     def post(self, request, pk):
         tutoria = get_object_or_404(Tutoria, pk=pk)
@@ -441,6 +448,7 @@ class ReporteCreateView(CodaViewMixin, CreateView):
         plantilla_nombre = form.get('plantilla')
         fecha_form = form.get('fecha')
         fecha_form = datetime.strptime(fecha_form,'%Y-%m-%dT%H:%M').date()
+        oficio_form = normalizar_numero_oficio(oficio_form, fecha_form)
         tutor_pk = self.kwargs.get('pk')
         
         plantilla = get_object_or_404(Documento, nombre=plantilla_nombre)
@@ -692,6 +700,7 @@ class Reporte2CreateView(CodaViewMixin, CreateView):
         fecha_form = form.get('fecha')
         no_inicio_form = form.get('no_inicio')
         fecha_form = datetime.strptime(fecha_form,'%Y-%m-%dT%H:%M').date()
+        
         tutor_pk = self.kwargs.get('pk')
         alumnos = get_list_or_404(Alumno, pk__in=selected_ids)
         plantilla = get_object_or_404(Documento, nombre=plantilla_nombre)
@@ -948,6 +957,8 @@ class ReporteTutoriasBrindadasView(CodaViewMixin, CreateView):
         plantilla_nombre = form.get('plantilla')
         fecha_inicio = form.get('fecha_inicio')
         fecha_fin = form.get('fecha_fin')
+        fecha_emision_date = datetime.strptime(fecha_emision, '%Y-%m-%dT%H:%M').date()
+        oficio = normalizar_numero_oficio(oficio, fecha_emision_date)
 
         tutor = get_object_or_404(Tutor, pk=tutor_pk)
         tema_dict = dict(TEMAS)
