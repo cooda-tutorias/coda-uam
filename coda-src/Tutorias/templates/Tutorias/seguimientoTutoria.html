@@ -1,6 +1,7 @@
 {% extends "Usuarios/HeaderAndFooterFachada.html"%}
 
-{% block title %} Reporte Tutoria {% endblock %}
+{% with titulo_reporte="Reporte Tutoria" %}
+{% block title %} {{ titulo_reporte }} {% endblock %}
 
 {% block body %}
 <section id="section" style="background-color: #eee;">
@@ -12,7 +13,7 @@
                     <form method="POST" action="{% url 'save_seguimiento' tutoria.pk %}">
                         {% csrf_token %}
                         <div class="card-body px-5 py-5 text-body">
-                            <h3 class="b-4 text-primary text-title-bold">Reporte de Tutoría</h3>
+                            <h3 class="b-4 text-primary text-title-bold">{{ titulo_reporte }}</h3>
 
                             <!-- Muestra información de tutoría seleccionada -->
                             <div class="d-flex w-100 justify-content-evenly align-items-center">
