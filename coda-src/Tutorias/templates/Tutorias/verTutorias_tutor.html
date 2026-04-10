@@ -50,11 +50,7 @@
                     <td>{{ tutoria.fecha|date:"P" }}</td>
                     <td>{{ tutoria.get_tema_display|join:", " }} </td>
                     <td class="text-body-bold">
-                      {% if tutoria.asistencia or tutoria.estado == "REJ" or tutoria.estado == "CAN" %}
-                      <p class="text-body-bold text-muted">Editar</p>
-                      {% else %}
                       <a href="{% url 'Tutorias-update' pk=tutoria.pk %}">Editar</a>
-                      {% endif %}
                     </td>
                     <td>
                       {% if tutoria.get_estado_display == 'Aceptada' and not tutoria.asistencia %}
