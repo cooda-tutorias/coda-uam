@@ -43,6 +43,19 @@ class Tutoria(models.Model):
         choices = dict(DURACION_ASESORIA)
         return choices.get(self.duracion, "Unknown")
 
+
+class HistorialCambioTutoria(models.Model):
+    tutoria = models.ForeignKey(Tutoria, on_delete=models.CASCADE, related_name='historial_cambios')
+    correo_editor = models.EmailField()
+    cambios_realizados = models.TextField()
+    fecha_cambio = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-fecha_cambio"]
+
+    def __str__(self) -> str:
+        return f'Historial tutoria {self.tutoria_id} - {self.correo_editor}'
+
     
 class Asesoria(models.Model):
 
