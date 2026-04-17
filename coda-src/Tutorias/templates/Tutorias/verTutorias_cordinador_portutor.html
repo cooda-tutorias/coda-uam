@@ -38,7 +38,6 @@
                       <th>Fecha</th>
                       <th>Hora</th>
                       <th>Tema</th>
-                      <th>Observaciones</th>
                       <th>¿Asistió</th>
                     </tr>
                   </thead>
@@ -51,7 +50,6 @@
                       <td>{{ tutoria.fecha|date }}</td>
                       <td>{{ tutoria.fecha|date:"P" }}</td>
                       <td>{{ tutoria.get_tema_display|join:", " }} </td>
-                      <td>{{ tutoria.descripcion}}</td>
                       <td>
                         {% if tutoria.asistencia %}
                           Sí
