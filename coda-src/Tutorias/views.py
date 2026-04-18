@@ -42,6 +42,7 @@ from django.shortcuts import get_object_or_404, get_list_or_404
 import re, docx, os
 from zipfile import ZipFile
 from io import BytesIO
+from .services.docx_reportes import generar_docx_reporte_tutorias_brindadas
 
 #Funcion para descargar pdf
 def carta_tutorados_pdf(request):
@@ -901,57 +902,10 @@ class ReporteTutoriasBrindadasView(CodaViewMixin, CreateView):
         kwargs['tutor_instance'] = tutor_instance
         return kwargs
 
-    def paragraph_replace_text(self,paragraph, regex, replace_str):
-        while True:
-            text = paragraph.text
-            match = regex.search(text)
-            if not match:
-                break
-
-            # --- when there's a match, we need to modify run.text for each run that
-            # --- contains any part of the match-string.
-            runs = iter(paragraph.runs)
-            start, end = match.start(), match.end()
-
-            # --- Skip over any leading runs that do not contain the match ---
-            for run in runs:
-                run_len = len(run.text)
-                if start < run_len:
-                    break
-                start, end = start - run_len, end - run_len
-
-            # --- Match starts somewhere in the current run. Replace match-str prefix
-            # --- occurring in this run with entire replacement str.
-            run_text = run.text
-            run_len = len(run_text)
-            run.text = "%s%s%s" % (run_text[:start], replace_str, run_text[end:])
-            end -= run_len  # --- note this is run-len before replacement ---
-
-            # --- Remove any suffix of match word that occurs in following runs. Note that
-            # --- such a suffix will always begin at the first character of the run. Also
-            # --- note a suffix can span one or more entire following runs.
-            for run in runs:  # --- next and remaining runs, uses same iterator ---
-                if end <= 0:
-                    break
-                run_text = run.text
-                run_len = len(run_text)
-                run.text = run_text[end:]
-                end -= run_len
-
-        # --- optionally get rid of any "spanned" runs that are now empty. This
-        # --- could potentially delete things like inline pictures, so use your judgement.
-        # for run in paragraph.runs:
-        #     if run.text == "":
-        #         r = run._r
-        #         r.getparent().remove(r)
-
-        return paragraph
-
     def post(self, request, *args, **kwargs):
         form = request.POST
         tutor_pk = self.kwargs.get('pk')
 
-        # Datos del formulario
         oficio = form.get('oficio')
         fecha_emision = form.get('fecha')
         plantilla_nombre = form.get('plantilla')
@@ -963,25 +917,19 @@ class ReporteTutoriasBrindadasView(CodaViewMixin, CreateView):
         tutor = get_object_or_404(Tutor, pk=tutor_pk)
         tema_dict = dict(TEMAS)
 
-
         if fecha_inicio and fecha_fin:
             fecha_inicio = timezone.datetime.strptime(fecha_inicio, '%Y-%m-%d')
             fecha_fin = timezone.datetime.strptime(fecha_fin, '%Y-%m-%d') + timedelta(days=1)
-
-            # Filtrar las tutorías por las fechas seleccionadas
             tutorias = Tutoria.objects.filter(tutor=tutor, fecha__range=(fecha_inicio, fecha_fin))
         else:
-            # Si no se han proporcionado fechas, obtener todas las tutorías del tutor
             tutorias = Tutoria.objects.filter(tutor=tutor)
 
-        # Recoger las columnas seleccionadas
         mostrar_col_alumno = 'col_alumno' in form
         mostrar_col_fecha = 'col_fecha' in form
         mostrar_col_hora = 'col_hora' in form
         mostrar_col_tema = 'col_tema' in form
         mostrar_col_notas = 'col_notas' in form
 
-         # Lista de columnas activas
         columnas_activas = []
         if mostrar_col_alumno:
             columnas_activas.append('Alumno')
@@ -994,146 +942,22 @@ class ReporteTutoriasBrindadasView(CodaViewMixin, CreateView):
         if mostrar_col_notas:
             columnas_activas.append('Notas')
 
-        # # filtro de tutorias. Solo deben aparecer las tutorías cuya asistencia ha sido confirmada.
-        # if tutorias:
-        #     # estos prints son solo para debug.
-        #     for tutoria in tutorias:
-        #         print(f"Id de tutoria: {tutoria.pk}")
-        #         print(f"Alumno: {tutoria.alumno}")
-        #         print(f"Tutor: {tutoria.tutor}")
-        #         print(f"Tema: {tutoria.tema}")
-        #         print(f"Requirio asesoria especial?: {tutoria.asesoria_especializada}")
-        #         print(f"Duracion: {tutoria.duracion}")
-        #         print(f"Fecha: {tutoria.fecha}")
-        #         print(f"Le dieron Beca {tutoria.beca_otorgada}")
-        #         print(f"Asistio? {tutoria.asistencia}\n")
-
         plantilla = get_object_or_404(Documento, nombre=plantilla_nombre)
-        open_plantilla = docx.Document(plantilla.archivo)
-        
-        # Verifica si el archivo tiene tablas
-        if not open_plantilla.tables:
-            messages.error(request, "Este archivo no es compatible con el tipo de carta que deseas generar")
-            return redirect('Reporte-tutorias', pk=tutor_pk)
 
-        #Creación de las expresiones regulares que se buscaran en el doc
-        reg_placeh = re.compile(r'\{.*?\}') #Placeholder "{}"
-        reg_ofi = re.compile(r'\{no_oficio\}') #Número de oficio
-        reg_fech =re.compile( r'\{fecha\}') #Fecha
-        reg_tut_min = re.compile(r'\{nombre_tutor\}')
-        reg_tut = re.compile(r'\{nombre_mayus_tutor\}') #Nombre de tutor en mayusculas
-        reg_est = re.compile(r'\{estimado\}') # indentificamos el articulo en minusculas
-
-
-        #Preparación de las ediciones del placeholder
-        self.est = ""
-        self.dr = ""
-        self.name = ""
-        self.name = f"{tutor.first_name} {tutor.last_name}"
-        self.nombre_licenciatura = ""
-        if tutor.sexo == "M":
-            # print(f'Masculino')
-            self.est = "Estimado"
-            self.dr = "Dr."
-        if tutor.sexo == "F":
-            self.est = "Estimada"
-            self.dr = "Dra."
-        if tutor.second_last_name:
-            self.name = self.name + f" {tutor.second_last_name}"
-
-        carreras_dict = {
-            "MAT": "Matemáticas Aplicadas",
-            "COM": "Ingeniería en Computación",
-            "IB": "Ingeniería Biológica",
-            "BM": "Biología Molecular"
-        }
-        self.nombre_licenciatura = carreras_dict.get(tutor.coordinacion, "Licenciatura desconocida")
-
-        #EDICIÓN DE LOS PLACEHOLDERS
-        c=0
-        for p in open_plantilla.paragraphs:
-            c = c+1
-            # print(c)
-            line = p.text
-            result = []
-            line_matches = [] if (result := re.findall(reg_placeh,line)) is None else result
-
-            for match in line_matches:
-                print(f'Esta linea: {match} hizo match')
-                if re.search(reg_ofi,match):
-                    self.paragraph_replace_text(p, reg_ofi, f"{oficio}").text
-                if re.match(reg_fech,match):
-                    self.paragraph_replace_text(p, reg_fech, f"{fecha_emision}").text
-                if re.match(reg_tut,match):
-                    self.paragraph_replace_text(p, reg_tut,(self.dr+" "+self.name).upper())
-                if re.match(reg_est,match):
-                    self.paragraph_replace_text(p, reg_est, self.est)
-                if re.match(reg_tut_min,match):
-                    self.paragraph_replace_text(p, reg_tut_min, self.dr+" "+self.name)
-
-        # Encuentra y elimina la tabla vieja
-        old_table = open_plantilla.tables[0]
-        table_style = old_table.style
-        parent = old_table._element.getparent()
-
-        placeholder = open_plantilla.add_paragraph()
-        parent.insert(parent.index(old_table._element), placeholder._element)
-        parent.remove(old_table._element)
-
-        # Crear nueva tabla con columnas activas
-        new_table = open_plantilla.add_table(rows=1, cols=len(columnas_activas))
-        new_table.style = table_style
-        placeholder._element.addnext(new_table._element)
-
-        # Encabezados de tabla
-        header_cells = new_table.rows[0].cells
-        for i, col_name in enumerate(columnas_activas):
-            header_cells[i].text = col_name
-            header_cells[i]._element.get_or_add_tcPr().append(
-                docx.oxml.parse_xml(r'<w:shd {} w:fill="BFBFBF"/>'.format(docx.oxml.ns.nsdecls('w')))
-            )
-
-        for tutoria in tutorias:
-            # si la asistencia del alumno no se ha registrado, la tutoria no cuenta para generar el reporte.
-            if not tutoria.asistencia:
-                continue
-            alumno = tutoria.alumno
-            row_cells = new_table.add_row().cells
-            col_index = 0
-            if mostrar_col_alumno:
-                nombre = f"{alumno.first_name} {alumno.last_name}"
-                if alumno.second_last_name:
-                    nombre += f" {alumno.second_last_name}"
-                row_cells[col_index].text = nombre
-                col_index += 1
-
-            if mostrar_col_fecha:
-                row_cells[col_index].text = tutoria.fecha.strftime('%Y-%m-%d')
-                col_index += 1
-
-            if mostrar_col_hora:
-                row_cells[col_index].text = tutoria.fecha.strftime('%H:%M')
-                col_index += 1
-
-            if mostrar_col_tema:
-                # según lo mencionado con el CODDAA, lo que permite evaluar la actividad de cada profesor está en función del primer tema seleccionado en la tutoría.
-                # Por lo anterior, se establece que solo se pinta el primer tema.
-                tema_cod = tutoria.tema[0]
-                tema_nombre = tema_dict.get(tema_cod, tema_cod)  # Si no se encuentra, muestra el código
-                row_cells[col_index].text = tema_nombre
-                col_index += 1
-
-            if mostrar_col_notas:
-                row_cells[col_index].text = tutoria.observaciones or ''
-                col_index += 1
-
-
-        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-        response['Content-Disposition'] = f'attachment; filename={tutor.last_name}_TUTORIAS_BRINDADAS.docx'
-        
-        open_plantilla.save(response)
-        
-        return response  
+        return generar_docx_reporte_tutorias_brindadas(
+            tutor=tutor,
+            tutorias=tutorias,
+            plantilla=plantilla,
+            oficio=oficio,
+            fecha_emision=fecha_emision,
+            columnas_activas=columnas_activas,
+            mostrar_col_alumno=mostrar_col_alumno,
+            mostrar_col_fecha=mostrar_col_fecha,
+            mostrar_col_hora=mostrar_col_hora,
+            mostrar_col_tema=mostrar_col_tema,
+            mostrar_col_notas=mostrar_col_notas,
+            tema_dict=tema_dict,
+        )
 
 # Ver Tutorias
 # TODO Añadir verificación de permisos de acceso a la tutoria
