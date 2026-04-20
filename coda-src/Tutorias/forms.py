@@ -40,6 +40,15 @@ class FormTutorias(forms.ModelForm):
                 self.add_error('otro_tema', 'Este campo es obligatorio si seleccionas "Otro".')
 
 
+class FormEditarEstadoAlumnoHistorico(forms.Form):
+    """Formulario para editar solo el estado histórico del alumno en una tutoría"""
+    estado_alumno_historico = forms.ChoiceField(
+        choices=ESTADOS_ALUMNO[1:],  # Excluir la opción vacía
+        label="Estado del alumno al momento de la tutoría",
+        required=True
+    )
+
+
 class FormSeguimiento(forms.ModelForm):
     asistencia = forms.BooleanField(required=True)
     duracion = forms.ChoiceField(choices=DURACION_ASESORIA, required=True)

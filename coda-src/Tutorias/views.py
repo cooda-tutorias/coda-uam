@@ -360,6 +360,25 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
         change_summary = self._build_change_summary(original, form) if changed_fields else "Sin cambios detectados"
         actor = self.request.user
 
+        # Manejar cambio de estado histórico si viene en el POST y el usuario tiene permiso
+        nuevo_estado_raw = self.request.POST.get('estado_alumno_historico')
+        if nuevo_estado_raw and not self.request.user.has_role("ALU"):
+            try:
+                nuevo_estado = int(nuevo_estado_raw)
+                if nuevo_estado != original.estado_alumno_historico:
+                    from Usuarios.constants import ESTADOS_ALUMNO
+                    estado_dict = dict(ESTADOS_ALUMNO)
+                    etiqueta_anterior = estado_dict.get(original.estado_alumno_historico, "Sin registro")
+                    etiqueta_nueva = estado_dict.get(nuevo_estado, "Desconocido")
+                    form.instance.estado_alumno_historico = nuevo_estado
+                    estado_change = f"Estado histórico del alumno: '{etiqueta_anterior}' -> '{etiqueta_nueva}'"
+                    if change_summary == "Sin cambios detectados":
+                        change_summary = estado_change
+                    else:
+                        change_summary += f" | {estado_change}"
+            except (ValueError, TypeError):
+                pass
+
         if self.request.user.has_role("TUT"):
             recipient = Alumno.objects.filter(pk=self.get_object().alumno_id)
         elif self.request.user.has_role("ALU"):
@@ -405,6 +424,10 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
         alumno = get_object_or_404(Alumno, pk=self.request.user)
         form.instance.alumno = alumno
         form.instance.tutor = alumno.tutor_asignado
+
+        # Snapshot del estado del alumno al momento de crear la tutoría
+        if not form.instance.estado_alumno_historico:
+            form.instance.estado_alumno_historico = alumno.estado
 
         # rol = self.request.user.has_role("ALU")
         if self.request.user.has_role("ALU"):
@@ -1439,6 +1462,9 @@ class QuickCreateTutoriaView(AlumnoViewMixin, CreateView):
         form.instance.tutor = alumno.tutor_asignado
         form.instance.estado = ACEPTADO
         
+        # Snapshot del estado del alumno al momento de crear la tutoría con QR
+        if not form.instance.estado_alumno_historico:
+            form.instance.estado_alumno_historico = alumno.estado
         
         # rol = self.request.user.get_rol()
         if self.request.user.has_role("ALU"):
@@ -1528,6 +1554,10 @@ class CrearTutoriaPorAlumnoView(TutorViewMixin, CreateView):
         form.instance.alumno = alumno
         form.instance.tutor = alumno.tutor_asignado
 
+        # Snapshot del estado del alumno al momento de crear la tutoría por tutor
+        if not form.instance.estado_alumno_historico:
+            form.instance.estado_alumno_historico = alumno.estado
+
         # Genera un slug único para la tutoría (puedes ajustar esto según tus necesidades)
         slug = slugify(form.instance.tema)
         form.instance.slug = slug
@@ -1547,6 +1577,77 @@ class RealizarSeguimientoView(TutorViewMixin, UpdateView):
 
         notify.send(tutor, recipient=recipient, verb='Seguimiento de tutoria realizado')
         return super().form_valid(form)
+
+
+class EditarEstadoAlumnoHistoricoView(BaseAccessMixin, View):
+    """
+    Vista para editar el estado histórico del alumno en una tutoría.
+    Solo TUT/COORDINADOR/CODA pueden editar; ALU no puede.
+    """
+    def post(self, request, pk):
+        tutoria = get_object_or_404(Tutoria, pk=pk)
+        
+        # Validar permisos
+        if request.user.has_role("TUT"):
+            # TUT solo puede editar si es el tutor asignado
+            if tutoria.tutor_id != request.user.pk:
+                raise PermissionDenied("No tienes permiso para editar esta tutoría")
+        elif request.user.has_role("COORDINADOR"):
+            # COORDINADOR solo puede editar si el tutor está en su coordinación
+            coord = get_object_or_404(Cordinador, pk=request.user.pk)
+            if tutoria.tutor.coordinacion != coord.coordinacion:
+                raise PermissionDenied("No tienes permiso para editar esta tutoría")
+        elif request.user.has_role("CODA"):
+            # CODA puede editar cualquier tutoría
+            pass
+        else:
+            raise PermissionDenied("No tienes permiso para realizar esta acción")
+        
+        # Importar el formulario
+        from .forms import FormEditarEstadoAlumnoHistorico
+        form = FormEditarEstadoAlumnoHistorico(request.POST)
+        
+        if form.is_valid():
+            nuevo_estado = form.cleaned_data['estado_alumno_historico']
+            estado_anterior = tutoria.estado_alumno_historico
+            
+            # Obtener etiquetas del diccionario ESTADOS_ALUMNO
+            from Usuarios.constants import ESTADOS_ALUMNO
+            estado_dict = {key: value for key, value in ESTADOS_ALUMNO}
+            
+            etiqueta_anterior = estado_dict.get(estado_anterior, "Sin estado registrado")
+            etiqueta_nueva = estado_dict.get(nuevo_estado, "Desconocido")
+            
+            # Actualizar el estado
+            tutoria.estado_alumno_historico = nuevo_estado
+            tutoria.save()
+            
+            # Registrar el cambio en HistorialCambioTutoria
+            cambio_mensaje = f"Estado histórico del alumno: '{etiqueta_anterior}' -> '{etiqueta_nueva}'"
+            HistorialCambioTutoria.objects.create(
+                tutoria=tutoria,
+                correo_editor=request.user.email,
+                cambios_realizados=cambio_mensaje,
+            )
+            
+            # Enviar notificación
+            tutor = Tutor.objects.filter(pk=tutoria.tutor_id)
+            alumno = Alumno.objects.filter(pk=tutoria.alumno_id)
+            
+            if request.user.has_role("TUT"):
+                notify.send(request.user, recipient=alumno, verb='Estado histórico de tutoría actualizado')
+            else:
+                notify.send(request.user, recipient=tutor, verb='Estado histórico de tutoría actualizado por administración')
+            
+            # Mostrar mensaje de éxito
+            messages.success(request, f"Estado histórico actualizado: {etiqueta_anterior} → {etiqueta_nueva}")
+            
+            # Redirigir a la vista de edición de la tutoría
+            return redirect('Tutorias-update', pk=pk)
+        else:
+            # Si el formulario no es válido, redirigir de vuelta
+            messages.error(request, "Error al actualizar el estado. Por favor, intenta de nuevo.")
+            return redirect('Tutorias-update', pk=pk)
     
 class TutoriasAceptadasListView(CodaViewMixin, ListView):
     model = Tutoria
