@@ -13,6 +13,7 @@ y el proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 - Unit Tests para CartaTutoradosPdf
 - Test Settings Configuration con soporte para SQLite testing
 - Script `coda-src/scripts/generar_tutorias_prueba.py` para generar tutorías de prueba en base de datos.
+- Visualización de la descripción de la tutoría en la lista de tutorías del tutor
 
 ### Fixed
 - Compatibilidad de ArrayField con SQLite mediante monkeypatch
@@ -26,6 +27,8 @@ y el proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 
 ### Changed 
 - Refactor de la generación de cartas a `Tutorias/services/docx_reportes.py` para separar la lógica de documentos de `views.py`. 
+- Ocultamiento de observaciones de tutoría para usuarios CODDAA en vistas de tutorías
+- Ocultamiento de observaciones de tutoría para usuarios coordinador en vistas de tutores > "tutor/a" 
 
 ### Initial Release
 - Estructura inicial del proyecto Django

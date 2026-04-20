@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 from .constants import TEMAS
 
-from .models import Tutoria
+from .models import Tutoria, HistorialCambioTutoria
 from .forms import FormTutorias, FormSeguimiento, FormReporte, FormCartasDeAsignacion, FormReporteDeTutorias
 # from .forms import FormSeguimiento # de nuevo, no estoy seguro, FormReporte
 from .constants import PENDIENTE, ACEPTADO, RECHAZADO, DURACION_ASESORIA, CANCELADO # de nuevo, no estoy seguro
@@ -311,14 +311,80 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
     model = Tutoria
     form_class = FormTutorias  # ← Usa tu formulario personalizado
     template_name = 'Tutorias/editarTutoria.html'
-    success_url = reverse_lazy('Tutorias-tutor')
+
+    def get_queryset(self) -> QuerySet[Any]:
+        queryset = super().get_queryset()
+
+        if self.request.user.has_role("TUT"):
+            return queryset.filter(tutor=self.request.user)
+
+        if self.request.user.has_role("ALU"):
+            return queryset.filter(alumno=self.request.user)
+
+        return queryset.none()
+
+    def get_success_url(self):
+        if self.request.user.has_role("ALU"):
+            return reverse_lazy('Tutorias-alumno')
+        return reverse_lazy('Tutorias-tutor')
+
+    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        context["historial_cambios"] = self.object.historial_cambios.all()[:20]
+        return context
+
+    def _build_change_summary(self, original: Tutoria, form: BaseModelForm) -> str:
+        field_labels = {
+            "tema": "Tema(s)",
+            "fecha": "Fecha y Hora",
+            "descripcion": "Observaciones",
+        }
+        tema_map = dict(TEMAS)
+        changes = []
+
+        for field in form.changed_data:
+            if field == "tema":
+                old_value = ", ".join(original.get_tema_display())
+                new_codes = form.cleaned_data.get("tema", [])
+                new_value = ", ".join([tema_map.get(code, code) for code in new_codes])
+            elif field == "fecha":
+                old_value = original.fecha.strftime('%Y-%m-%d %H:%M')
+                new_value = form.cleaned_data.get("fecha").strftime('%Y-%m-%d %H:%M')
+            elif field == "descripcion":
+                old_value = original.descripcion or ""
+                new_value = form.cleaned_data.get("descripcion") or ""
+            else:
+                old_value = str(getattr(original, field, ""))
+                new_value = str(form.cleaned_data.get(field, ""))
+
+            label = field_labels.get(field, field)
+            changes.append(f"{label}: '{old_value}' -> '{new_value}'")
+
+        return " | ".join(changes)
 
     def form_valid(self, form: BaseModelForm) -> HttpResponse:
+        original = self.get_object()
+        changed_fields = list(form.changed_data)
+        change_summary = self._build_change_summary(original, form) if changed_fields else "Sin cambios detectados"
+        actor = self.request.user
+
         if self.request.user.has_role("TUT"):
-            tutor = Tutor.objects.get(pk=self.request.user)
-        recipient = Alumno.objects.filter(pk=self.get_object().alumno)
-        notify.send(tutor, recipient=recipient, verb='Tutoria Modificada')
-        return super().form_valid(form)
+            recipient = Alumno.objects.filter(pk=self.get_object().alumno_id)
+        elif self.request.user.has_role("ALU"):
+            recipient = Tutor.objects.filter(pk=self.get_object().tutor_id)
+        else:
+            recipient = Tutor.objects.none()
+
+        notify.send(actor, recipient=recipient, verb='Tutoria Modificada')
+        response = super().form_valid(form)
+
+        HistorialCambioTutoria.objects.create(
+            tutoria=self.object,
+            correo_editor=actor.email,
+            cambios_realizados=change_summary,
+        )
+
+        return response
     
     def editar_tutoria(request, pk):
         tutoria = get_object_or_404(Tutoria, pk=pk)
