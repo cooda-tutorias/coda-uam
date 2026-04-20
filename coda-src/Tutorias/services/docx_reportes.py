@@ -1,5 +1,6 @@
 import re
 import docx
+import math
 from django.http import HttpResponse
 from django.shortcuts import redirect
 from docx.enum.text import WD_BREAK
@@ -89,11 +90,14 @@ def _replace_reporte_placeholders(documento, tutor, oficio, fecha_emision):
                 paragraph_replace_text(p, reg_tut_min, tutor_data['nombre_tutor'])
 
 
-# Aquí se filtran tutorías (ej: asistencia)
+# Aquí se filtran tutorías (ej: asistencia, estado)
 def _build_report_rows(tutorias, mostrar_col_alumno, mostrar_col_fecha, mostrar_col_hora, mostrar_col_tema, mostrar_col_notas, tema_dict):
     rows = []
     for tutoria in tutorias:
-        if not tutoria.asistencia:  # cambiar aquí si quieres otro filtro
+        if not tutoria.asistencia:  # deben haber asistido
+            continue
+        
+        if tutoria.alumno.estado != 1:
             continue
 
         alumno = tutoria.alumno
@@ -199,10 +203,29 @@ def _insert_short_header(documento, current_element, oficio, fecha_emision, refs
 
 
 # Controla espacio antes de firma
-def _push_signature_down(documento, current_element):
-    # Separación fija equivalente a 5 líneas en la última página.
-    return _insert_vertical_spacer(documento, current_element, count=5)  # subir/bajar firma cambiando este valor
+def _push_signature_down(documento, current_element, filas_ultima, max_filas):
+    # Calcula cuántas filas NO se usaron en la última página
+    faltantes = max_filas - filas_ultima
 
+    # Si hay mucho espacio vacío (tabla corta)
+    # → empujar más la firma hacia abajo
+    if faltantes >= 8:
+        espacios = 5   # aumentar este valor = firma más abajo
+
+    # Espacio medio
+    elif faltantes >= 5:
+        espacios = 3   # valor intermedio
+
+    # Poco espacio libre
+    elif faltantes >= 2:
+        espacios = 2   # separación ligera
+
+    # Tabla casi llena
+    else:
+        espacios = 1   # mínimo espacio para no pegar firma
+
+    # Inserta líneas vacías (cada unidad = un salto de línea)
+    return _insert_vertical_spacer(documento, current_element, count=espacios)
 
 def _set_cell_border(cell, color="000000", size="8"):  # color borde, size="8"  # grosor borde (8 ≈ 1pt)
     tc = cell._tc
@@ -267,6 +290,48 @@ def _add_page_number_footer(documento):
         run2 = paragraph.add_run(' de ')
         _append_field(run2, 'NUMPAGES')
 
+def _distribuir_bloques(rows, columnas_activas):
+    total = len(rows)
+    num_columnas = len(columnas_activas)
+
+    if total == 0:
+        return [[]], 10
+
+    # Define cuántas filas caben por página según columnas.
+    # 1-2 columnas: tabla más angosta, caben más filas.
+    # 3 columnas: caso intermedio.
+    # 4 o más: las filas crecen más, caben menos.
+    if num_columnas <= 2:
+        max_por_pagina = 15
+        min_ultima = 1
+    elif num_columnas == 3:
+        max_por_pagina = 10
+        min_ultima = 6
+    else:
+        max_por_pagina = 8
+        min_ultima = 5
+
+    # Reparto inicial por bloques fijos.
+    bloques = [rows[i:i + max_por_pagina] for i in range(0, total, max_por_pagina)]
+
+    # Si la última página queda muy vacía, redistribuir.
+    # Ejemplo: 21 filas con max 10 → 10,10,1
+    # se convierte en 11,10 para evitar una página casi vacía.
+    if len(bloques) > 1 and len(bloques[-1]) < min_ultima:
+        total_paginas = len(bloques) - 1
+        total_filas = total
+
+        filas_base = total_filas // total_paginas
+        extra = total_filas % total_paginas
+
+        bloques = []
+        inicio = 0
+        for i in range(total_paginas):
+            tam = filas_base + (1 if i < extra else 0)
+            bloques.append(rows[inicio:inicio + tam])
+            inicio += tam
+
+    return bloques, max_por_pagina
 
 def generar_docx_reporte_tutorias_brindadas(
     tutor,
@@ -295,25 +360,18 @@ def generar_docx_reporte_tutorias_brindadas(
         'asunto': _find_reference_paragraph(open_plantilla, "Asunto Tutorados(as) atendidos"),
     }
 
-    # 🔴 Ajuste dinámico de filas por página según columnas
-    num_columnas = len(columnas_activas)
-
-    if num_columnas <= 2:
-        MAX_FILAS = 15
-    else :
-        MAX_FILAS = 10
+    # Ajuste dinámico de filas por página según columnas
     tutorias_validas = _build_report_rows(
-        tutorias,
-        mostrar_col_alumno,
-        mostrar_col_fecha,
-        mostrar_col_hora,
-        mostrar_col_tema,
-        mostrar_col_notas,
-        tema_dict,
+    tutorias,
+    mostrar_col_alumno,
+    mostrar_col_fecha,
+    mostrar_col_hora,
+    mostrar_col_tema,
+    mostrar_col_notas,
+    tema_dict,
     )
-    bloques = [tutorias_validas[i:i + MAX_FILAS] for i in range(0, len(tutorias_validas), MAX_FILAS)]
-    if not bloques:
-        bloques = [[]]
+
+    bloques, MAX_FILAS = _distribuir_bloques(tutorias_validas, columnas_activas)
 
     old_table = open_plantilla.tables[0]
     table_style = old_table.style
@@ -350,8 +408,13 @@ def generar_docx_reporte_tutorias_brindadas(
         _apply_black_borders(table)
 
         if len(bloques) > 1 and i == len(bloques) - 1:
-            current_element = _push_signature_down(open_plantilla, current_element)
-
+            current_element = _push_signature_down(
+                open_plantilla,
+                current_element,
+                len(bloque),
+                MAX_FILAS   
+            )
+    
     _add_page_number_footer(open_plantilla)
 
     response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
