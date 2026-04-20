@@ -27,6 +27,23 @@
                 <div class="d-flex mb-4 align-items-center w-100">
 
                 </div>
+
+                <!--Inicio de Formulario de Filtro-->
+                <form method="post" class="mb-4">
+                  {% csrf_token %}
+                  <div class="row">
+                    <div class="col-md-6">
+                      <div class="form-group">
+                        <label for="id_estado">{{ form.estado.label }}</label>
+                        {{ form.estado }}
+                      </div>
+                    </div>
+                    <div class="col-md-6 d-flex align-items-end">
+                      <button type="submit" class="btn btn-primary">Filtrar</button>
+                    </div>
+                  </div>
+                </form>
+                <!--Fin de Formulario de Filtro-->
                  <!--Inicio de table-->
               <div class="table-responsive text-body">
                 <table class="table table-striped table-hover datatable">
@@ -35,6 +52,7 @@
                       <th>Id</th>
                       <th>Matrícula</th>
                       <th>Alumno</th>
+                      <th>Estado Alumno</th>
                       <th>Fecha</th>
                       <th>Hora</th>
                       <th>Tema</th>
@@ -47,6 +65,7 @@
                       <td>{{ tutoria.pk }}</td>
                       <td>{{ tutoria.alumno.matricula }}</td>
                       <td>{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}</td>
+                      <td>{{ tutoria.alumno.get_estado_display }}</td>
                       <td>{{ tutoria.fecha|date }}</td>
                       <td>{{ tutoria.fecha|date:"P" }}</td>
                       <td>{{ tutoria.get_tema_display|join:", " }} </td>

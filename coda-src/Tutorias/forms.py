@@ -2,6 +2,7 @@ from django import forms
 from .models import Tutoria
 from Usuarios.models import Documento
 from .constants import TEMAS, ESTADO, ACEPTADO, PENDIENTE, DURACION_ASESORIA
+from Usuarios.constants import ESTADOS_ALUMNO
 
 class FormTutorias(forms.ModelForm):
 
@@ -159,3 +160,11 @@ class FormReporteDeTutorias(forms.ModelForm):
                 if tutor_instance.second_last_name:
                     full_name += f" {tutor_instance.second_last_name}"
                 self.fields['tutor'].initial = full_name
+
+
+class FormVerTutorias(forms.Form):
+    estado = forms.ChoiceField(
+        choices=[('', 'Todos los estados')] + ESTADOS_ALUMNO[1:],
+        required=False,
+        label="Estado del Alumno"
+    )

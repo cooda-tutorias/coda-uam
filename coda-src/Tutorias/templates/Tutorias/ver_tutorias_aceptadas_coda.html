@@ -33,6 +33,7 @@
               <th>Matrícula</th>
               <th>Alumno</th>
               <th>Carrera</th>
+              <th>Estado Alumno</th>
               <th>Fecha</th>
               <th>Hora</th>
               <th>Tutor</th>
@@ -47,6 +48,7 @@
               <td>{{ tutoria.alumno.matricula }}</td>
               <td>{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}</td>
               <td>{{ tutoria.alumno.get_carrera_display }}</td>
+              <td>{{ tutoria.alumno.get_estado_display }}</td>
               <td>{{ tutoria.fecha|date }}</td>
               <td>{{ tutoria.fecha|date:"P" }}</td>
               <td>{{ tutoria.tutor.first_name }} {{ tutoria.tutor.last_name }} {{ tutoria.tutor.second_last_name }}</td>

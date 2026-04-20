@@ -8,7 +8,7 @@ from django.http import HttpRequest, HttpResponse
 from django.views.generic.detail import DetailView
 from django.views.generic.list import ListView
 from django.views.generic.edit import CreateView, UpdateView
-from django.views.generic import View
+from django.views.generic import View, FormView
 from django.urls import reverse_lazy
 from django.utils.text import slugify
 from django.core.exceptions import PermissionDenied
@@ -19,7 +19,7 @@ import pandas as pd
 from .constants import TEMAS
 
 from .models import Tutoria, HistorialCambioTutoria
-from .forms import FormTutorias, FormSeguimiento, FormReporte, FormCartasDeAsignacion, FormReporteDeTutorias
+from .forms import FormTutorias, FormSeguimiento, FormReporte, FormCartasDeAsignacion, FormReporteDeTutorias, FormVerTutorias
 # from .forms import FormSeguimiento # de nuevo, no estoy seguro, FormReporte
 from .constants import PENDIENTE, ACEPTADO, RECHAZADO, DURACION_ASESORIA, CANCELADO # de nuevo, no estoy seguro
 from Usuarios.constants import TUTOR, ALUMNO, COORDINADOR, TEMPLATES, CORREO
@@ -1240,38 +1240,61 @@ class HistorialTutoriasGenerateView(BaseAccessMixin, ListView):
     model = Tutoria
     template_name = 'Tutorias/generarhistorialtutoria.html'
 
-class VerTutoriasCoordinadorListView(CordinadorViewMixin, ListView):
+class VerTutoriasCoordinadorListView(CordinadorViewMixin, FormView):
     model = Tutoria
     template_name='Tutorias/verTutorias_cordinador.html'
+    form_class = FormVerTutorias
 
-    def get_queryset(self) -> QuerySet[Any]:
-        
+    def form_valid(self, form):
+        estado = form.cleaned_data.get("estado")
+
         coord = get_object_or_404(Cordinador, pk=self.request.user.pk)
         tutores = Tutor.objects.all().filter(coordinacion=coord.coordinacion)
-        queryset = super().get_queryset().filter(tutor__in=tutores)   
-        
-        return queryset 
+        tutorias = Tutoria.objects.filter(tutor__in=tutores)
+
+        if estado:
+            tutorias = tutorias.filter(alumno__estado=estado)
+
+        context = self.get_context_data(form=form, object_list=tutorias)
+        return self.render_to_response(context)
+
+    def get(self, request, *args, **kwargs):
+        form = self.get_form()
+        coord = get_object_or_404(Cordinador, pk=request.user.pk)
+        tutores = Tutor.objects.all().filter(coordinacion=coord.coordinacion)
+        tutorias = Tutoria.objects.filter(tutor__in=tutores)
+        return self.render_to_response(self.get_context_data(form=form, object_list=tutorias))
     
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
 
-        #tutor = Tutor.objects.get(pk=self.kwargs.get('pk'))
         coord = get_object_or_404(Cordinador, pk=self.request.user.pk)
         tutores = Tutor.objects.all().filter(coordinacion=coord.coordinacion)
         context["tutores"] = tutores
 
         return context
     
-class VerTutoriasCoordinadorPorTutorListView(CordinadorViewMixin, ListView):
+class VerTutoriasCoordinadorPorTutorListView(CordinadorViewMixin, FormView):
      
     model = Tutoria
     template_name='Tutorias/verTutorias_cordinador_portutor.html'
+    form_class = FormVerTutorias
 
-    def get_queryset(self) -> QuerySet[Any]:
-        
-        queryset = super().get_queryset().filter(tutor=self.kwargs.get('pk'))   
-        
-        return queryset 
+    def form_valid(self, form):
+        estado = form.cleaned_data.get("estado")
+
+        tutorias = Tutoria.objects.filter(tutor=self.kwargs.get('pk'))
+
+        if estado:
+            tutorias = tutorias.filter(alumno__estado=estado)
+
+        context = self.get_context_data(form=form, object_list=tutorias)
+        return self.render_to_response(context)
+
+    def get(self, request, *args, **kwargs):
+        form = self.get_form()
+        tutorias = Tutoria.objects.filter(tutor=self.kwargs.get('pk'))
+        return self.render_to_response(self.get_context_data(form=form, object_list=tutorias))
     
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
@@ -1347,17 +1370,27 @@ class VerTutoradosCoordinadorListView(CordinadorViewMixin, ListView):
         context["tutor"] = tutor
         return context
 
-class VerTutoriasTutorListView(TutorViewMixin, ListView):
+class VerTutoriasTutorListView(TutorViewMixin, FormView):
      
     model = Tutoria
     template_name='Tutorias/verTutorias_tutor.html'
+    form_class = FormVerTutorias
 
-    def get_queryset(self) -> QuerySet[Any]:
-        
-        # Tutorias correspondientes al tutor
-        queryset = super().get_queryset().filter(tutor=self.request.user)
-    
-        return queryset
+    def form_valid(self, form):
+        estado = form.cleaned_data.get("estado")
+
+        tutorias = Tutoria.objects.filter(tutor=self.request.user)
+
+        if estado:
+            tutorias = tutorias.filter(alumno__estado=estado)
+
+        context = self.get_context_data(form=form, object_list=tutorias)
+        return self.render_to_response(context)
+
+    def get(self, request, *args, **kwargs):
+        form = self.get_form()
+        tutorias = Tutoria.objects.filter(tutor=request.user)
+        return self.render_to_response(self.get_context_data(form=form, object_list=tutorias))
     
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
