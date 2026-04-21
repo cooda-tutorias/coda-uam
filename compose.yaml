@@ -1,12 +1,19 @@
 services:
   db:
-    image: postgres
+    image: postgres:17
     volumes:
       - ./pgdata:/var/lib/postgresql
     environment:
-      - POSTGRES_DB=coda
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - app_net
   web:
     build: ./coda-src
     volumes:
@@ -15,19 +22,27 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DJANGO_SECRET_KEY=715c00f151ab251bc9b82fa18665b84d10b0dc49ac72d9d2fe0a8bcf654fdbb157bd865be9677b52b57dede8605ba8165c71083eca38445ff88d3183f12f6bf35d2d67bf188f7e19d86a489ee5cd51357c5e7661a70344b1469eb96287ff9c8e1c2c3fff
-      - RDS_DB_NAME=coda
-      - RDS_USERNAME=postgres
+      - DJANGO_ENV=${DJANGO_ENV}
+      - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
+      - RDS_DB_NAME=${RDS_DB_NAME}
+      - RDS_USERNAME=${RDS_USERNAME}
       - RDS_HOSTNAME=db
-      - RDS_PORT=5432
-      - RDS_PASSWORD=postgres
-      - DJANGO_DEBUG=True
-      - IP_COMPUTADORA=127.0.0.1
-      - TUTORIAS_DOMINIO=localhost
-      - EMAIL_DOMAIN=a@a.com
-      - EMAIL_HOST_PASSWORD=1234
-      - POSTGRES_NAME=postgres
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - RDS_PORT=${RDS_PORT}
+      - RDS_PASSWORD=${RDS_PASSWORD}
+      - DJANGO_DEBUG=${DJANGO_DEBUG}
+      - IP_COMPUTADORA=${IP_COMPUTADORA}
+      - TUTORIAS_DOMINIO=${TUTORIAS_DOMINIO}
+      - EMAIL_DOMAIN=${EMAIL_DOMAIN}
+      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD}
+      - POSTGRES_NAME=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    networks:
+      - app_net
+
+networks:
+  app_net:
+    driver: bridge
