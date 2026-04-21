@@ -56,7 +56,7 @@ class FormSeguimiento(forms.ModelForm):
 
 
 class FormReporte(forms.ModelForm):
-    oficio = forms.CharField(required=False)
+    oficio = forms.IntegerField(required=True, min_value=1)
     fecha = forms.DateTimeField(widget=forms.DateTimeInput(attrs={'type': 'datetime-local'}))
     plantilla = forms.ModelChoiceField(queryset=Documento.objects.all(), to_field_name='nombre', label="Selecciona una plantilla")
     tutor = forms.CharField(widget=forms.TextInput(attrs={'readonly': 'readonly'}))
@@ -133,7 +133,7 @@ class FormCartasDeAsignacion(forms.ModelForm):
 
 class FormReporteDeTutorias(forms.ModelForm):
     
-    oficio = forms.CharField(required=True)
+    oficio = forms.IntegerField(required=True, min_value=1)
     fecha_inicio = forms.DateField(required=True)
     fecha_fin = forms.DateField(required=True)
     fecha = forms.DateTimeField(widget=forms.DateTimeInput(attrs={'type': 'datetime-local'}), required=True)
