@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:17
+    build: ./DB
     volumes:
       - ./pgdata:/var/lib/postgresql
     environment:
@@ -37,6 +37,7 @@ services:
       - POSTGRES_NAME=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
     depends_on:
       db:
         condition: service_healthy
