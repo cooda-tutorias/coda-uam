@@ -42,10 +42,11 @@ class FormTutorias(forms.ModelForm):
 
 class FormEditarEstadoAlumnoHistorico(forms.Form):
     """Formulario para editar solo el estado histórico del alumno en una tutoría"""
-    estado_alumno_historico = forms.ChoiceField(
+    estado_alumno_historico = forms.TypedChoiceField(
         choices=ESTADOS_ALUMNO[1:],  # Excluir la opción vacía
         label="Estado del alumno al momento de la tutoría",
-        required=True
+        required=True,
+        coerce=int,
     )
 
 
@@ -172,8 +173,10 @@ class FormReporteDeTutorias(forms.ModelForm):
 
 
 class FormVerTutorias(forms.Form):
-    estado = forms.ChoiceField(
+    estado = forms.TypedChoiceField(
         choices=[('', 'Todos los estados')] + ESTADOS_ALUMNO[1:],
         required=False,
-        label="Estado del Alumno"
+        label="Estado del Alumno",
+        coerce=int,
+        empty_value='',
     )
