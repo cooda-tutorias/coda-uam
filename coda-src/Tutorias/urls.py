@@ -38,6 +38,8 @@ urlpatterns = [
     # In urls.py
     path('tutoria/seguimiento/<int:pk>/', views.RealizarSeguimientoView.as_view(), name='save_seguimiento'),
 
+    # Editar estado histórico del alumno
+    path('tutoria/<int:pk>/editar-estado-historico/', views.EditarEstadoAlumnoHistoricoView.as_view(), name='editar-estado-historico'),
     
     # URLS CODA 
     path('tutores-coda/', views.VerTutoresListView.as_view(), name='Tutores-Coda'),

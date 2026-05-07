@@ -21,8 +21,8 @@
 
                                 <div class="form-outline mb-3">
                                     <div class="form-outline">                                
-                                        {% render_field form.oficio type="text" class="form-control" id="oficio" rows="3" placeholder="DNC_CODDAA_XXX_20XX"%}
-                                        <label class="form-label" for="oficio">No. Oificio</label>
+                                        {% render_field form.oficio type="number" min="1" step="1" class="form-control" id="oficio" placeholder="Ej. 900" %}
+                                        <label class="form-label" for="oficio">Número de Oficio</label>
                                     </div>
                                 </div>
 

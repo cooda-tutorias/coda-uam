@@ -2,6 +2,7 @@ from django import forms
 from .models import Tutoria
 from Usuarios.models import Documento
 from .constants import TEMAS, ESTADO, ACEPTADO, PENDIENTE, DURACION_ASESORIA
+from Usuarios.constants import ESTADOS_ALUMNO
 
 class FormTutorias(forms.ModelForm):
 
@@ -39,6 +40,16 @@ class FormTutorias(forms.ModelForm):
                 self.add_error('otro_tema', 'Este campo es obligatorio si seleccionas "Otro".')
 
 
+class FormEditarEstadoAlumnoHistorico(forms.Form):
+    """Formulario para editar solo el estado histórico del alumno en una tutoría"""
+    estado_alumno_historico = forms.TypedChoiceField(
+        choices=ESTADOS_ALUMNO[1:],  # Excluir la opción vacía
+        label="Estado del alumno al momento de la tutoría",
+        required=True,
+        coerce=int,
+    )
+
+
 class FormSeguimiento(forms.ModelForm):
     asistencia = forms.BooleanField(required=True)
     duracion = forms.ChoiceField(choices=DURACION_ASESORIA, required=True)
@@ -56,7 +67,7 @@ class FormSeguimiento(forms.ModelForm):
 
 
 class FormReporte(forms.ModelForm):
-    oficio = forms.CharField(required=False)
+    oficio = forms.IntegerField(required=True, min_value=1)
     fecha = forms.DateTimeField(widget=forms.DateTimeInput(attrs={'type': 'datetime-local'}))
     plantilla = forms.ModelChoiceField(queryset=Documento.objects.all(), to_field_name='nombre', label="Selecciona una plantilla")
     tutor = forms.CharField(widget=forms.TextInput(attrs={'readonly': 'readonly'}))
@@ -133,7 +144,7 @@ class FormCartasDeAsignacion(forms.ModelForm):
 
 class FormReporteDeTutorias(forms.ModelForm):
     
-    oficio = forms.CharField(required=True)
+    oficio = forms.IntegerField(required=True, min_value=1)
     fecha_inicio = forms.DateField(required=True)
     fecha_fin = forms.DateField(required=True)
     fecha = forms.DateTimeField(widget=forms.DateTimeInput(attrs={'type': 'datetime-local'}), required=True)
@@ -159,3 +170,13 @@ class FormReporteDeTutorias(forms.ModelForm):
                 if tutor_instance.second_last_name:
                     full_name += f" {tutor_instance.second_last_name}"
                 self.fields['tutor'].initial = full_name
+
+
+class FormVerTutorias(forms.Form):
+    estado = forms.TypedChoiceField(
+        choices=[('', 'Todos los estados')] + ESTADOS_ALUMNO[1:],
+        required=False,
+        label="Estado del Alumno",
+        coerce=int,
+        empty_value='',
+    )

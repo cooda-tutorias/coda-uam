@@ -8,7 +8,7 @@ from django.http import HttpRequest, HttpResponse
 from django.views.generic.detail import DetailView
 from django.views.generic.list import ListView
 from django.views.generic.edit import CreateView, UpdateView
-from django.views.generic import View
+from django.views.generic import View, FormView
 from django.urls import reverse_lazy
 from django.utils.text import slugify
 from django.core.exceptions import PermissionDenied
@@ -19,7 +19,7 @@ import pandas as pd
 from .constants import TEMAS
 
 from .models import Tutoria, HistorialCambioTutoria
-from .forms import FormTutorias, FormSeguimiento, FormReporte, FormCartasDeAsignacion, FormReporteDeTutorias
+from .forms import FormTutorias, FormSeguimiento, FormReporte, FormCartasDeAsignacion, FormReporteDeTutorias, FormVerTutorias
 # from .forms import FormSeguimiento # de nuevo, no estoy seguro, FormReporte
 from .constants import PENDIENTE, ACEPTADO, RECHAZADO, DURACION_ASESORIA, CANCELADO # de nuevo, no estoy seguro
 from Usuarios.constants import TUTOR, ALUMNO, COORDINADOR, TEMPLATES, CORREO
@@ -42,6 +42,7 @@ from django.shortcuts import get_object_or_404, get_list_or_404
 import re, docx, os
 from zipfile import ZipFile
 from io import BytesIO
+from .services.docx_reportes import generar_docx_reporte_tutorias_brindadas
 
 #Funcion para descargar pdf
 def carta_tutorados_pdf(request):
@@ -278,6 +279,13 @@ def generar_archivo_txt(request,pk):
 def index(request):
     return HttpResponse("Tutorias app index placeholder")
 
+def normalizar_numero_oficio(oficio_ingresado, fecha_documento) -> str:
+    if oficio_ingresado in (None, ""):
+        return ""
+
+    anio = fecha_documento.year
+    return f"DCNI_CODDAA_{int(oficio_ingresado)}_{anio}"
+
 class AceptarTutoriaView(View):
     def post(self, request, pk):
         tutoria = get_object_or_404(Tutoria, pk=pk)
@@ -360,6 +368,25 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
         change_summary = self._build_change_summary(original, form) if changed_fields else "Sin cambios detectados"
         actor = self.request.user
 
+        # Manejar cambio de estado histórico si viene en el POST y el usuario tiene permiso
+        nuevo_estado_raw = self.request.POST.get('estado_alumno_historico')
+        if nuevo_estado_raw and not self.request.user.has_role("ALU"):
+            try:
+                nuevo_estado = int(nuevo_estado_raw)
+                if nuevo_estado != original.estado_alumno_historico:
+                    from Usuarios.constants import ESTADOS_ALUMNO
+                    estado_dict = dict(ESTADOS_ALUMNO)
+                    etiqueta_anterior = estado_dict.get(original.estado_alumno_historico, "Sin registro")
+                    etiqueta_nueva = estado_dict.get(nuevo_estado, "Desconocido")
+                    form.instance.estado_alumno_historico = nuevo_estado
+                    estado_change = f"Estado histórico del alumno: '{etiqueta_anterior}' -> '{etiqueta_nueva}'"
+                    if change_summary == "Sin cambios detectados":
+                        change_summary = estado_change
+                    else:
+                        change_summary += f" | {estado_change}"
+            except (ValueError, TypeError):
+                pass
+
         if self.request.user.has_role("TUT"):
             recipient = Alumno.objects.filter(pk=self.get_object().alumno_id)
         elif self.request.user.has_role("ALU"):
@@ -405,6 +432,10 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
         alumno = get_object_or_404(Alumno, pk=self.request.user)
         form.instance.alumno = alumno
         form.instance.tutor = alumno.tutor_asignado
+
+        # Snapshot del estado del alumno al momento de crear la tutoría
+        if not form.instance.estado_alumno_historico:
+            form.instance.estado_alumno_historico = alumno.estado
 
         # rol = self.request.user.has_role("ALU")
         if self.request.user.has_role("ALU"):
@@ -507,6 +538,7 @@ class ReporteCreateView(CodaViewMixin, CreateView):
         plantilla_nombre = form.get('plantilla')
         fecha_form = form.get('fecha')
         fecha_form = datetime.strptime(fecha_form,'%Y-%m-%dT%H:%M').date()
+        oficio_form = normalizar_numero_oficio(oficio_form, fecha_form)
         tutor_pk = self.kwargs.get('pk')
         
         plantilla = get_object_or_404(Documento, nombre=plantilla_nombre)
@@ -758,6 +790,7 @@ class Reporte2CreateView(CodaViewMixin, CreateView):
         fecha_form = form.get('fecha')
         no_inicio_form = form.get('no_inicio')
         fecha_form = datetime.strptime(fecha_form,'%Y-%m-%dT%H:%M').date()
+        
         tutor_pk = self.kwargs.get('pk')
         alumnos = get_list_or_404(Alumno, pk__in=selected_ids)
         plantilla = get_object_or_404(Documento, nombre=plantilla_nombre)
@@ -958,85 +991,34 @@ class ReporteTutoriasBrindadasView(CodaViewMixin, CreateView):
         kwargs['tutor_instance'] = tutor_instance
         return kwargs
 
-    def paragraph_replace_text(self,paragraph, regex, replace_str):
-        while True:
-            text = paragraph.text
-            match = regex.search(text)
-            if not match:
-                break
-
-            # --- when there's a match, we need to modify run.text for each run that
-            # --- contains any part of the match-string.
-            runs = iter(paragraph.runs)
-            start, end = match.start(), match.end()
-
-            # --- Skip over any leading runs that do not contain the match ---
-            for run in runs:
-                run_len = len(run.text)
-                if start < run_len:
-                    break
-                start, end = start - run_len, end - run_len
-
-            # --- Match starts somewhere in the current run. Replace match-str prefix
-            # --- occurring in this run with entire replacement str.
-            run_text = run.text
-            run_len = len(run_text)
-            run.text = "%s%s%s" % (run_text[:start], replace_str, run_text[end:])
-            end -= run_len  # --- note this is run-len before replacement ---
-
-            # --- Remove any suffix of match word that occurs in following runs. Note that
-            # --- such a suffix will always begin at the first character of the run. Also
-            # --- note a suffix can span one or more entire following runs.
-            for run in runs:  # --- next and remaining runs, uses same iterator ---
-                if end <= 0:
-                    break
-                run_text = run.text
-                run_len = len(run_text)
-                run.text = run_text[end:]
-                end -= run_len
-
-        # --- optionally get rid of any "spanned" runs that are now empty. This
-        # --- could potentially delete things like inline pictures, so use your judgement.
-        # for run in paragraph.runs:
-        #     if run.text == "":
-        #         r = run._r
-        #         r.getparent().remove(r)
-
-        return paragraph
-
     def post(self, request, *args, **kwargs):
         form = request.POST
         tutor_pk = self.kwargs.get('pk')
 
-        # Datos del formulario
         oficio = form.get('oficio')
         fecha_emision = form.get('fecha')
         plantilla_nombre = form.get('plantilla')
         fecha_inicio = form.get('fecha_inicio')
         fecha_fin = form.get('fecha_fin')
+        fecha_emision_date = datetime.strptime(fecha_emision, '%Y-%m-%dT%H:%M').date()
+        oficio = normalizar_numero_oficio(oficio, fecha_emision_date)
 
         tutor = get_object_or_404(Tutor, pk=tutor_pk)
         tema_dict = dict(TEMAS)
 
-
         if fecha_inicio and fecha_fin:
             fecha_inicio = timezone.datetime.strptime(fecha_inicio, '%Y-%m-%d')
             fecha_fin = timezone.datetime.strptime(fecha_fin, '%Y-%m-%d') + timedelta(days=1)
-
-            # Filtrar las tutorías por las fechas seleccionadas
             tutorias = Tutoria.objects.filter(tutor=tutor, fecha__range=(fecha_inicio, fecha_fin))
         else:
-            # Si no se han proporcionado fechas, obtener todas las tutorías del tutor
             tutorias = Tutoria.objects.filter(tutor=tutor)
 
-        # Recoger las columnas seleccionadas
         mostrar_col_alumno = 'col_alumno' in form
         mostrar_col_fecha = 'col_fecha' in form
         mostrar_col_hora = 'col_hora' in form
         mostrar_col_tema = 'col_tema' in form
         mostrar_col_notas = 'col_notas' in form
 
-         # Lista de columnas activas
         columnas_activas = []
         if mostrar_col_alumno:
             columnas_activas.append('Alumno')
@@ -1049,146 +1031,22 @@ class ReporteTutoriasBrindadasView(CodaViewMixin, CreateView):
         if mostrar_col_notas:
             columnas_activas.append('Notas')
 
-        # # filtro de tutorias. Solo deben aparecer las tutorías cuya asistencia ha sido confirmada.
-        # if tutorias:
-        #     # estos prints son solo para debug.
-        #     for tutoria in tutorias:
-        #         print(f"Id de tutoria: {tutoria.pk}")
-        #         print(f"Alumno: {tutoria.alumno}")
-        #         print(f"Tutor: {tutoria.tutor}")
-        #         print(f"Tema: {tutoria.tema}")
-        #         print(f"Requirio asesoria especial?: {tutoria.asesoria_especializada}")
-        #         print(f"Duracion: {tutoria.duracion}")
-        #         print(f"Fecha: {tutoria.fecha}")
-        #         print(f"Le dieron Beca {tutoria.beca_otorgada}")
-        #         print(f"Asistio? {tutoria.asistencia}\n")
-
         plantilla = get_object_or_404(Documento, nombre=plantilla_nombre)
-        open_plantilla = docx.Document(plantilla.archivo)
-        
-        # Verifica si el archivo tiene tablas
-        if not open_plantilla.tables:
-            messages.error(request, "Este archivo no es compatible con el tipo de carta que deseas generar")
-            return redirect('Reporte-tutorias', pk=tutor_pk)
 
-        #Creación de las expresiones regulares que se buscaran en el doc
-        reg_placeh = re.compile(r'\{.*?\}') #Placeholder "{}"
-        reg_ofi = re.compile(r'\{no_oficio\}') #Número de oficio
-        reg_fech =re.compile( r'\{fecha\}') #Fecha
-        reg_tut_min = re.compile(r'\{nombre_tutor\}')
-        reg_tut = re.compile(r'\{nombre_mayus_tutor\}') #Nombre de tutor en mayusculas
-        reg_est = re.compile(r'\{estimado\}') # indentificamos el articulo en minusculas
-
-
-        #Preparación de las ediciones del placeholder
-        self.est = ""
-        self.dr = ""
-        self.name = ""
-        self.name = f"{tutor.first_name} {tutor.last_name}"
-        self.nombre_licenciatura = ""
-        if tutor.sexo == "M":
-            # print(f'Masculino')
-            self.est = "Estimado"
-            self.dr = "Dr."
-        if tutor.sexo == "F":
-            self.est = "Estimada"
-            self.dr = "Dra."
-        if tutor.second_last_name:
-            self.name = self.name + f" {tutor.second_last_name}"
-
-        carreras_dict = {
-            "MAT": "Matemáticas Aplicadas",
-            "COM": "Ingeniería en Computación",
-            "IB": "Ingeniería Biológica",
-            "BM": "Biología Molecular"
-        }
-        self.nombre_licenciatura = carreras_dict.get(tutor.coordinacion, "Licenciatura desconocida")
-
-        #EDICIÓN DE LOS PLACEHOLDERS
-        c=0
-        for p in open_plantilla.paragraphs:
-            c = c+1
-            # print(c)
-            line = p.text
-            result = []
-            line_matches = [] if (result := re.findall(reg_placeh,line)) is None else result
-
-            for match in line_matches:
-                print(f'Esta linea: {match} hizo match')
-                if re.search(reg_ofi,match):
-                    self.paragraph_replace_text(p, reg_ofi, f"{oficio}").text
-                if re.match(reg_fech,match):
-                    self.paragraph_replace_text(p, reg_fech, f"{fecha_emision}").text
-                if re.match(reg_tut,match):
-                    self.paragraph_replace_text(p, reg_tut,(self.dr+" "+self.name).upper())
-                if re.match(reg_est,match):
-                    self.paragraph_replace_text(p, reg_est, self.est)
-                if re.match(reg_tut_min,match):
-                    self.paragraph_replace_text(p, reg_tut_min, self.dr+" "+self.name)
-
-        # Encuentra y elimina la tabla vieja
-        old_table = open_plantilla.tables[0]
-        table_style = old_table.style
-        parent = old_table._element.getparent()
-
-        placeholder = open_plantilla.add_paragraph()
-        parent.insert(parent.index(old_table._element), placeholder._element)
-        parent.remove(old_table._element)
-
-        # Crear nueva tabla con columnas activas
-        new_table = open_plantilla.add_table(rows=1, cols=len(columnas_activas))
-        new_table.style = table_style
-        placeholder._element.addnext(new_table._element)
-
-        # Encabezados de tabla
-        header_cells = new_table.rows[0].cells
-        for i, col_name in enumerate(columnas_activas):
-            header_cells[i].text = col_name
-            header_cells[i]._element.get_or_add_tcPr().append(
-                docx.oxml.parse_xml(r'<w:shd {} w:fill="BFBFBF"/>'.format(docx.oxml.ns.nsdecls('w')))
-            )
-
-        for tutoria in tutorias:
-            # si la asistencia del alumno no se ha registrado, la tutoria no cuenta para generar el reporte.
-            if not tutoria.asistencia:
-                continue
-            alumno = tutoria.alumno
-            row_cells = new_table.add_row().cells
-            col_index = 0
-            if mostrar_col_alumno:
-                nombre = f"{alumno.first_name} {alumno.last_name}"
-                if alumno.second_last_name:
-                    nombre += f" {alumno.second_last_name}"
-                row_cells[col_index].text = nombre
-                col_index += 1
-
-            if mostrar_col_fecha:
-                row_cells[col_index].text = tutoria.fecha.strftime('%Y-%m-%d')
-                col_index += 1
-
-            if mostrar_col_hora:
-                row_cells[col_index].text = tutoria.fecha.strftime('%H:%M')
-                col_index += 1
-
-            if mostrar_col_tema:
-                # según lo mencionado con el CODDAA, lo que permite evaluar la actividad de cada profesor está en función del primer tema seleccionado en la tutoría.
-                # Por lo anterior, se establece que solo se pinta el primer tema.
-                tema_cod = tutoria.tema[0]
-                tema_nombre = tema_dict.get(tema_cod, tema_cod)  # Si no se encuentra, muestra el código
-                row_cells[col_index].text = tema_nombre
-                col_index += 1
-
-            if mostrar_col_notas:
-                row_cells[col_index].text = tutoria.observaciones or ''
-                col_index += 1
-
-
-        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
-        response['Content-Disposition'] = f'attachment; filename={tutor.last_name}_TUTORIAS_BRINDADAS.docx'
-        
-        open_plantilla.save(response)
-        
-        return response  
+        return generar_docx_reporte_tutorias_brindadas(
+            tutor=tutor,
+            tutorias=tutorias,
+            plantilla=plantilla,
+            oficio=oficio,
+            fecha_emision=fecha_emision,
+            columnas_activas=columnas_activas,
+            mostrar_col_alumno=mostrar_col_alumno,
+            mostrar_col_fecha=mostrar_col_fecha,
+            mostrar_col_hora=mostrar_col_hora,
+            mostrar_col_tema=mostrar_col_tema,
+            mostrar_col_notas=mostrar_col_notas,
+            tema_dict=tema_dict,
+        )
 
 # Ver Tutorias
 # TODO Añadir verificación de permisos de acceso a la tutoria
@@ -1240,38 +1098,61 @@ class HistorialTutoriasGenerateView(BaseAccessMixin, ListView):
     model = Tutoria
     template_name = 'Tutorias/generarhistorialtutoria.html'
 
-class VerTutoriasCoordinadorListView(CordinadorViewMixin, ListView):
+class VerTutoriasCoordinadorListView(CordinadorViewMixin, FormView):
     model = Tutoria
     template_name='Tutorias/verTutorias_cordinador.html'
+    form_class = FormVerTutorias
 
-    def get_queryset(self) -> QuerySet[Any]:
-        
+    def form_valid(self, form):
+        estado = form.cleaned_data.get("estado")
+
         coord = get_object_or_404(Cordinador, pk=self.request.user.pk)
         tutores = Tutor.objects.all().filter(coordinacion=coord.coordinacion)
-        queryset = super().get_queryset().filter(tutor__in=tutores)   
-        
-        return queryset 
+        tutorias = Tutoria.objects.filter(tutor__in=tutores)
+
+        if estado:
+            tutorias = tutorias.filter(alumno__estado=estado)
+
+        context = self.get_context_data(form=form, object_list=tutorias)
+        return self.render_to_response(context)
+
+    def get(self, request, *args, **kwargs):
+        form = self.get_form()
+        coord = get_object_or_404(Cordinador, pk=request.user.pk)
+        tutores = Tutor.objects.all().filter(coordinacion=coord.coordinacion)
+        tutorias = Tutoria.objects.filter(tutor__in=tutores)
+        return self.render_to_response(self.get_context_data(form=form, object_list=tutorias))
     
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
 
-        #tutor = Tutor.objects.get(pk=self.kwargs.get('pk'))
         coord = get_object_or_404(Cordinador, pk=self.request.user.pk)
         tutores = Tutor.objects.all().filter(coordinacion=coord.coordinacion)
         context["tutores"] = tutores
 
         return context
     
-class VerTutoriasCoordinadorPorTutorListView(CordinadorViewMixin, ListView):
+class VerTutoriasCoordinadorPorTutorListView(CordinadorViewMixin, FormView):
      
     model = Tutoria
     template_name='Tutorias/verTutorias_cordinador_portutor.html'
+    form_class = FormVerTutorias
 
-    def get_queryset(self) -> QuerySet[Any]:
-        
-        queryset = super().get_queryset().filter(tutor=self.kwargs.get('pk'))   
-        
-        return queryset 
+    def form_valid(self, form):
+        estado = form.cleaned_data.get("estado")
+
+        tutorias = Tutoria.objects.filter(tutor=self.kwargs.get('pk'))
+
+        if estado:
+            tutorias = tutorias.filter(alumno__estado=estado)
+
+        context = self.get_context_data(form=form, object_list=tutorias)
+        return self.render_to_response(context)
+
+    def get(self, request, *args, **kwargs):
+        form = self.get_form()
+        tutorias = Tutoria.objects.filter(tutor=self.kwargs.get('pk'))
+        return self.render_to_response(self.get_context_data(form=form, object_list=tutorias))
     
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
@@ -1347,17 +1228,27 @@ class VerTutoradosCoordinadorListView(CordinadorViewMixin, ListView):
         context["tutor"] = tutor
         return context
 
-class VerTutoriasTutorListView(TutorViewMixin, ListView):
+class VerTutoriasTutorListView(TutorViewMixin, FormView):
      
     model = Tutoria
     template_name='Tutorias/verTutorias_tutor.html'
+    form_class = FormVerTutorias
 
-    def get_queryset(self) -> QuerySet[Any]:
-        
-        # Tutorias correspondientes al tutor
-        queryset = super().get_queryset().filter(tutor=self.request.user)
-    
-        return queryset
+    def form_valid(self, form):
+        estado = form.cleaned_data.get("estado")
+
+        tutorias = Tutoria.objects.filter(tutor=self.request.user)
+
+        if estado:
+            tutorias = tutorias.filter(alumno__estado=estado)
+
+        context = self.get_context_data(form=form, object_list=tutorias)
+        return self.render_to_response(context)
+
+    def get(self, request, *args, **kwargs):
+        form = self.get_form()
+        tutorias = Tutoria.objects.filter(tutor=request.user)
+        return self.render_to_response(self.get_context_data(form=form, object_list=tutorias))
     
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
@@ -1406,6 +1297,9 @@ class QuickCreateTutoriaView(AlumnoViewMixin, CreateView):
         form.instance.tutor = alumno.tutor_asignado
         form.instance.estado = ACEPTADO
         
+        # Snapshot del estado del alumno al momento de crear la tutoría con QR
+        if not form.instance.estado_alumno_historico:
+            form.instance.estado_alumno_historico = alumno.estado
         
         # rol = self.request.user.get_rol()
         if self.request.user.has_role("ALU"):
@@ -1495,6 +1389,10 @@ class CrearTutoriaPorAlumnoView(TutorViewMixin, CreateView):
         form.instance.alumno = alumno
         form.instance.tutor = alumno.tutor_asignado
 
+        # Snapshot del estado del alumno al momento de crear la tutoría por tutor
+        if not form.instance.estado_alumno_historico:
+            form.instance.estado_alumno_historico = alumno.estado
+
         # Genera un slug único para la tutoría (puedes ajustar esto según tus necesidades)
         slug = slugify(form.instance.tema)
         form.instance.slug = slug
@@ -1514,6 +1412,77 @@ class RealizarSeguimientoView(TutorViewMixin, UpdateView):
 
         notify.send(tutor, recipient=recipient, verb='Seguimiento de tutoria realizado')
         return super().form_valid(form)
+
+
+class EditarEstadoAlumnoHistoricoView(BaseAccessMixin, View):
+    """
+    Vista para editar el estado histórico del alumno en una tutoría.
+    Solo TUT/COORDINADOR/CODA pueden editar; ALU no puede.
+    """
+    def post(self, request, pk):
+        tutoria = get_object_or_404(Tutoria, pk=pk)
+        
+        # Validar permisos
+        if request.user.has_role("TUT"):
+            # TUT solo puede editar si es el tutor asignado
+            if tutoria.tutor_id != request.user.pk:
+                raise PermissionDenied("No tienes permiso para editar esta tutoría")
+        elif request.user.has_role("COORDINADOR"):
+            # COORDINADOR solo puede editar si el tutor está en su coordinación
+            coord = get_object_or_404(Cordinador, pk=request.user.pk)
+            if tutoria.tutor.coordinacion != coord.coordinacion:
+                raise PermissionDenied("No tienes permiso para editar esta tutoría")
+        elif request.user.has_role("CODA"):
+            # CODA puede editar cualquier tutoría
+            pass
+        else:
+            raise PermissionDenied("No tienes permiso para realizar esta acción")
+        
+        # Importar el formulario
+        from .forms import FormEditarEstadoAlumnoHistorico
+        form = FormEditarEstadoAlumnoHistorico(request.POST)
+        
+        if form.is_valid():
+            nuevo_estado = form.cleaned_data['estado_alumno_historico']
+            estado_anterior = tutoria.estado_alumno_historico
+            
+            # Obtener etiquetas del diccionario ESTADOS_ALUMNO
+            from Usuarios.constants import ESTADOS_ALUMNO
+            estado_dict = {key: value for key, value in ESTADOS_ALUMNO}
+            
+            etiqueta_anterior = estado_dict.get(estado_anterior, "Sin estado registrado")
+            etiqueta_nueva = estado_dict.get(nuevo_estado, "Desconocido")
+            
+            # Actualizar el estado
+            tutoria.estado_alumno_historico = nuevo_estado
+            tutoria.save()
+            
+            # Registrar el cambio en HistorialCambioTutoria
+            cambio_mensaje = f"Estado histórico del alumno: '{etiqueta_anterior}' -> '{etiqueta_nueva}'"
+            HistorialCambioTutoria.objects.create(
+                tutoria=tutoria,
+                correo_editor=request.user.email,
+                cambios_realizados=cambio_mensaje,
+            )
+            
+            # Enviar notificación
+            tutor = Tutor.objects.filter(pk=tutoria.tutor_id)
+            alumno = Alumno.objects.filter(pk=tutoria.alumno_id)
+            
+            if request.user.has_role("TUT"):
+                notify.send(request.user, recipient=alumno, verb='Estado histórico de tutoría actualizado')
+            else:
+                notify.send(request.user, recipient=tutor, verb='Estado histórico de tutoría actualizado por administración')
+            
+            # Mostrar mensaje de éxito
+            messages.success(request, f"Estado histórico actualizado: {etiqueta_anterior} → {etiqueta_nueva}")
+            
+            # Redirigir a la vista de edición de la tutoría
+            return redirect('Tutorias-update', pk=pk)
+        else:
+            # Si el formulario no es válido, redirigir de vuelta
+            messages.error(request, "Error al actualizar el estado. Por favor, intenta de nuevo.")
+            return redirect('Tutorias-update', pk=pk)
     
 class TutoriasAceptadasListView(CodaViewMixin, ListView):
     model = Tutoria
