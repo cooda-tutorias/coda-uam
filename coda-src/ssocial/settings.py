@@ -33,7 +33,11 @@ SESSION_COOKIE_SECURE=False
 DEBUG = True
 
 ALLOWED_HOSTS = ['127.0.0.1', os.environ['TUTORIAS_DOMINIO'], os.environ['IP_COMPUTADORA']]
+if os.getenv('LOCAL_HOST_NAME'):
+    ALLOWED_HOSTS.append(os.environ['LOCAL_HOST_NAME'])
+
 CSRF_TRUSTED_ORIGINS = ['http://'+os.environ['TUTORIAS_DOMINIO']]
+
 
 #Custom user model
 AUTH_USER_MODEL = "Usuarios.Usuario"

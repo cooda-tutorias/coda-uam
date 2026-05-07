@@ -2,6 +2,7 @@ from django import forms
 from .models import Tutoria
 from Usuarios.models import Documento
 from .constants import TEMAS, ESTADO, ACEPTADO, PENDIENTE, DURACION_ASESORIA
+from Usuarios.constants import ESTADOS_ALUMNO
 
 class FormTutorias(forms.ModelForm):
 
@@ -37,6 +38,16 @@ class FormTutorias(forms.ModelForm):
         if temas and 'OTRO' in temas:
             if not otro_tema or not otro_tema.strip():
                 self.add_error('otro_tema', 'Este campo es obligatorio si seleccionas "Otro".')
+
+
+class FormEditarEstadoAlumnoHistorico(forms.Form):
+    """Formulario para editar solo el estado histórico del alumno en una tutoría"""
+    estado_alumno_historico = forms.TypedChoiceField(
+        choices=ESTADOS_ALUMNO[1:],  # Excluir la opción vacía
+        label="Estado del alumno al momento de la tutoría",
+        required=True,
+        coerce=int,
+    )
 
 
 class FormSeguimiento(forms.ModelForm):
@@ -159,3 +170,13 @@ class FormReporteDeTutorias(forms.ModelForm):
                 if tutor_instance.second_last_name:
                     full_name += f" {tutor_instance.second_last_name}"
                 self.fields['tutor'].initial = full_name
+
+
+class FormVerTutorias(forms.Form):
+    estado = forms.TypedChoiceField(
+        choices=[('', 'Todos los estados')] + ESTADOS_ALUMNO[1:],
+        required=False,
+        label="Estado del Alumno",
+        coerce=int,
+        empty_value='',
+    )
