@@ -46,6 +46,16 @@ docker exec -it 2845f8985f73 python manage.py createsuperuser
 
 6. Para esquema de pruebas, requeriras realizar el levantamiento de todos los perfiles de usuario, pide apoyo al `Product Owner / Poject Manager ` para que te apoye en el llenado de la base de datos.
 
+### Migraciones al actualizar el código
+
+Si ya tienes el entorno corriendo y se incorporó una nueva funcionalidad que modifica los modelos (por ejemplo, nuevos campos), debes ejecutar las migraciones manualmente para aplicar los cambios a la base de datos:
+
+```sh
+docker compose exec web python manage.py migrate
+```
+
+> **Nota:** Las tutorías creadas **antes** de correr una migración que agrega nuevos campos opcionales mostrarán `Sin registro` en esos campos. Esto es normal y esperado — el dato simplemente no estaba disponible cuando se creó el registro. Las tutorías nuevas capturarán el dato automáticamente.
+
 
 ## Docker manual
 Antes de empezar, descomenta la línea 17 del archivo `coda-src/ssocial/settings.py` como se muestra a continuación:

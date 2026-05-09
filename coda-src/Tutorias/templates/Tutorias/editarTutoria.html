@@ -4,15 +4,31 @@
 
 {% block body %}
 <section id="section" style="background-color: #eee;">
-  <div class="container py-5 h-100">
-    <div class="row d-flex justify-content-center align-items-center h-100">
-      <div class="col-lg-8 col-xl-6">
+  <div class="container py-5">
+    <div class="row justify-content-center">
+      <div class="col-lg-8 col-xl-6 mb-5">
         <div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
 
-          {% load widget_tweaks %}
+          {% load widget_tweaks custom_filters %}
           <form method="post">{% csrf_token %}
             <div class="card-body py-4 px-4 text-body">
               <h3 class="mb-4 text-primary text-title-bold">Editar Tutoría</h3>
+
+              <!-- Sección de Estados del Alumno -->
+              <div class="form-group mb-4">
+                <label class="mb-2 text-body-bold text-muted">Estado del Alumno</label>
+                <ul class="list-unstyled text-body mb-2">
+                  <li><span class="text-muted">Estado actual (en el sistema):</span> {{ object.alumno.get_estado_display }}</li>
+                  <li><span class="text-muted">Estado guardado (en la solicitud de la tutoría):</span> {{ object.get_estado_alumno_historico_display }}</li>
+                </ul>
+                {% if user|has_role:"TUT" or user|has_role:"COORDINADOR" or user|has_role:"CODA" %}
+                <select id="estado-select" name="estado_alumno_historico" class="form-select">
+                  <option value="1" {% if object.estado_alumno_historico == 1 %}selected{% endif %}>Activo</option>
+                  <option value="2" {% if object.estado_alumno_historico == 2 %}selected{% endif %}>No reinscrito</option>
+                  <option value="10" {% if object.estado_alumno_historico == 10 %}selected{% endif %}>Inscrito sin carga académica</option>
+                </select>
+                {% endif %}
+              </div>
 
               <div class="form-group mb-4">
                 <label class="mb-2 text-body-bold text-muted">Tema(s) de la tutoría.</label>
@@ -51,9 +67,9 @@
               <h5 class="mt-4 mb-3 text-primary text-title-bold">Historial de cambios</h5>
 
               {% if historial_cambios %}
-              <div class="table-responsive">
-                <table class="table table-striped table-sm">
-                  <thead>
+              <div class="table-responsive{% if historial_cambios|length > 5 %} historial-scroll{% endif %}">
+                <table class="table table-striped table-sm mb-0">
+                  <thead class="table-light sticky-top">
                     <tr>
                       <th>Fecha</th>
                       <th>Correo</th>
@@ -63,7 +79,7 @@
                   <tbody>
                     {% for cambio in historial_cambios %}
                     <tr>
-                      <td>{{ cambio.fecha_cambio|date:"d/m/Y H:i" }}</td>
+                      <td class="text-nowrap">{{ cambio.fecha_cambio|date:"d/m/Y H:i" }}</td>
                       <td>{{ cambio.correo_editor }}</td>
                       <td>{{ cambio.cambios_realizados }}</td>
                     </tr>
@@ -76,12 +92,20 @@
               {% endif %}
             </div>
           </form>
+
         </div>
       </div>
     </div>
   </div>
 </section>
 
+
+<style>
+  .historial-scroll {
+    max-height: 248px; /* aprox. 5 filas */
+    overflow-y: auto;
+  }
+</style>
 
 <script>
   document.addEventListener("DOMContentLoaded", function () {
