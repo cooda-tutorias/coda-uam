@@ -1,0 +1,84 @@
+{% extends "Usuarios/HeaderAndFooterFachada.html"%}
+
+{% block title %} Generar reportes masivos de tutorías {% endblock %}
+
+{% block body %}
+<section class="min-vh-100" style="background-color: #eee;">
+    <div class="container py-5 h-100">
+        <div class="row d-flex justify-content-center align-items-center h-100">
+            <div class="col-lg-8 col-xl-8">
+                <div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
+                    {% load widget_tweaks %}
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="card-body p-5">
+                            <h3 class="mb-4 text-primary text-title-bold">Generar reportes masivos de tutorías</h3>
+                            {% if form.non_field_errors %}
+                            <div class="alert alert-danger mb-3">
+                            {% for error in form.non_field_errors %}
+                            <div>{{ error }}</div>
+                            {% endfor %}
+                            </div>
+                            {% endif %}
+                            <div class="mb-4">
+                                <label class="form-label">Licenciaturas</label>
+                                <div class="mb-2">
+                                    {% render_field form.incluir_todas class="form-check-input" %}
+                                    <label class="form-check-label" for="{{ form.incluir_todas.id_for_label }}">
+                                        Incluir todas las licenciaturas
+                                    </label>
+                                </div>
+                                <div>
+                                    {{ form.coordinaciones }}
+                                    {{ form.coordinaciones.errors }}
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label">Número de Oficio inicial</label>
+                                {% render_field form.oficio_inicial class="form-control" placeholder="Ej. 900" %}
+                                {{ form.oficio_inicial.errors }}
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label">Fecha de inicio</label>
+                                {% render_field form.fecha_inicio class="form-control" %}
+                                {{ form.fecha_inicio.errors }}
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label">Fecha de fin</label>
+                                {% render_field form.fecha_fin class="form-control" %}
+                                {{ form.fecha_fin.errors }}
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label">Fecha de emisión</label>
+                                {% render_field form.fecha class="form-control" %}
+                                {{ form.fecha.errors }}
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label">Plantilla</label>
+                                {% render_field form.plantilla class="form-select" %}
+                                {{ form.plantilla.errors }}
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label">Columnas del reporte</label>
+                                <div>{{ form.col_alumno }} Alumno</div>
+                                <div>{{ form.col_fecha }} Fecha</div>
+                                <div>{{ form.col_hora }} Hora</div>
+                                <div>{{ form.col_tema }} Tema</div>
+                                <div>{{ form.col_notas }} Notas</div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-block">Generar reportes</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

@@ -170,6 +170,70 @@ class FormReporteDeTutorias(forms.ModelForm):
                 if tutor_instance.second_last_name:
                     full_name += f" {tutor_instance.second_last_name}"
                 self.fields['tutor'].initial = full_name
+                
+class FormReporteTutoriasMasivo(forms.Form):
+    COORDINACION_CHOICES = [
+        ("MAT", "Matemáticas Aplicadas"),
+        ("COM", "Ingeniería en Computación"),
+        ("IB", "Ingeniería Biológica"),
+        ("BM", "Biología Molecular"),
+    ]
+
+    coordinaciones = forms.MultipleChoiceField(
+        choices=COORDINACION_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Licenciaturas"
+    )
+
+    incluir_todas = forms.BooleanField(
+        required=False,
+        label="Incluir todas las licenciaturas"
+    )
+
+    oficio_inicial = forms.IntegerField(required=True, min_value=1, label="Número de Oficio inicial")
+    fecha_inicio = forms.DateField(required=True, widget=forms.DateInput(attrs={'type': 'date'}))
+    fecha_fin = forms.DateField(required=True, widget=forms.DateInput(attrs={'type': 'date'}))
+    fecha = forms.DateTimeField(
+        required=True,
+        widget=forms.DateTimeInput(attrs={'type': 'datetime-local'}),
+        label="Fecha de emisión"
+    )
+
+    plantilla = forms.ModelChoiceField(
+        queryset=Documento.objects.all(),
+        to_field_name='nombre',
+        label="Selecciona una plantilla",
+        required=True
+    )
+
+    col_alumno = forms.BooleanField(required=False, initial=True, label="Alumno")
+    col_fecha = forms.BooleanField(required=False, initial=True, label="Fecha")
+    col_hora = forms.BooleanField(required=False, label="Hora")
+    col_tema = forms.BooleanField(required=False, label="Tema")
+    col_notas = forms.BooleanField(required=False, label="Notas")
+
+    def clean(self):
+        cleaned_data = super().clean()
+        incluir_todas = cleaned_data.get("incluir_todas")
+        coordinaciones = cleaned_data.get("coordinaciones") or []
+        
+        if not any([
+            cleaned_data.get("col_alumno"),
+            cleaned_data.get("col_fecha"),
+            cleaned_data.get("col_hora"),
+            cleaned_data.get("col_tema"),
+            cleaned_data.get("col_notas"),
+        ]):
+            raise forms.ValidationError("Selecciona al menos una columna para el reporte.")
+
+        if not incluir_todas and not coordinaciones:
+            raise forms.ValidationError("Selecciona al menos una licenciatura o marca 'Incluir todas las licenciaturas'.")
+
+        if len(coordinaciones) > 3:
+            raise forms.ValidationError("Solo se pueden seleccionar entre 1 y 3 licenciaturas.")
+
+        return cleaned_data
 
 
 class FormVerTutorias(forms.Form):

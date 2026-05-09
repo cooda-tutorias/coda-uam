@@ -19,9 +19,15 @@ import pandas as pd
 from .constants import TEMAS
 
 from .models import Tutoria, HistorialCambioTutoria
-from .forms import FormTutorias, FormSeguimiento, FormReporte, FormCartasDeAsignacion, FormReporteDeTutorias, FormVerTutorias
-# from .forms import FormSeguimiento # de nuevo, no estoy seguro, FormReporte
-from .constants import PENDIENTE, ACEPTADO, RECHAZADO, DURACION_ASESORIA, CANCELADO # de nuevo, no estoy seguro
+from .forms import (
+    FormTutorias,
+    FormSeguimiento,
+    FormReporte,
+    FormCartasDeAsignacion,
+    FormReporteDeTutorias, FormVerTutorias,
+    FormReporteTutoriasMasivo,
+)
+from .constants import PENDIENTE, ACEPTADO, RECHAZADO, DURACION_ASESORIA, CANCELADO 
 from Usuarios.constants import TUTOR, ALUMNO, COORDINADOR, TEMPLATES, CORREO
 from Usuarios.views import BaseAccessMixin, CodaViewMixin, TutorViewMixin, AlumnoViewMixin, CordinadorViewMixin
 from Usuarios.models import Tutor, Alumno, Cordinador, Coda
@@ -1047,6 +1053,96 @@ class ReporteTutoriasBrindadasView(CodaViewMixin, CreateView):
             mostrar_col_notas=mostrar_col_notas,
             tema_dict=tema_dict,
         )
+
+class ReporteTutoriasBrindadasMasivoView(CodaViewMixin, View):
+    template_name = 'Tutorias/generarhistorialtutorias_masivo.html'
+
+    def get(self, request, *args, **kwargs):
+        form = FormReporteTutoriasMasivo()
+        return render(request, self.template_name, {'form': form})
+
+    def post(self, request, *args, **kwargs):
+        form = FormReporteTutoriasMasivo(request.POST)
+
+        if not form.is_valid():
+            return render(request, self.template_name, {'form': form})
+
+        coordinaciones = form.cleaned_data.get('coordinaciones') or []
+        incluir_todas = form.cleaned_data.get('incluir_todas')
+        oficio_inicial = form.cleaned_data.get('oficio_inicial')
+        fecha_inicio = form.cleaned_data.get('fecha_inicio')
+        fecha_fin = form.cleaned_data.get('fecha_fin')
+        fecha_emision = form.cleaned_data.get('fecha')
+        fecha_emision_str = fecha_emision.strftime('%Y-%m-%dT%H:%M')
+        plantilla = form.cleaned_data.get('plantilla')
+
+        mostrar_col_alumno = form.cleaned_data.get('col_alumno')
+        mostrar_col_fecha = form.cleaned_data.get('col_fecha')
+        mostrar_col_hora = form.cleaned_data.get('col_hora')
+        mostrar_col_tema = form.cleaned_data.get('col_tema')
+        mostrar_col_notas = form.cleaned_data.get('col_notas')
+
+        columnas_activas = []
+        if mostrar_col_alumno:
+            columnas_activas.append('Alumno')
+        if mostrar_col_fecha:
+            columnas_activas.append('Fecha')
+        if mostrar_col_hora:
+            columnas_activas.append('Hora')
+        if mostrar_col_tema:
+            columnas_activas.append('Tema')
+        if mostrar_col_notas:
+            columnas_activas.append('Notas')
+
+        if incluir_todas:
+            tutores = Tutor.objects.all().order_by('coordinacion', 'last_name', 'first_name').distinct()
+        else:
+            tutores = Tutor.objects.filter(
+                coordinacion__in=coordinaciones
+            ).order_by('coordinacion', 'last_name', 'first_name').distinct()
+
+        fecha_inicio_dt = timezone.datetime.combine(fecha_inicio, datetime.min.time())
+        fecha_fin_dt = timezone.datetime.combine(fecha_fin, datetime.min.time()) + timedelta(days=1)
+
+        tema_dict = dict(TEMAS)
+        zip_buffer = BytesIO()
+
+        with ZipFile(zip_buffer, 'w') as zip_file:
+            consecutivo = oficio_inicial
+
+            for tutor in tutores:
+                tutorias = Tutoria.objects.filter(
+                    tutor=tutor,
+                    fecha__range=(fecha_inicio_dt, fecha_fin_dt)
+                )
+
+                oficio = normalizar_numero_oficio(consecutivo, fecha_emision.date())
+
+                response = generar_docx_reporte_tutorias_brindadas(
+                    tutor=tutor,
+                    tutorias=tutorias,
+                    plantilla=plantilla,
+                    oficio=oficio,
+                    fecha_emision=fecha_emision_str,
+                    columnas_activas=columnas_activas,
+                    mostrar_col_alumno=mostrar_col_alumno,
+                    mostrar_col_fecha=mostrar_col_fecha,
+                    mostrar_col_hora=mostrar_col_hora,
+                    mostrar_col_tema=mostrar_col_tema,
+                    mostrar_col_notas=mostrar_col_notas,
+                    tema_dict=tema_dict,
+                )
+
+                nombre_archivo = f"{tutor.matricula}_{tutor.last_name}_{tutor.first_name}_TUTORIAS_BRINDADAS.docx"
+                zip_file.writestr(nombre_archivo, response.content)
+
+                consecutivo += 1
+
+        zip_buffer.seek(0)
+        response = HttpResponse(zip_buffer.getvalue(), content_type='application/zip')
+        response['Content-Disposition'] = 'attachment; filename="reportes_tutorias_masivos.zip"'
+        return response
+
 
 # Ver Tutorias
 # TODO Añadir verificación de permisos de acceso a la tutoria
