@@ -1,6 +1,7 @@
 {% extends "Usuarios/HeaderAndFooterFachada.html"%}
 
-{% block title %} Seguimiento Tutoria {% endblock %}
+{% with titulo_reporte="Reporte de Tutoría" %}
+{% block title %} {{ titulo_reporte }} {% endblock %}
 
 {% block body %}
 <section id="section" style="background-color: #eee;">
@@ -12,7 +13,7 @@
                     <form method="POST" action="{% url 'save_seguimiento' tutoria.pk %}">
                         {% csrf_token %}
                         <div class="card-body px-5 py-5 text-body">
-                            <h3 class="b-4 text-primary text-title-bold">Seguimiento de Tutoría</h3>
+                            <h3 class="b-4 text-primary text-title-bold">{{ titulo_reporte }}</h3>
 
                             <!-- Sección de Estados del Alumno (Informativa) -->
                             <div class="alert alert-info mb-4" role="alert">
@@ -115,7 +116,7 @@
                                     <textarea name="resultados_tutoria" class="form-control" maxlength="1000"></textarea>
                                 </div>
                                 <div class="py-4 d-flex w-100 justify-content-center text-title">
-                                    <button type="submit" class="btn btn-primary ms-2" id="guardar-btn">Guardar Seguimiento</button>
+                                    <button type="submit" class="btn btn-primary ms-2" id="guardar-btn">Guardar Reporte</button>
                                 </div>   
                             </div>
                         </form>
