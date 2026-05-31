@@ -1,8 +1,7 @@
-from django.db.models.signals import post_save
-from notifications.signals import notify
-from Tutorias.models import Tutoria
+"""
+Las notificaciones de tutoría se disparan de forma explícita desde las vistas
+de negocio para evitar duplicados y mantener trazabilidad por evento.
 
-def my_handler(sender, instance, created, **kwargs):
-    notify.send(instance, verb='was saved')
-
-post_save.connect(my_handler, sender=Tutoria)
+Este módulo se conserva para futuras señales específicas, pero la notificación
+genérica de post_save queda deshabilitada deliberadamente.
+"""

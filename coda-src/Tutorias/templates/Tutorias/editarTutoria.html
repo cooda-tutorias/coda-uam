@@ -54,6 +54,32 @@
                 </div>
               </div>
 
+              <div class="form-group mb-4">
+                <label class="mb-2 text-body-bold text-muted">Estado de la Tutoría</label>
+                <div class="status-container">
+                  {% if object.estado == "ACE" %}
+                    <span class="status-chip status-chip--aceptada">ACEPTADA</span>
+                  {% elif object.estado == "REJ" %}
+                    <span class="status-chip status-chip--rechazada">RECHAZADA</span>
+                  {% elif object.estado == "CAN" %}
+                    <span class="status-chip status-chip--cancelada">CANCELADA</span>
+                  {% else %}
+                    <span class="status-chip status-chip--pendiente">PENDIENTE</span>
+                  {% endif %}
+                </div>
+              </div>
+
+              {% if user|has_role:"TUT" %}
+              <div class="form-group mb-4">
+                <label class="mb-2 text-body-bold text-muted" for="estado_tutoria">Decisión del Tutor</label>
+                <select id="estado_tutoria" name="estado_tutoria" class="form-select">
+                  <option value="ACE" {% if object.estado == "ACE" %}selected{% endif %}>Aceptar tutoría</option>
+                  <option value="REJ" {% if object.estado == "REJ" %}selected{% endif %}>Rechazar tutoría</option>
+                </select>
+                <small class="text-muted">Puedes cambiar tu decisión aunque la tutoría ya haya sido aceptada o rechazada.</small>
+              </div>
+              {% endif %}
+
 
               <div class="form-group mb-4">
                 {% render_field form.descripcion class="form-control" id="descripcion" rows="3" %}
@@ -104,6 +130,50 @@
   .historial-scroll {
     max-height: 248px; /* aprox. 5 filas */
     overflow-y: auto;
+  }
+
+  .status-container {
+    display: flex;
+    align-items: center;
+  }
+
+  .status-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 140px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    border: 2px solid transparent;
+  }
+
+  /* Norma solicitada: Aceptado verde, Rechazado rojo, Pendiente amarillo */
+  .status-chip--aceptada {
+    background: #d9fbe4;
+    color: #0f5132;
+    border-color: #75d49b;
+  }
+
+  .status-chip--rechazada {
+    background: #fde0e0;
+    color: #842029;
+    border-color: #f1a2a7;
+  }
+
+  .status-chip--pendiente {
+    background: #fff3cd;
+    color: #7a5800;
+    border-color: #ffe08a;
+  }
+
+  /* Estado adicional con contraste neutro */
+  .status-chip--cancelada {
+    background: #eceff3;
+    color: #334155;
+    border-color: #cbd5e1;
   }
 </style>
 

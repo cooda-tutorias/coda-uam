@@ -20,14 +20,14 @@ from .constants import TEMAS
 
 from .models import Tutoria, HistorialCambioTutoria
 from .forms import FormTutorias, FormSeguimiento, FormReporte, FormCartasDeAsignacion, FormReporteDeTutorias, FormVerTutorias
+from .notification_service import notify_student_tutoria_event
 # from .forms import FormSeguimiento # de nuevo, no estoy seguro, FormReporte
-from .constants import PENDIENTE, ACEPTADO, RECHAZADO, DURACION_ASESORIA, CANCELADO # de nuevo, no estoy seguro
-from Usuarios.constants import TUTOR, ALUMNO, COORDINADOR, TEMPLATES, CORREO
+from .constants import PENDIENTE, ACEPTADO, RECHAZADO, DURACION_ASESORIA, CANCELADO, ESTADO # de nuevo, no estoy seguro
+from Usuarios.constants import TUTOR, ALUMNO, COORDINADOR, TEMPLATES
 from Usuarios.views import BaseAccessMixin, CodaViewMixin, TutorViewMixin, AlumnoViewMixin, CordinadorViewMixin
 from Usuarios.models import Tutor, Alumno, Cordinador, Coda
 from Usuarios.models import Documento
 from notifications.signals import notify
-from smtplib import SMTPException
 
 from django.http import FileResponse
 from django.utils import timezone
@@ -289,15 +289,29 @@ def normalizar_numero_oficio(oficio_ingresado, fecha_documento) -> str:
 class AceptarTutoriaView(View):
     def post(self, request, pk):
         tutoria = get_object_or_404(Tutoria, pk=pk)
+        if not request.user.has_role("TUT") or tutoria.tutor_id != request.user.pk:
+            raise PermissionDenied("No tienes permiso para modificar esta tutoría")
+
+        if tutoria.estado == ACEPTADO:
+            return redirect('Tutorias-tutor')
+
         tutoria.estado = ACEPTADO
-        tutoria.save()
+        tutoria.save(update_fields=["estado"])
+        notify_student_tutoria_event("aceptada", tutoria, request.user)
         return redirect('Tutorias-tutor')  
 
 class RechazarTutoriaView(View):
     def post(self, request, pk):
         tutoria = get_object_or_404(Tutoria, pk=pk)
+        if not request.user.has_role("TUT") or tutoria.tutor_id != request.user.pk:
+            raise PermissionDenied("No tienes permiso para modificar esta tutoría")
+
+        if tutoria.estado == RECHAZADO:
+            return redirect('Tutorias-tutor')
+
         tutoria.estado = RECHAZADO
-        tutoria.save()
+        tutoria.save(update_fields=["estado"])
+        notify_student_tutoria_event("rechazada", tutoria, request.user)
         return redirect('Tutorias-tutor')
 
 class CancelarTutoriaView(View):
@@ -333,16 +347,18 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
         context["historial_cambios"] = self.object.historial_cambios.all()[:20]
         return context
 
-    def _build_change_summary(self, original: Tutoria, form: BaseModelForm) -> str:
+    def _build_change_summary(self, original: Tutoria, form: BaseModelForm, changed_fields: list[str]) -> str:
         field_labels = {
             "tema": "Tema(s)",
             "fecha": "Fecha y Hora",
             "descripcion": "Observaciones",
+            "estado": "Estado de la tutoría",
         }
         tema_map = dict(TEMAS)
+        estado_map = dict(ESTADO)
         changes = []
 
-        for field in form.changed_data:
+        for field in changed_fields:
             if field == "tema":
                 old_value = ", ".join(original.get_tema_display())
                 new_codes = form.cleaned_data.get("tema", [])
@@ -353,6 +369,10 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
             elif field == "descripcion":
                 old_value = original.descripcion or ""
                 new_value = form.cleaned_data.get("descripcion") or ""
+            elif field == "estado":
+                old_value = estado_map.get(original.estado, original.estado)
+                new_state = form.cleaned_data.get("estado") or getattr(form.instance, "estado", None)
+                new_value = estado_map.get(new_state, new_state)
             else:
                 old_value = str(getattr(original, field, ""))
                 new_value = str(form.cleaned_data.get(field, ""))
@@ -365,7 +385,21 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
     def form_valid(self, form: BaseModelForm) -> HttpResponse:
         original = self.get_object()
         changed_fields = list(form.changed_data)
-        change_summary = self._build_change_summary(original, form) if changed_fields else "Sin cambios detectados"
+        fecha_changed_by_tutor = self.request.user.has_role("TUT") and "fecha" in changed_fields
+        estado_changed_by_tutor = False
+        estado_notification_event = None
+
+        if self.request.user.has_role("TUT"):
+            nuevo_estado_tutoria = self.request.POST.get("estado_tutoria")
+            allowed_states = {ACEPTADO, RECHAZADO}
+            if nuevo_estado_tutoria in allowed_states and nuevo_estado_tutoria != original.estado:
+                form.instance.estado = nuevo_estado_tutoria
+                if "estado" not in changed_fields:
+                    changed_fields.append("estado")
+                estado_changed_by_tutor = True
+                estado_notification_event = "aceptada" if nuevo_estado_tutoria == ACEPTADO else "rechazada"
+
+        change_summary = self._build_change_summary(original, form, changed_fields) if changed_fields else "Sin cambios detectados"
         actor = self.request.user
 
         # Manejar cambio de estado histórico si viene en el POST y el usuario tiene permiso
@@ -396,6 +430,12 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
 
         notify.send(actor, recipient=recipient, verb='Tutoria Modificada')
         response = super().form_valid(form)
+
+        if fecha_changed_by_tutor:
+            notify_student_tutoria_event("cita_programada", self.object, actor)
+
+        if estado_changed_by_tutor and estado_notification_event:
+            notify_student_tutoria_event(estado_notification_event, self.object, actor)
 
         HistorialCambioTutoria.objects.create(
             tutoria=self.object,
@@ -1408,10 +1448,9 @@ class RealizarSeguimientoView(TutorViewMixin, UpdateView):
 
     def form_valid(self, form: BaseModelForm) -> HttpResponse:
         tutor = Tutor.objects.get(pk=self.request.user)
-        recipient = Alumno.objects.filter(pk=self.get_object().alumno)
-
-        notify.send(tutor, recipient=recipient, verb='Seguimiento de tutoria realizado')
-        return super().form_valid(form)
+        response = super().form_valid(form)
+        notify_student_tutoria_event("seguimiento_registrado", self.object, tutor)
+        return response
 
 
 class EditarEstadoAlumnoHistoricoView(BaseAccessMixin, View):
