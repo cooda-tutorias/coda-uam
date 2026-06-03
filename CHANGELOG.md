@@ -14,6 +14,13 @@ y el proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 - Test Settings Configuration con soporte para SQLite testing
 - Script `coda-src/scripts/generar_tutorias_prueba.py` para generar tutorías de prueba en base de datos.
 - Visualización de la descripción de la tutoría en la lista de tutorías del tutor
+- Se agregó la vista de generación masiva de reportes de tutorías.
+- Se agregó la selección de tutores específicos para limitar la generación de reportes.
+- Se implementó la descarga de reportes en formato ZIP.
+- Los documentos generados se organizan por licenciatura dentro del archivo comprimido.
+
+### Testing
+- Se habilitó la Fase 0 de pruebas piloto para validar generación de reportes con subconjuntos de tutores.
 
 ### Fixed
 - Compatibilidad de ArrayField con SQLite mediante monkeypatch

@@ -33,7 +33,15 @@
                                     {{ form.coordinaciones.errors }}
                                 </div>
                             </div>
-
+                            <div class="mb-4">
+                                <label class="form-label">Tutores específicos</label>
+                                {% render_field form.tutores class="form-select" %}
+                                {{ form.tutores.errors }}
+                                <small class="form-text text-muted">
+                                    Mantén presionada la tecla Ctrl para seleccionar más de un tutor.
+                                    Si seleccionas tutores, se generarán reportes únicamente para esos tutores.
+                                </small>
+                            </div>
                             <div class="mb-4">
                                 <label class="form-label">Número de Oficio inicial</label>
                                 {% render_field form.oficio_inicial class="form-control" placeholder="Ej. 900" %}

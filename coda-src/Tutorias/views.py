@@ -27,7 +27,7 @@ from .forms import (
     FormReporteDeTutorias, FormVerTutorias,
     FormReporteTutoriasMasivo,
 )
-from .constants import PENDIENTE, ACEPTADO, RECHAZADO, DURACION_ASESORIA, CANCELADO 
+from .constants import PENDIENTE, ACEPTADO, RECHAZADO, DURACION_ASESORIA, CANCELADO
 from Usuarios.constants import TUTOR, ALUMNO, COORDINADOR, TEMPLATES, CORREO
 from Usuarios.views import BaseAccessMixin, CodaViewMixin, TutorViewMixin, AlumnoViewMixin, CordinadorViewMixin
 from Usuarios.models import Tutor, Alumno, Cordinador, Coda
@@ -85,10 +85,10 @@ def carta_tutorados_pdf(request):
     elements.append(Spacer(1, 12))  # Ajusta el segundo valor para controlar la altura de la separación
 
     # Agregar párrafo
-    parrafo = f"""Estimado doctor {tutor.last_name}, como parte del Sistema de Acompañamiento al 
+    parrafo = f"""Estimado doctor {tutor.last_name}, como parte del Sistema de Acompañamiento al
     Alumnado que desarrolla la Universidad Autónoma Metropolitana Unidad Cuajimalpa y con la finalidad de
-    propiciar el buen desempeño académico de nuestros alumnos y alumnas desde su ingreso a la Universidad y 
-    hasta la conclusión de sus estudios, le comunico que tiene asignados los siguientes miembros del alumnado de 
+    propiciar el buen desempeño académico de nuestros alumnos y alumnas desde su ingreso a la Universidad y
+    hasta la conclusión de sus estudios, le comunico que tiene asignados los siguientes miembros del alumnado de
     la licenciatura en Ingeniería en Computación para su Tutoría y Asesoría."""
     parr_paragraph = Paragraph(parrafo, header_style)
     elements.append(parr_paragraph)
@@ -113,11 +113,11 @@ def carta_tutorados_pdf(request):
     style = TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.orange),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.white), 
-        ('GRID', (0, 0), (-1, -1), 1, colors.black), 
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'), 
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'), 
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12), 
+        ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
     ])
 
     # Crear la tabla
@@ -138,13 +138,13 @@ def generar_pdf(request):
 
     # Obtener las fechas seleccionadas del formulario HTML
     fecha_inicio_str = request.GET.get('fecha_inicio')
-    fecha_fin_str = request.GET.get('fecha_fin') 
+    fecha_fin_str = request.GET.get('fecha_fin')
     # Obtención de los checkbox
-    alumno = request.GET.get('alumno') 
-    fecha = request.GET.get('fecha') 
-    hora = request.GET.get('hora') 
-    tema = request.GET.get('tema') 
-    notas = request.GET.get('notas') 
+    alumno = request.GET.get('alumno')
+    fecha = request.GET.get('fecha')
+    hora = request.GET.get('hora')
+    tema = request.GET.get('tema')
+    notas = request.GET.get('notas')
     todo = request.GET.get('todo')
 
     # Convertir las fechas de cadena a objetos de fecha si se han proporcionado
@@ -213,17 +213,17 @@ def generar_pdf(request):
         if notas == None:
             ind = data[0].index("Notas")
             for i in range(len(data)):
-                data[i].remove(data[i][ind]) 
+                data[i].remove(data[i][ind])
 
     # Estilo de la tabla
     style = TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.white),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.white), 
-        ('GRID', (0, 0), (-1, -1), 1, colors.orange), 
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'), 
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'), 
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12), 
+        ('BACKGROUND', (0, 1), (-1, -1), colors.white),
+        ('GRID', (0, 0), (-1, -1), 1, colors.orange),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
     ])
 
     # Crear la tabla
@@ -249,7 +249,7 @@ def generar_archivo_txt(request,pk):
 
     # Obtener las fechas seleccionadas del formulario HTML
     fecha_inicio_str = request.GET.get('fecha_inicio')
-    fecha_fin_str = request.GET.get('fecha_fin') 
+    fecha_fin_str = request.GET.get('fecha_fin')
 
     # Convertir las fechas de cadena a objetos de fecha si se han proporcionado
     if fecha_inicio_str and fecha_fin_str:
@@ -261,7 +261,7 @@ def generar_archivo_txt(request,pk):
     else:
         # Si no se han proporcionado fechas, obtener todas las tutorías del tutor
         tutorias = Tutoria.objects.filter(tutor=tutor)
-    
+
     contenido = "Tutorias \n"
     for tutoria in tutorias:
         contenido += f"Alumno: {tutoria.alumno.first_name} {tutoria.alumno.last_name} {tutoria.alumno.second_last_name}\n"
@@ -297,7 +297,7 @@ class AceptarTutoriaView(View):
         tutoria = get_object_or_404(Tutoria, pk=pk)
         tutoria.estado = ACEPTADO
         tutoria.save()
-        return redirect('Tutorias-tutor')  
+        return redirect('Tutorias-tutor')
 
 class RechazarTutoriaView(View):
     def post(self, request, pk):
@@ -312,7 +312,7 @@ class CancelarTutoriaView(View):
         tutoria.estado = CANCELADO
         tutoria.save()
         return redirect('Tutorias-tutor')
-    
+
 class TutoriaUpdateView(BaseAccessMixin, UpdateView):
     model = Tutoria
     form_class = FormTutorias  # ← Usa tu formulario personalizado
@@ -410,7 +410,7 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
         )
 
         return response
-    
+
     def editar_tutoria(request, pk):
         tutoria = get_object_or_404(Tutoria, pk=pk)
 
@@ -423,8 +423,8 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
             form = FormTutorias(instance=tutoria)
 
         return render(request, 'tutoria/editar_tutoria.html', {'form': form})
-    
-    
+
+
 # Solicitud Tutorias
 class TutoriaCreateView(AlumnoViewMixin, CreateView):
 
@@ -450,7 +450,7 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
         # notify.send(alumno, recipient=recipient, verb='Nueva solicitud de tutoria', description=f'{form.instance.get_tema_display()}')
         # Eliminar corchetes de la lista
         notify.send(alumno, recipient=recipient, verb='Nueva solicitud de tutoria', description=f'{", ".join(form.instance.get_tema_display())}')
-        
+
         # TODO utilizar una rutina para mandar los correos
         #send_mail(
          #   subject='Nueva solicitud de tutoria',
@@ -458,14 +458,14 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
            # from_email=CORREO,
             #recipient_list=[recipient.email],
             #fail_silently=False
-    
-        
+
+
 
         return super().form_valid(form)
 
     def get_initial(self) -> dict[str, Any]:
         return super().get_initial()
-    
+
 # Carta de notificación de tutorados (para el tutor)
 class ReporteCreateView(CodaViewMixin, CreateView):
     model = Coda
@@ -491,7 +491,7 @@ class ReporteCreateView(CodaViewMixin, CreateView):
         form.instance.tutor = tutor
 
         return super().form_valid(form)
-    
+
     def paragraph_replace_text(self,paragraph, regex, replace_str):
         while True:
             text = paragraph.text
@@ -546,10 +546,10 @@ class ReporteCreateView(CodaViewMixin, CreateView):
         fecha_form = datetime.strptime(fecha_form,'%Y-%m-%dT%H:%M').date()
         oficio_form = normalizar_numero_oficio(oficio_form, fecha_form)
         tutor_pk = self.kwargs.get('pk')
-        
+
         plantilla = get_object_or_404(Documento, nombre=plantilla_nombre)
         tutor = get_object_or_404(Tutor, pk=tutor_pk)
-        open_plantilla = docx.Document(plantilla.archivo)   
+        open_plantilla = docx.Document(plantilla.archivo)
 
         # Verifica si el archivo tiene tablas
         if not open_plantilla.tables:
@@ -566,14 +566,14 @@ class ReporteCreateView(CodaViewMixin, CreateView):
         reg_lic = re.compile(r'\{licenciatura\}')
 
         tut_alums = Alumno.objects.filter(tutor_asignado=tutor_pk)
-        
+
         ## EDICIÓN DE LA TABLA
         # Find the table you want to replace (assuming it's the first table)
         old_table = open_plantilla.tables[0]
-        
+
         # Extract headers from the first row
         headers = [cell.text for cell in old_table.rows[0].cells]
-        
+
         # Extract table style
         table_style = old_table.style
 
@@ -591,7 +591,7 @@ class ReporteCreateView(CodaViewMixin, CreateView):
         new_table = open_plantilla.add_table(rows=1, cols=len(headers))
         new_table.style = table_style
         placeholder._element.addnext(new_table._element)
-        
+
         # Extract column widths
         column_widths = [cell.width for cell in old_table.rows[0].cells]
 
@@ -625,7 +625,7 @@ class ReporteCreateView(CodaViewMixin, CreateView):
             row_cells[2].text = str(obj.last_name) #Si el modelo tiene un campo para segundo apellido, agregar
             row_cells[3].text = str(obj.second_last_name) #Si el modelo tiene un campo para segundo apellido, agregar
             row_cells[4].text = str(obj.first_name)  # Replace with actual fields
-        
+
         # Ensure data rows inherit cell formatting from old table
         for row_index, row in enumerate(new_table.rows[1:]):
             old_row = old_table.rows[min(row_index + 1, len(old_table.rows) - 1)]  # Avoid index out of bounds
@@ -666,7 +666,7 @@ class ReporteCreateView(CodaViewMixin, CreateView):
             line = p.text
             result = []
             line_matches = [] if (result := re.findall(reg_placeh,line)) is None else result
-            # print(f'Before cycle: {(line_matches)}') if line_matches else None 
+            # print(f'Before cycle: {(line_matches)}') if line_matches else None
 
             for match in line_matches:
                 print(f'Esta linea: {match} hizo match')
@@ -687,9 +687,9 @@ class ReporteCreateView(CodaViewMixin, CreateView):
 
         response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
         response['Content-Disposition'] = f'attachment; filename={tutor.last_name}_TUTORES_ATENDIDOS.docx'
-        
+
         open_plantilla.save(response)
-        
+
         return response
         # return FileResponse(buffer, as_attachment=True, filename=f'{tutor.last_name.upper()}_TUTORES_ATENDIDOS_21-24.pdf')
         # return super().post(request)
@@ -710,13 +710,13 @@ class Reporte2CreateView(CodaViewMixin, CreateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        
+
         # Get selected students from URL parameters
         selected_ids = self.request.GET.getlist('selected_alumnos')
         if not selected_ids:
                 selected_ids = self.request.session.get('selected_alumnos', [])
         print(selected_ids)
-        
+
         # Fetch student objects from the database
         alumnos = get_list_or_404(Alumno, pk__in=selected_ids)
 
@@ -740,7 +740,7 @@ class Reporte2CreateView(CodaViewMixin, CreateView):
         form.instance.tutor = tutor
 
         return super().form_valid(form)
-    
+
     def paragraph_replace_text(self,paragraph, regex, replace_str):
         while True:
             text = paragraph.text
@@ -796,13 +796,13 @@ class Reporte2CreateView(CodaViewMixin, CreateView):
         fecha_form = form.get('fecha')
         no_inicio_form = form.get('no_inicio')
         fecha_form = datetime.strptime(fecha_form,'%Y-%m-%dT%H:%M').date()
-        
+
         tutor_pk = self.kwargs.get('pk')
         alumnos = get_list_or_404(Alumno, pk__in=selected_ids)
         plantilla = get_object_or_404(Documento, nombre=plantilla_nombre)
         tutor = get_object_or_404(Tutor, pk=tutor_pk)
-        
-        open_plantilla = docx.Document(plantilla.archivo)   
+
+        open_plantilla = docx.Document(plantilla.archivo)
         if open_plantilla.tables:
             messages.error(request, "Este archivo no es compatible con el tipo de carta que deseas generar")
 
@@ -890,7 +890,7 @@ class Reporte2CreateView(CodaViewMixin, CreateView):
             response['Content-Disposition'] = f'attachment; filename={alumno.first_name}_{alumno.last_name}_TUTOR.docx'
             open_plantilla.save(response)
 
-        else :    
+        else :
             ##EDICIÓN DE LOS PLACEHOLDERS
             zip_buffer = BytesIO()
             oficio_regex = re.search(r'\_[xX]+\_', oficio_form)
@@ -1054,19 +1054,14 @@ class ReporteTutoriasBrindadasView(CodaViewMixin, CreateView):
             tema_dict=tema_dict,
         )
 
-class ReporteTutoriasBrindadasMasivoView(CodaViewMixin, View):
+class ReporteTutoriasBrindadasMasivoView(CodaViewMixin, FormView):
     template_name = 'Tutorias/generarhistorialtutorias_masivo.html'
+    form_class = FormReporteTutoriasMasivo
 
-    def get(self, request, *args, **kwargs):
-        form = FormReporteTutoriasMasivo()
-        return render(request, self.template_name, {'form': form})
+    def form_invalid(self, form):
+        return self.render_to_response(self.get_context_data(form=form))
 
-    def post(self, request, *args, **kwargs):
-        form = FormReporteTutoriasMasivo(request.POST)
-
-        if not form.is_valid():
-            return render(request, self.template_name, {'form': form})
-
+    def form_valid(self, form):
         coordinaciones = form.cleaned_data.get('coordinaciones') or []
         incluir_todas = form.cleaned_data.get('incluir_todas')
         oficio_inicial = form.cleaned_data.get('oficio_inicial')
@@ -1075,6 +1070,7 @@ class ReporteTutoriasBrindadasMasivoView(CodaViewMixin, View):
         fecha_emision = form.cleaned_data.get('fecha')
         fecha_emision_str = fecha_emision.strftime('%Y-%m-%dT%H:%M')
         plantilla = form.cleaned_data.get('plantilla')
+        tutores_seleccionados = form.cleaned_data.get('tutores')
 
         mostrar_col_alumno = form.cleaned_data.get('col_alumno')
         mostrar_col_fecha = form.cleaned_data.get('col_fecha')
@@ -1095,11 +1091,16 @@ class ReporteTutoriasBrindadasMasivoView(CodaViewMixin, View):
             columnas_activas.append('Notas')
 
         if incluir_todas:
-            tutores = Tutor.objects.all().order_by('coordinacion', 'last_name', 'first_name').distinct()
+            tutores = Tutor.objects.all()
+        elif coordinaciones:
+            tutores = Tutor.objects.filter(coordinacion__in=coordinaciones)
         else:
-            tutores = Tutor.objects.filter(
-                coordinacion__in=coordinaciones
-            ).order_by('coordinacion', 'last_name', 'first_name').distinct()
+            tutores = Tutor.objects.all()
+
+        if tutores_seleccionados.exists():
+            tutores = tutores.filter(pk__in=tutores_seleccionados.values_list('pk', flat=True))
+
+        tutores = tutores.order_by('coordinacion', 'last_name', 'first_name').distinct()
 
         fecha_inicio_dt = timezone.datetime.combine(fecha_inicio, datetime.min.time())
         fecha_fin_dt = timezone.datetime.combine(fecha_fin, datetime.min.time()) + timedelta(days=1)
@@ -1133,8 +1134,18 @@ class ReporteTutoriasBrindadasMasivoView(CodaViewMixin, View):
                     tema_dict=tema_dict,
                 )
 
+                carpetas_licenciatura = {
+                    "COM": "Ingenieria_en_Computacion",
+                    "MAT": "Matematicas_Aplicadas",
+                    "IB": "Ingenieria_Biologica",
+                    "BM": "Biologia_Molecular",
+                }
+
+                nombre_carpeta = carpetas_licenciatura.get(tutor.coordinacion, "Sin_licenciatura")
                 nombre_archivo = f"{tutor.matricula}_{tutor.last_name}_{tutor.first_name}_TUTORIAS_BRINDADAS.docx"
-                zip_file.writestr(nombre_archivo, response.content)
+                ruta_zip = f"{nombre_carpeta}/{nombre_archivo}"
+
+                zip_file.writestr(ruta_zip, response.content)
 
                 consecutivo += 1
 
@@ -1147,7 +1158,7 @@ class ReporteTutoriasBrindadasMasivoView(CodaViewMixin, View):
 # Ver Tutorias
 # TODO Añadir verificación de permisos de acceso a la tutoria
 class TutoriasDetailView(BaseAccessMixin, DetailView):
-     
+
     model = Tutoria
 
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
@@ -1156,38 +1167,38 @@ class TutoriasDetailView(BaseAccessMixin, DetailView):
     template_name='Tutorias/verTutorias_tutor.html'
 
     def get_queryset(self) -> QuerySet[Any]:
-        
+
         if Tutor.objects.filter(pk=self.request.user.pk).exists():
             # Tutorias correspondientes al tutor
             queryset = super().get_queryset().filter(tutor=self.request.user)
-        else: 
+        else:
             # Tutorias correspondientes al alumno
             queryset = super().get_queryset().filter(alumno=self.request.user)
-        
-        if self.request.user.is_superuser == 1: 
+
+        if self.request.user.is_superuser == 1:
             # Muestra todas las tutorias para el primer usuario creado (generalmente el primer superuser)
             queryset = super().get_queryset().all()
-        
+
         return queryset
-    
+
 class HistorialTutoriasListView(BaseAccessMixin, ListView):
-     
+
     model = Tutoria
     template_name='Tutorias/historialtutoria.html'
 
     def get_queryset(self) -> QuerySet[Any]:
-        
+
         if Tutor.objects.filter(pk=self.request.user.pk).exists():
             # Tutorias correspondientes al tutor
             queryset = super().get_queryset().filter(tutor=self.request.user.pk)
-        else: 
+        else:
             # Tutorias correspondientes al alumno
             queryset = super().get_queryset().filter(alumno=self.request.user)
-        
-        if self.request.user.is_superuser == 1: 
+
+        if self.request.user.is_superuser == 1:
             # Muestra todas las tutorias para el primer usuario creado (generalmente el primer superuser)
             queryset = super().get_queryset().all()
-        
+
         return queryset
 
 class HistorialTutoriasGenerateView(BaseAccessMixin, ListView):
@@ -1218,7 +1229,7 @@ class VerTutoriasCoordinadorListView(CordinadorViewMixin, FormView):
         tutores = Tutor.objects.all().filter(coordinacion=coord.coordinacion)
         tutorias = Tutoria.objects.filter(tutor__in=tutores)
         return self.render_to_response(self.get_context_data(form=form, object_list=tutorias))
-    
+
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
 
@@ -1227,9 +1238,9 @@ class VerTutoriasCoordinadorListView(CordinadorViewMixin, FormView):
         context["tutores"] = tutores
 
         return context
-    
+
 class VerTutoriasCoordinadorPorTutorListView(CordinadorViewMixin, FormView):
-     
+
     model = Tutoria
     template_name='Tutorias/verTutorias_cordinador_portutor.html'
     form_class = FormVerTutorias
@@ -1249,7 +1260,7 @@ class VerTutoriasCoordinadorPorTutorListView(CordinadorViewMixin, FormView):
         form = self.get_form()
         tutorias = Tutoria.objects.filter(tutor=self.kwargs.get('pk'))
         return self.render_to_response(self.get_context_data(form=form, object_list=tutorias))
-    
+
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
         tutor = Tutor.objects.get(pk=self.kwargs.get('pk'))
@@ -1257,16 +1268,16 @@ class VerTutoriasCoordinadorPorTutorListView(CordinadorViewMixin, FormView):
         return context
 
 
-class VerTutoriasCodaListView(CodaViewMixin, ListView):    
+class VerTutoriasCodaListView(CodaViewMixin, ListView):
     model = Tutoria
     template_name='Tutorias/verTutorias_cooda.html'
-    
+
     def get_queryset(self) -> QuerySet[Any]:
-        
-        queryset = super().get_queryset().filter(tutor=self.kwargs.get('pk'))   
-        
-        return queryset 
-    
+
+        queryset = super().get_queryset().filter(tutor=self.kwargs.get('pk'))
+
+        return queryset
+
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
         tutor = Tutor.objects.get(pk=self.kwargs.get('pk'))
@@ -1290,16 +1301,16 @@ class VerTutoresCoordListView(CordinadorViewMixin, ListView):
 
         queryset = super().get_queryset().filter(coordinacion=coord.coordinacion)
         return queryset
-    
+
 class VerTutoradosCodaListView(CodaViewMixin, ListView):
     model = Alumno
     template_name = 'Tutorias/verTutorados_coda.html'
-    
+
     def get_queryset(self) -> QuerySet[Any]:
-        
-        queryset = super().get_queryset().filter(tutor_asignado=self.kwargs.get('pk'))   
-        
-        return queryset 
+
+        queryset = super().get_queryset().filter(tutor_asignado=self.kwargs.get('pk'))
+
+        return queryset
 
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
@@ -1307,16 +1318,16 @@ class VerTutoradosCodaListView(CodaViewMixin, ListView):
         context["tutor"] = tutor
         print(context)
         return context
-    
+
 class VerTutoradosCoordinadorListView(CordinadorViewMixin, ListView):
     model = Alumno
     template_name = 'Tutorias/verTutorados_cordinador.html'
-    
+
     def get_queryset(self) -> QuerySet[Any]:
-        
-        queryset = super().get_queryset().filter(tutor_asignado=self.kwargs.get('pk'))   
-        
-        return queryset 
+
+        queryset = super().get_queryset().filter(tutor_asignado=self.kwargs.get('pk'))
+
+        return queryset
 
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
@@ -1325,7 +1336,7 @@ class VerTutoradosCoordinadorListView(CordinadorViewMixin, ListView):
         return context
 
 class VerTutoriasTutorListView(TutorViewMixin, FormView):
-     
+
     model = Tutoria
     template_name='Tutorias/verTutorias_tutor.html'
     form_class = FormVerTutorias
@@ -1345,7 +1356,7 @@ class VerTutoriasTutorListView(TutorViewMixin, FormView):
         form = self.get_form()
         tutorias = Tutoria.objects.filter(tutor=request.user)
         return self.render_to_response(self.get_context_data(form=form, object_list=tutorias))
-    
+
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
         tutorados = Alumno.objects.filter(tutor_asignado=self.request.user)
@@ -1354,21 +1365,21 @@ class VerTutoriasTutorListView(TutorViewMixin, FormView):
 
 
 class VerTutoriasAlumnoListView(AlumnoViewMixin, ListView):
-     
+
     model = Tutoria
     template_name='Tutorias/verTutorias_alumno.html'
 
     def get_queryset(self) -> QuerySet[Any]:
-        
+
         # Tutorias correspondientes al alumno
-        
+
         queryset = super().get_queryset().filter(alumno=self.request.user)
-        #if self.request.user.is_superuser == 1: 
+        #if self.request.user.is_superuser == 1:
             # Muestra todas las tutorias para el primer usuario creado (generalmente el primer superuser)
             #queryset = super().get_queryset().all()
-        
+
         return queryset
-    
+
 
 # TODO Eliminar para prod
 # class DebugTutoriasView(LoginRequiredMixin, ListView):
@@ -1378,8 +1389,8 @@ class VerTutoriasAlumnoListView(AlumnoViewMixin, ListView):
 
 #     def get_queryset(self) -> QuerySet[Any]:
 #         return super().get_queryset()
-    
-    
+
+
 class QuickCreateTutoriaView(AlumnoViewMixin, CreateView):
     model = Tutoria
     template_name = 'Tutorias/registrar-tutoria.html'
@@ -1392,17 +1403,17 @@ class QuickCreateTutoriaView(AlumnoViewMixin, CreateView):
         form.instance.alumno = alumno
         form.instance.tutor = alumno.tutor_asignado
         form.instance.estado = ACEPTADO
-        
+
         # Snapshot del estado del alumno al momento de crear la tutoría con QR
         if not form.instance.estado_alumno_historico:
             form.instance.estado_alumno_historico = alumno.estado
-        
+
         # rol = self.request.user.get_rol()
         if self.request.user.has_role("ALU"):
             recipient = alumno.tutor_asignado   # No sé que hace este bloque, pero no lo voy a quitar para que no se rompa. -Alfredo
         else:
             recipient = Alumno.objects.filter(pk=self.get_object().alumno)
-        
+
         notify.send(alumno, recipient=recipient, verb='Tutoria registrada con QR')
 
         return super().form_valid(form)
@@ -1424,19 +1435,19 @@ class QuickCreateTutoriaView(AlumnoViewMixin, CreateView):
         print(f'Fecha: {datetime.now().strftime("%Y-%m-%d %H:%M")}')
         self.initial["fecha"] = datetime.now().strftime("%Y-%m-%d %H:%M")
         self.initial["descripcion"] = "Tutoria registrada con QR"
-        return self.initial 
-      
-    
+        return self.initial
+
+
 class VerTutoradosTutorListView(TutorViewMixin, ListView):
-     
+
     model = Alumno
     template_name='Tutorias/list_tutorados.html'
 
     def get_queryset(self) -> QuerySet[Any]:
-        
+
         # Tutorias correspondientes al tutor
         queryset = super().get_queryset().filter(tutor_asignado=self.request.user)
-    
+
         return queryset
 
 # Este es para asesorias, aun no se va a usar
@@ -1517,7 +1528,7 @@ class EditarEstadoAlumnoHistoricoView(BaseAccessMixin, View):
     """
     def post(self, request, pk):
         tutoria = get_object_or_404(Tutoria, pk=pk)
-        
+
         # Validar permisos
         if request.user.has_role("TUT"):
             # TUT solo puede editar si es el tutor asignado
@@ -1533,26 +1544,26 @@ class EditarEstadoAlumnoHistoricoView(BaseAccessMixin, View):
             pass
         else:
             raise PermissionDenied("No tienes permiso para realizar esta acción")
-        
+
         # Importar el formulario
         from .forms import FormEditarEstadoAlumnoHistorico
         form = FormEditarEstadoAlumnoHistorico(request.POST)
-        
+
         if form.is_valid():
             nuevo_estado = form.cleaned_data['estado_alumno_historico']
             estado_anterior = tutoria.estado_alumno_historico
-            
+
             # Obtener etiquetas del diccionario ESTADOS_ALUMNO
             from Usuarios.constants import ESTADOS_ALUMNO
             estado_dict = {key: value for key, value in ESTADOS_ALUMNO}
-            
+
             etiqueta_anterior = estado_dict.get(estado_anterior, "Sin estado registrado")
             etiqueta_nueva = estado_dict.get(nuevo_estado, "Desconocido")
-            
+
             # Actualizar el estado
             tutoria.estado_alumno_historico = nuevo_estado
             tutoria.save()
-            
+
             # Registrar el cambio en HistorialCambioTutoria
             cambio_mensaje = f"Estado histórico del alumno: '{etiqueta_anterior}' -> '{etiqueta_nueva}'"
             HistorialCambioTutoria.objects.create(
@@ -1560,26 +1571,26 @@ class EditarEstadoAlumnoHistoricoView(BaseAccessMixin, View):
                 correo_editor=request.user.email,
                 cambios_realizados=cambio_mensaje,
             )
-            
+
             # Enviar notificación
             tutor = Tutor.objects.filter(pk=tutoria.tutor_id)
             alumno = Alumno.objects.filter(pk=tutoria.alumno_id)
-            
+
             if request.user.has_role("TUT"):
                 notify.send(request.user, recipient=alumno, verb='Estado histórico de tutoría actualizado')
             else:
                 notify.send(request.user, recipient=tutor, verb='Estado histórico de tutoría actualizado por administración')
-            
+
             # Mostrar mensaje de éxito
             messages.success(request, f"Estado histórico actualizado: {etiqueta_anterior} → {etiqueta_nueva}")
-            
+
             # Redirigir a la vista de edición de la tutoría
             return redirect('Tutorias-update', pk=pk)
         else:
             # Si el formulario no es válido, redirigir de vuelta
             messages.error(request, "Error al actualizar el estado. Por favor, intenta de nuevo.")
             return redirect('Tutorias-update', pk=pk)
-    
+
 class TutoriasAceptadasListView(CodaViewMixin, ListView):
     model = Tutoria
     template_name = 'Tutorias/ver_tutorias_aceptadas_coda.html'
@@ -1591,7 +1602,7 @@ class TutoriasAceptadasListView(CodaViewMixin, ListView):
 class ExportarTutoriasAceptadasExcelView(CodaViewMixin, View):
 
     def get(self, request, *args, **kwargs):
-        tema_dict = dict(TEMAS) 
+        tema_dict = dict(TEMAS)
         tutorias = Tutoria.objects.filter(estado='ACE').select_related('alumno', 'tutor')
 
         data = []
@@ -1609,7 +1620,7 @@ class ExportarTutoriasAceptadasExcelView(CodaViewMixin, View):
             asistencia = "No"
             if tutoria.asistencia:
                 asistencia = "Sí"
-            
+
             data.append({
                 "Id":tutoria.pk,
                 "Matricula": tutoria.alumno.matricula,

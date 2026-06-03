@@ -1,6 +1,6 @@
 from django import forms
 from .models import Tutoria
-from Usuarios.models import Documento
+from Usuarios.models import Documento, Tutor
 from .constants import TEMAS, ESTADO, ACEPTADO, PENDIENTE, DURACION_ASESORIA
 from Usuarios.constants import ESTADOS_ALUMNO
 
@@ -79,7 +79,7 @@ class FormReporte(forms.ModelForm):
 
     def __init__(self, *args, tutor_instance=None, **kwargs):
         super().__init__(*args, **kwargs)
-        
+
         if tutor_instance:
             full_name = ""
             # Llenamos el nombre del tutor.
@@ -118,7 +118,7 @@ class FormCartasDeAsignacion(forms.ModelForm):
 
     def __init__(self, *args, tutor_instance=None, **kwargs):
         super().__init__(*args, **kwargs)
-        
+
         if tutor_instance:
             full_name = ""
             # Llenamos el nombre del tutor.
@@ -143,7 +143,7 @@ class FormCartasDeAsignacion(forms.ModelForm):
         self.fields['carrera'].initial = carreras_dict.get(tutor_instance.coordinacion, "Carrera desconocida")
 
 class FormReporteDeTutorias(forms.ModelForm):
-    
+
     oficio = forms.IntegerField(required=True, min_value=1)
     fecha_inicio = forms.DateField(required=True)
     fecha_fin = forms.DateField(required=True)
@@ -170,8 +170,17 @@ class FormReporteDeTutorias(forms.ModelForm):
                 if tutor_instance.second_last_name:
                     full_name += f" {tutor_instance.second_last_name}"
                 self.fields['tutor'].initial = full_name
-                
+
 class FormReporteTutoriasMasivo(forms.Form):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.fields["tutores"].label_from_instance = self.label_tutor
+
+    def label_tutor(self, tutor):
+        return f"{tutor.matricula} - {tutor.first_name} {tutor.last_name}"
+
     COORDINACION_CHOICES = [
         ("MAT", "Matemáticas Aplicadas"),
         ("COM", "Ingeniería en Computación"),
@@ -189,6 +198,16 @@ class FormReporteTutoriasMasivo(forms.Form):
     incluir_todas = forms.BooleanField(
         required=False,
         label="Incluir todas las licenciaturas"
+    )
+
+    tutores = forms.ModelMultipleChoiceField(
+        queryset=Tutor.objects.all().order_by('coordinacion', 'last_name', 'first_name'),
+        widget=forms.SelectMultiple(attrs={
+            "class": "form-select",
+            "size": "10",
+        }),
+        required=False,
+        label="Tutores específicos"
     )
 
     oficio_inicial = forms.IntegerField(required=True, min_value=1, label="Número de Oficio inicial")
@@ -217,7 +236,8 @@ class FormReporteTutoriasMasivo(forms.Form):
         cleaned_data = super().clean()
         incluir_todas = cleaned_data.get("incluir_todas")
         coordinaciones = cleaned_data.get("coordinaciones") or []
-        
+        tutores = cleaned_data.get("tutores") or Tutor.objects.none()
+
         if not any([
             cleaned_data.get("col_alumno"),
             cleaned_data.get("col_fecha"),
@@ -227,8 +247,10 @@ class FormReporteTutoriasMasivo(forms.Form):
         ]):
             raise forms.ValidationError("Selecciona al menos una columna para el reporte.")
 
-        if not incluir_todas and not coordinaciones:
-            raise forms.ValidationError("Selecciona al menos una licenciatura o marca 'Incluir todas las licenciaturas'.")
+        if not incluir_todas and not coordinaciones and not tutores.exists():
+            raise forms.ValidationError(
+                "Selecciona al menos una licenciatura, tutores específicos o marca 'Incluir todas las licenciaturas'."
+            )
 
         if len(coordinaciones) > 3:
             raise forms.ValidationError("Solo se pueden seleccionar entre 1 y 3 licenciaturas.")
