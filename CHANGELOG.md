@@ -25,6 +25,7 @@ y el proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 ### Fixed
 - Compatibilidad de ArrayField con SQLite mediante monkeypatch
 - Dependencias corregidas (python-docx, pandas, whitenoise, coverage)
+- Renombrado de "Seguimiento" a "Reporte" en el módulo de tutorías para mejorar claridad en la interfaz
 - Corrección de campo de texto de oficio en generación de reporte anual (placeholder y subtítulo)
 - Paginación de tablas en cartas de reporte de tutorados para limitar filas por página y mantener bordes visibles.
 - Ajuste dinámico de filas por página según la cantidad de columnas seleccionadas en la carta: 
@@ -40,3 +41,4 @@ y el proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 ### Initial Release
 - Estructura inicial del proyecto Django
 - Apps: Tutorias, Usuarios, Metricas
+
