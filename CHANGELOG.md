@@ -8,29 +8,28 @@ y el proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 ## [Unreleased]
 
 ### Added
-- PR Template con checklists estructurados para pull requests
-- Unit Tests para FormSeguimiento
-- Unit Tests para CartaTutoradosPdf
-- Test Settings Configuration con soporte para SQLite testing
-- Script `coda-src/scripts/generar_tutorias_prueba.py` para generar tutorías de prueba en base de datos.
-- Visualización de la descripción de la tutoría en la lista de tutorías del tutor
 - Se agregó la vista de generación masiva de reportes de tutorías.
 - Se agregó la selección de tutores específicos para limitar la generación de reportes.
 - Se implementó la descarga de reportes en formato ZIP.
 - Los documentos generados se organizan por licenciatura dentro del archivo comprimido.
+- Generación masiva de reportes de tutorías para múltiples tutores.
+- Descarga de reportes agrupados en un archivo ZIP.
+- Organización de reportes por licenciatura dentro del ZIP generado.
+- Selección de tutores específicos por licenciatura desde la interfaz de generación masiva.
+- Opción para generar reportes de todos los tutores de una licenciatura o únicamente de tutores seleccionados.
+- Agrupación visual de tutores por licenciatura para facilitar la selección.
+- Script `coda-src/scripts/medir_reportes_tutorias_masivos.py` para medir tiempos de generación y tamaños de archivos en reportes masivos.
+- Script `coda-src/scripts/diagnosticar_peso_docx.py` para analizar el peso de plantillas y documentos DOCX generados.
 
 ### Testing
 - Se habilitó la Fase 0 de pruebas piloto para validar generación de reportes con subconjuntos de tutores.
+- Se realizaron mediciones de tiempo de generación y tamaño de archivos para reportes masivos.
+- Se verificó la organización de documentos por licenciatura dentro del ZIP generado.
 
 ### Fixed
-- Compatibilidad de ArrayField con SQLite mediante monkeypatch
-- Dependencias corregidas (python-docx, pandas, whitenoise, coverage)
-- Renombrado de "Seguimiento" a "Reporte" en el módulo de tutorías para mejorar claridad en la interfaz
-- Corrección de campo de texto de oficio en generación de reporte anual (placeholder y subtítulo)
-- Paginación de tablas en cartas de reporte de tutorados para limitar filas por página y mantener bordes visibles.
-- Ajuste dinámico de filas por página según la cantidad de columnas seleccionadas en la carta: 
-    - 2 columnas: 15 filas por página - 3 o más columnas: 10 filas por página
-- Filtrado de reportes de tutorías para incluir únicamente alumnos con estado activo (`estado = 1`).
+- Corrección en la estructura de carpetas del ZIP para clasificar reportes por licenciatura.
+- Rediseño del formulario de generación masiva para mejorar la experiencia de usuario.
+- Filtrado visual de tutores por coordinación/licenciatura.
 
 
 ### Changed 
