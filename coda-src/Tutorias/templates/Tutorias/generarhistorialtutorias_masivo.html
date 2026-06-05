@@ -13,35 +13,107 @@
                         {% csrf_token %}
                         <div class="card-body p-5">
                             <h3 class="mb-4 text-primary text-title-bold">Generar reportes masivos de tutorías</h3>
+
                             {% if form.non_field_errors %}
-                            <div class="alert alert-danger mb-3">
-                            {% for error in form.non_field_errors %}
-                            <div>{{ error }}</div>
-                            {% endfor %}
-                            </div>
+                                <div class="alert alert-danger mb-3">
+                                    {% for error in form.non_field_errors %}
+                                        <div>{{ error }}</div>
+                                    {% endfor %}
+                                </div>
                             {% endif %}
+
                             <div class="mb-4">
-                                <label class="form-label">Licenciaturas</label>
-                                <div class="mb-2">
-                                    {% render_field form.incluir_todas class="form-check-input" %}
-                                    <label class="form-check-label" for="{{ form.incluir_todas.id_for_label }}">
+                                <label class="form-label">Licenciaturas y tutores</label>
+
+                                <div class="mb-3">
+                                    {% render_field form.incluir_todas class="form-check-input" id="id_incluir_todas" %}
+                                    <label class="form-check-label" for="id_incluir_todas">
                                         Incluir todas las licenciaturas
                                     </label>
                                 </div>
-                                <div>
-                                    {{ form.coordinaciones }}
-                                    {{ form.coordinaciones.errors }}
-                                </div>
-                            </div>
-                            <div class="mb-4">
-                                <label class="form-label">Tutores específicos</label>
-                                {% render_field form.tutores class="form-select" %}
+
+                                {{ form.coordinaciones.errors }}
                                 {{ form.tutores.errors }}
+
+                                <div class="border rounded p-3 bg-light">
+                                    {% for grupo in tutores_por_coordinacion %}
+                                        <div class="mb-3 bloque-licenciatura" data-coordinacion="{{ grupo.codigo }}">
+                                            <div class="form-check">
+                                                <input
+                                                    type="checkbox"
+                                                    name="coordinaciones"
+                                                    value="{{ grupo.codigo }}"
+                                                    id="coord_{{ grupo.codigo }}"
+                                                    class="form-check-input coord-checkbox"
+                                                    data-coordinacion="{{ grupo.codigo }}"
+                                                >
+                                                <label class="form-check-label fw-bold" for="coord_{{ grupo.codigo }}">
+                                                    {{ grupo.nombre }}
+                                                </label>
+                                            </div>
+
+                                            <div class="ms-4 mt-2 opciones-tutores d-none" data-coordinacion="{{ grupo.codigo }}">
+                                                <div class="form-check">
+                                                    <input
+                                                        type="radio"
+                                                        name="modo_tutores_{{ grupo.codigo }}"
+                                                        id="modo_todos_{{ grupo.codigo }}"
+                                                        value="todos"
+                                                        class="form-check-input modo-tutores"
+                                                        data-coordinacion="{{ grupo.codigo }}"
+                                                        checked
+                                                    >
+                                                    <label class="form-check-label" for="modo_todos_{{ grupo.codigo }}">
+                                                        Todos los tutores de esta licenciatura
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <input
+                                                        type="radio"
+                                                        name="modo_tutores_{{ grupo.codigo }}"
+                                                        id="modo_especificos_{{ grupo.codigo }}"
+                                                        value="especificos"
+                                                        class="form-check-input modo-tutores"
+                                                        data-coordinacion="{{ grupo.codigo }}"
+                                                    >
+                                                    <label class="form-check-label" for="modo_especificos_{{ grupo.codigo }}">
+                                                        Seleccionar tutores específicos
+                                                    </label>
+                                                </div>
+
+                                                <div class="ms-4 mt-2 lista-tutores d-none" data-coordinacion="{{ grupo.codigo }}">
+                                                    {% if grupo.tutores %}
+                                                        {% for tutor in grupo.tutores %}
+                                                            <div class="form-check">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    name="tutores"
+                                                                    value="{{ tutor.pk }}"
+                                                                    id="tutor_{{ tutor.pk }}"
+                                                                    class="form-check-input tutor-checkbox"
+                                                                    data-coordinacion="{{ grupo.codigo }}"
+                                                                >
+                                                                <label class="form-check-label" for="tutor_{{ tutor.pk }}">
+                                                                    {{ tutor.matricula }} - {{ tutor.first_name }} {{ tutor.last_name }}
+                                                                </label>
+                                                            </div>
+                                                        {% endfor %}
+                                                    {% else %}
+                                                        <small class="text-muted">No hay tutores registrados en esta licenciatura.</small>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+
                                 <small class="form-text text-muted">
-                                    Mantén presionada la tecla Ctrl para seleccionar más de un tutor.
-                                    Si seleccionas tutores, se generarán reportes únicamente para esos tutores.
+                                    Selecciona una o más licenciaturas. Puedes generar reportes para todos sus tutores
+                                    o elegir tutores específicos por licenciatura.
                                 </small>
                             </div>
+
                             <div class="mb-4">
                                 <label class="form-label">Número de Oficio inicial</label>
                                 {% render_field form.oficio_inicial class="form-control" placeholder="Ej. 900" %}
@@ -89,4 +161,78 @@
         </div>
     </div>
 </section>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const incluirTodas = document.getElementById("id_incluir_todas");
+    const coordCheckboxes = document.querySelectorAll(".coord-checkbox");
+    const modoRadios = document.querySelectorAll(".modo-tutores");
+
+    function actualizarGrupo(codigo) {
+        const coord = document.querySelector(`.coord-checkbox[data-coordinacion="${codigo}"]`);
+        const opciones = document.querySelector(`.opciones-tutores[data-coordinacion="${codigo}"]`);
+        const lista = document.querySelector(`.lista-tutores[data-coordinacion="${codigo}"]`);
+        const modoEspecificos = document.getElementById(`modo_especificos_${codigo}`);
+        const tutoresGrupo = document.querySelectorAll(`.tutor-checkbox[data-coordinacion="${codigo}"]`);
+
+        if (!coord || !opciones || !lista) {
+            return;
+        }
+
+        if (coord.checked) {
+            opciones.classList.remove("d-none");
+
+            if (modoEspecificos && modoEspecificos.checked) {
+                lista.classList.remove("d-none");
+            } else {
+                lista.classList.add("d-none");
+                tutoresGrupo.forEach(function (checkbox) {
+                    checkbox.checked = false;
+                });
+            }
+        } else {
+            opciones.classList.add("d-none");
+            lista.classList.add("d-none");
+
+            tutoresGrupo.forEach(function (checkbox) {
+                checkbox.checked = false;
+            });
+        }
+    }
+
+    function actualizarTodo() {
+        const marcarTodas = incluirTodas && incluirTodas.checked;
+
+        coordCheckboxes.forEach(function (checkbox) {
+            if (marcarTodas) {
+                checkbox.checked = true;
+            }
+
+            actualizarGrupo(checkbox.dataset.coordinacion);
+        });
+    }
+
+    coordCheckboxes.forEach(function (checkbox) {
+        checkbox.addEventListener("change", function () {
+            if (incluirTodas && !checkbox.checked) {
+                incluirTodas.checked = false;
+            }
+
+            actualizarGrupo(checkbox.dataset.coordinacion);
+        });
+    });
+
+    modoRadios.forEach(function (radio) {
+        radio.addEventListener("change", function () {
+            actualizarGrupo(radio.dataset.coordinacion);
+        });
+    });
+
+    if (incluirTodas) {
+        incluirTodas.addEventListener("change", actualizarTodo);
+    }
+
+    actualizarTodo();
+});
+</script>
 {% endblock %}

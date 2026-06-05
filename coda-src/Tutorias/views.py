@@ -1057,6 +1057,32 @@ class ReporteTutoriasBrindadasView(CodaViewMixin, CreateView):
 class ReporteTutoriasBrindadasMasivoView(CodaViewMixin, FormView):
     template_name = 'Tutorias/generarhistorialtutorias_masivo.html'
     form_class = FormReporteTutoriasMasivo
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        coordinaciones = [
+            ("MAT", "Matemáticas Aplicadas"),
+            ("COM", "Ingeniería en Computación"),
+            ("IB", "Ingeniería Biológica"),
+            ("BM", "Biología Molecular"),
+        ]
+
+        tutores_por_coordinacion = []
+
+        for codigo, nombre in coordinaciones:
+            tutores = Tutor.objects.filter(
+                coordinacion=codigo
+            ).order_by("last_name", "first_name")
+
+            tutores_por_coordinacion.append({
+                "codigo": codigo,
+                "nombre": nombre,
+                "tutores": tutores,
+            })
+
+        context["tutores_por_coordinacion"] = tutores_por_coordinacion
+        return context
 
     def form_invalid(self, form):
         return self.render_to_response(self.get_context_data(form=form))

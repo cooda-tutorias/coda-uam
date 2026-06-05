@@ -202,10 +202,7 @@ class FormReporteTutoriasMasivo(forms.Form):
 
     tutores = forms.ModelMultipleChoiceField(
         queryset=Tutor.objects.all().order_by('coordinacion', 'last_name', 'first_name'),
-        widget=forms.SelectMultiple(attrs={
-            "class": "form-select",
-            "size": "10",
-        }),
+        widget=forms.CheckboxSelectMultiple,
         required=False,
         label="Tutores específicos"
     )
