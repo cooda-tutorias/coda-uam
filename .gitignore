@@ -176,3 +176,4 @@ cython_debug/
 coda-src/ssocial/env_vars.py
 
 data
+.env.test

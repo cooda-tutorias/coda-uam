@@ -1,0 +1,66 @@
+name: All tests are passing
+
+on:
+  pull_request:
+    branches: [ develop, main ]
+  push:
+    branches: [ develop, main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: test_db
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      working-directory: ./coda-src
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install coverage
+    
+    - name: Run tests with coverage
+      working-directory: ./coda-src
+      env:
+        DJANGO_SETTINGS_MODULE: ssocial.settings_test
+        DJANGO_SECRET_KEY: test-secret-key
+        TUTORIAS_DOMINIO: localhost
+        IP_COMPUTADORA: 127.0.0.1
+        RDS_DB_NAME: test_db
+        RDS_USERNAME: test_user
+        RDS_PASSWORD: test_password
+        RDS_HOSTNAME: localhost
+        RDS_PORT: 5432
+        EMAIL_HOST_PASSWORD: test
+      run: |
+        coverage run --source='Tutorias' -m django test Tutorias.tests -v 2
+        coverage report -m
+    
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./coda-src/.coverage
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
