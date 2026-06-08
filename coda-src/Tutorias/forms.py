@@ -1,13 +1,8 @@
 from django import forms
 from .models import Tutoria
-<<<<<<< HEAD
 from Usuarios.models import Documento, Alumno
 from .constants import TEMAS, ESTADO, ACEPTADO, PENDIENTE, DURACION_ASESORIA, ROLES, CARRERAS
-=======
-from Usuarios.models import Documento
-from .constants import TEMAS, ESTADO, ACEPTADO, PENDIENTE, DURACION_ASESORIA
 from Usuarios.constants import ESTADOS_ALUMNO
->>>>>>> origin/develop
 
 class FormTutorias(forms.ModelForm):
 
@@ -175,7 +170,6 @@ class FormReporteDeTutorias(forms.ModelForm):
                 self.fields['tutor'].initial = full_name
 
 
-<<<<<<< HEAD
 class AlumnoChoiceField(forms.ModelMultipleChoiceField):
     def label_from_instance(self, obj):
         nombres = f"{obj.first_name} {obj.last_name}"
@@ -243,7 +237,7 @@ class ComunicacionMasivaForm(forms.Form):
 
             self.fields['tutorados'].queryset = Alumno.objects.filter(tutor_asignado=tutor_actual)
             print(f"Alumnos encontrados para {tutor_actual}: {self.fields['tutorados'].queryset.count()}")
-=======
+
 class FormVerTutorias(forms.Form):
     estado = forms.TypedChoiceField(
         choices=[('', 'Todos los estados')] + ESTADOS_ALUMNO[1:],
@@ -252,4 +246,3 @@ class FormVerTutorias(forms.Form):
         coerce=int,
         empty_value='',
     )
->>>>>>> origin/develop
