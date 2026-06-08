@@ -1,6 +1,7 @@
 import logging
 import re
-from typing import Any
+from threading import Thread
+from typing import Any, Optional
 
 from django.conf import settings
 from django.core.mail import send_mail
@@ -33,6 +34,7 @@ EVENT_CONFIG: dict[str, dict[str, str]] = {
 
 
 def _event_headline(event: str, tutor_nombre: str) -> str:
+    """Construye el encabezado corto que resume el evento de tutoría."""
     if event == "aceptada":
         return f"El tutor acepto tu solicitud de tutoría."
     if event == "rechazada":
@@ -45,6 +47,7 @@ def _event_headline(event: str, tutor_nombre: str) -> str:
 
 
 def _institutional_contact() -> dict[str, str]:
+    """Obtiene la información institucional usada en el pie del correo HTML."""
     return {
         "logo_url": getattr(settings, "NOTIFICATIONS_EMAIL_LOGO_URL", ""),
         "address": getattr(
@@ -63,6 +66,7 @@ def _institutional_contact() -> dict[str, str]:
 
 
 def _student_emails(alumno: Alumno) -> list[str]:
+    """Devuelve los correos del alumno sin duplicados, preservando el orden."""
     emails: list[str] = []
     for candidate in [alumno.email, alumno.correo_personal]:
         if candidate and candidate not in emails:
@@ -71,11 +75,13 @@ def _student_emails(alumno: Alumno) -> list[str]:
 
 
 def _phone_href(phone: str) -> str:
+    """Normaliza un teléfono para usarlo en un enlace tel: compatible."""
     normalized = re.sub(r"[^\d+]", "", phone or "")
     return normalized or ""
 
 
 def _build_email_body(event: str, tutoria: Any) -> str:
+    """Construye la versión de texto plano del correo de notificación."""
     temas = ", ".join(tutoria.get_tema_display())
     fecha_local = timezone.localtime(tutoria.fecha).strftime("%d/%m/%Y %H:%M")
     tutor_nombre = tutoria.tutor.get_full_name()
@@ -101,6 +107,7 @@ def _build_email_body(event: str, tutoria: Any) -> str:
 
 
 def _build_email_html(event: str, tutoria: Any) -> str:
+    """Construye el cuerpo HTML profesional del correo de notificación."""
     temas = ", ".join(tutoria.get_tema_display())
     fecha_local = timezone.localtime(tutoria.fecha).strftime("%d/%m/%Y %H:%M")
     tutor_nombre = tutoria.tutor.get_full_name()
@@ -188,7 +195,55 @@ def _build_email_html(event: str, tutoria: Any) -> str:
 """
 
 
+def _send_email_notification(
+    *,
+    subject: str,
+    message: str,
+    from_email: Optional[str],
+    recipient_list: list[str],
+    html_message: str,
+    tutoria_id: int,
+) -> None:
+    """Envía el correo real y captura errores para no interrumpir la petición web."""
+    try:
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=from_email,
+            recipient_list=recipient_list,
+            html_message=html_message,
+            fail_silently=False,
+        )
+    except Exception:
+        logger.exception("Fallo al enviar correo de notificacion para tutoria %s", tutoria_id)
+
+
+def _send_email_notification_async(
+    *,
+    subject: str,
+    message: str,
+    from_email: Optional[str],
+    recipient_list: list[str],
+    html_message: str,
+    tutoria_id: int,
+) -> None:
+    """Despacha el envío de correo en segundo plano para evitar bloquear la respuesta."""
+    Thread(
+        target=_send_email_notification,
+        kwargs={
+            "subject": subject,
+            "message": message,
+            "from_email": from_email,
+            "recipient_list": recipient_list,
+            "html_message": html_message,
+            "tutoria_id": tutoria_id,
+        },
+        daemon=True,
+    ).start()
+
+
 def notify_student_tutoria_event(event: str, tutoria: Any, actor: Any) -> None:
+    """Envía la notificación interna y el correo al alumno para un evento de tutoría."""
     config = EVENT_CONFIG.get(event)
     if not config:
         logger.warning("Evento de notificacion no soportado: %s", event)
@@ -203,14 +258,11 @@ def notify_student_tutoria_event(event: str, tutoria: Any, actor: Any) -> None:
         logger.warning("Alumno %s sin correos para enviar notificacion", tutoria.alumno_id)
         return
 
-    try:
-        send_mail(
-            subject=config["subject"],
-            message=_build_email_body(event, tutoria),
-            from_email=getattr(settings, "EMAIL_HOST_USER", None) or getattr(settings, "DEFAULT_FROM_EMAIL", None),
-            recipient_list=emails,
-            html_message=_build_email_html(event, tutoria),
-            fail_silently=False,
-        )
-    except Exception:
-        logger.exception("Fallo al enviar correo de notificacion para tutoria %s", tutoria.pk)
+    _send_email_notification_async(
+        subject=config["subject"],
+        message=_build_email_body(event, tutoria),
+        from_email=getattr(settings, "EMAIL_HOST_USER", None) or getattr(settings, "DEFAULT_FROM_EMAIL", None),
+        recipient_list=emails,
+        html_message=_build_email_html(event, tutoria),
+        tutoria_id=tutoria.pk,
+    )

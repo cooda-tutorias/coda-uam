@@ -20,15 +20,13 @@ from .constants import TEMAS
 
 from .models import Tutoria, HistorialCambioTutoria
 from .forms import FormTutorias, FormSeguimiento, FormReporte, FormCartasDeAsignacion, FormReporteDeTutorias, FormVerTutorias
-from .notification_service import notify_student_tutoria_event
+from .signals import tutoria_notification_requested
 # from .forms import FormSeguimiento # de nuevo, no estoy seguro, FormReporte
 from .constants import PENDIENTE, ACEPTADO, RECHAZADO, DURACION_ASESORIA, CANCELADO, ESTADO # de nuevo, no estoy seguro
 from Usuarios.constants import TUTOR, ALUMNO, COORDINADOR, TEMPLATES
 from Usuarios.views import BaseAccessMixin, CodaViewMixin, TutorViewMixin, AlumnoViewMixin, CordinadorViewMixin
 from Usuarios.models import Tutor, Alumno, Cordinador, Coda
 from Usuarios.models import Documento
-from notifications.signals import notify
-
 from django.http import FileResponse
 from django.utils import timezone
 from reportlab.pdfgen import canvas
@@ -280,6 +278,7 @@ def index(request):
     return HttpResponse("Tutorias app index placeholder")
 
 def normalizar_numero_oficio(oficio_ingresado, fecha_documento) -> str:
+    """Normaliza el número de oficio al formato institucional esperado."""
     if oficio_ingresado in (None, ""):
         return ""
 
@@ -297,7 +296,12 @@ class AceptarTutoriaView(View):
 
         tutoria.estado = ACEPTADO
         tutoria.save(update_fields=["estado"])
-        notify_student_tutoria_event("aceptada", tutoria, request.user)
+        tutoria_notification_requested.send(
+            sender=self.__class__,
+            event="aceptada",
+            tutoria=tutoria,
+            actor=request.user,
+        )
         return redirect('Tutorias-tutor')  
 
 class RechazarTutoriaView(View):
@@ -311,7 +315,12 @@ class RechazarTutoriaView(View):
 
         tutoria.estado = RECHAZADO
         tutoria.save(update_fields=["estado"])
-        notify_student_tutoria_event("rechazada", tutoria, request.user)
+        tutoria_notification_requested.send(
+            sender=self.__class__,
+            event="rechazada",
+            tutoria=tutoria,
+            actor=request.user,
+        )
         return redirect('Tutorias-tutor')
 
 class CancelarTutoriaView(View):
@@ -348,6 +357,7 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
         return context
 
     def _build_change_summary(self, original: Tutoria, form: BaseModelForm, changed_fields: list[str]) -> str:
+        """Resume los campos modificados de la tutoría para guardarlos en el historial."""
         field_labels = {
             "tema": "Tema(s)",
             "fecha": "Fecha y Hora",
@@ -428,14 +438,31 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
         else:
             recipient = Tutor.objects.none()
 
-        notify.send(actor, recipient=recipient, verb='Tutoria Modificada')
+        tutoria_notification_requested.send(
+            sender=self.__class__,
+            event="tutoria_modificada",
+            tutoria=self.object,
+            actor=actor,
+            recipient=recipient,
+            verb="Tutoria Modificada",
+        )
         response = super().form_valid(form)
 
         if fecha_changed_by_tutor:
-            notify_student_tutoria_event("cita_programada", self.object, actor)
+            tutoria_notification_requested.send(
+                sender=self.__class__,
+                event="cita_programada",
+                tutoria=self.object,
+                actor=actor,
+            )
 
         if estado_changed_by_tutor and estado_notification_event:
-            notify_student_tutoria_event(estado_notification_event, self.object, actor)
+            tutoria_notification_requested.send(
+                sender=self.__class__,
+                event=estado_notification_event,
+                tutoria=self.object,
+                actor=actor,
+            )
 
         HistorialCambioTutoria.objects.create(
             tutoria=self.object,
@@ -481,9 +508,16 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
         if self.request.user.has_role("ALU"):
             recipient = Tutor.objects.get(pk=alumno.tutor_asignado)
 
-        # notify.send(alumno, recipient=recipient, verb='Nueva solicitud de tutoria', description=f'{form.instance.get_tema_display()}')
         # Eliminar corchetes de la lista
-        notify.send(alumno, recipient=recipient, verb='Nueva solicitud de tutoria', description=f'{", ".join(form.instance.get_tema_display())}')
+        tutoria_notification_requested.send(
+            sender=self.__class__,
+            event="solicitud_creada",
+            tutoria=form.instance,
+            actor=alumno,
+            recipient=recipient,
+            verb='Nueva solicitud de tutoria',
+            description=f'{", ".join(form.instance.get_tema_display())}',
+        )
         
         # TODO utilizar una rutina para mandar los correos
         #send_mail(
@@ -1347,7 +1381,14 @@ class QuickCreateTutoriaView(AlumnoViewMixin, CreateView):
         else:
             recipient = Alumno.objects.filter(pk=self.get_object().alumno)
         
-        notify.send(alumno, recipient=recipient, verb='Tutoria registrada con QR')
+        tutoria_notification_requested.send(
+            sender=self.__class__,
+            event="qr_generada",
+            tutoria=form.instance,
+            actor=alumno,
+            recipient=recipient,
+            verb='Tutoria registrada con QR',
+        )
 
         return super().form_valid(form)
 
@@ -1449,7 +1490,12 @@ class RealizarSeguimientoView(TutorViewMixin, UpdateView):
     def form_valid(self, form: BaseModelForm) -> HttpResponse:
         tutor = Tutor.objects.get(pk=self.request.user)
         response = super().form_valid(form)
-        notify_student_tutoria_event("seguimiento_registrado", self.object, tutor)
+        tutoria_notification_requested.send(
+            sender=self.__class__,
+            event="seguimiento_registrado",
+            tutoria=self.object,
+            actor=tutor,
+        )
         return response
 
 
@@ -1509,9 +1555,23 @@ class EditarEstadoAlumnoHistoricoView(BaseAccessMixin, View):
             alumno = Alumno.objects.filter(pk=tutoria.alumno_id)
             
             if request.user.has_role("TUT"):
-                notify.send(request.user, recipient=alumno, verb='Estado histórico de tutoría actualizado')
+                tutoria_notification_requested.send(
+                    sender=self.__class__,
+                    event="estado_historico_actualizado",
+                    tutoria=tutoria,
+                    actor=request.user,
+                    recipient=alumno,
+                    verb='Estado histórico de tutoría actualizado',
+                )
             else:
-                notify.send(request.user, recipient=tutor, verb='Estado histórico de tutoría actualizado por administración')
+                tutoria_notification_requested.send(
+                    sender=self.__class__,
+                    event="estado_historico_actualizado",
+                    tutoria=tutoria,
+                    actor=request.user,
+                    recipient=tutor,
+                    verb='Estado histórico de tutoría actualizado por administración',
+                )
             
             # Mostrar mensaje de éxito
             messages.success(request, f"Estado histórico actualizado: {etiqueta_anterior} → {etiqueta_nueva}")
