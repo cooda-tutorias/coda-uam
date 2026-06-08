@@ -1,8 +1,8 @@
 services:
   db:
-    image: postgres:17
+    build: ./DB
     volumes:
-      - ./data/db:/var/lib/postgresql/data
+      - ./pgdata:/var/lib/postgresql
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
@@ -17,7 +17,6 @@ services:
   web:
     build: ./coda-src
     volumes:
-      - ./coda-src:/app
       - ./media:/app/media
       - ./coda-src/static:/app/static
     ports:
@@ -39,6 +38,7 @@ services:
       - POSTGRES_NAME=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
     depends_on:
       db:
         condition: service_healthy

@@ -12,14 +12,14 @@ from django.views.generic import View, FormView
 from django.urls import reverse_lazy
 from django.utils.text import slugify
 from django.core.exceptions import PermissionDenied
-from django.core.mail import send_mail
+from django.core.mail import send_mail, EmailMessage
 from django.contrib import messages
 from datetime import datetime, timedelta
 import pandas as pd
 from .constants import TEMAS
 
 from .models import Tutoria, HistorialCambioTutoria
-from .forms import FormTutorias, FormSeguimiento, FormReporte, FormCartasDeAsignacion, FormReporteDeTutorias, FormVerTutorias
+from .forms import FormTutorias, FormSeguimiento, FormReporte, FormCartasDeAsignacion, FormReporteDeTutorias, ComunicacionMasivaForm, FormVerTutorias
 # from .forms import FormSeguimiento # de nuevo, no estoy seguro, FormReporte
 from .constants import PENDIENTE, ACEPTADO, RECHAZADO, DURACION_ASESORIA, CANCELADO # de nuevo, no estoy seguro
 from Usuarios.constants import TUTOR, ALUMNO, COORDINADOR, TEMPLATES, CORREO
@@ -43,6 +43,9 @@ import re, docx, os
 from zipfile import ZipFile
 from io import BytesIO
 from .services.docx_reportes import generar_docx_reporte_tutorias_brindadas
+
+from django.views.generic import TemplateView, FormView
+from django.conf import settings
 
 #Funcion para descargar pdf
 def carta_tutorados_pdf(request):
@@ -1538,3 +1541,72 @@ class ExportarTutoriasAceptadasExcelView(CodaViewMixin, View):
 
         return response
 
+
+class ComunicacionMasivaTutoriasView(FormView):
+
+    print("Inicializando vista de comunicación masiva")
+    
+    template_name = 'Tutorias/comunicacionMasiva.html'
+    form_class = ComunicacionMasivaForm
+    success_url = reverse_lazy('tutorias-comunicacion-masiva')
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['header_footer'] = "Usuarios/base.html"
+        print("Contexto:", ctx)
+        return ctx
+
+    
+    def get_form_kwargs(self):
+        
+        kwargs = super().get_form_kwargs()
+        usuario_actual = self.request.user
+        
+        tutor_instance = None
+        if hasattr(usuario_actual, 'tutor'):
+            tutor_instance = usuario_actual.tutor 
+        else:
+            try:
+                tutor_instance = Tutor.objects.get(pk=usuario_actual.pk)
+            except Tutor.DoesNotExist:
+                print("El usuario logueado no es un Tutor válido")
+        
+        kwargs['tutor'] = tutor_instance
+        return kwargs
+
+    def form_valid(self, form):
+        asunto = form.cleaned_data['asunto']
+        mensaje = form.cleaned_data['mensaje']
+        tutorados = form.cleaned_data['tutorados']
+        
+        lista_correos = [alumno.email for alumno in tutorados if alumno.email]
+        if lista_correos:
+            try:
+                print(f"Preparando correo con asunto: {asunto}")
+                email = EmailMessage(
+                    subject=asunto,
+                    body=mensaje,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    to=[self.request.user.email], 
+                    bcc=lista_correos
+                )
+
+                print(f"Enviando correo a: {lista_correos}")
+
+                archivos = self.request.FILES.getlist('archivos')
+                for f in archivos:
+                    email.attach(f.name, f.read(), f.content_type)
+
+                email.send(fail_silently=False)
+                
+                cantidad = len(lista_correos)
+                destinatario_texto = "tutorado" if cantidad == 1 else "tutorados"
+                messages.success(self.request, f'Correo enviado a {cantidad} {destinatario_texto}.')
+
+            except Exception as e:
+                messages.error(self.request, f'Ocurrió un error al enviar el correo: {str(e)}')
+                return super().form_invalid(form)
+        else:
+            messages.warning(self.request, 'No alumnos con correo válido.')
+
+        return super().form_valid(form)

@@ -31,6 +31,7 @@ urlpatterns = [
     path('tutoria/<int:pk>/rechazar/', views.RechazarTutoriaView.as_view(), name='rechazar_tutoria'),
     path('tutoria/<int:pk>/cancelar/', views.CancelarTutoriaView.as_view(), name='cancelar-tutoria'),
     path('historial-tutorias/', views.HistorialTutoriasListView.as_view(), name='Tutorias-historial'),
+    path('tutorias-comunicacion-masiva/', views.ComunicacionMasivaTutoriasView.as_view(), name='tutorias-comunicacion-masiva'),
     path('historial-tutorias-generar/', views.HistorialTutoriasGenerateView.as_view(), name='Tutorias-historial-generar'),
     path('tutorados-tutor/', views.VerTutoradosTutorListView.as_view(), name='Tutorados-tutor'),
     path('tutorias-tutor/', views.VerTutoriasTutorListView.as_view(),name='Tutorias-tutor'),
