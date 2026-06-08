@@ -1,8 +1,8 @@
 services:
   db:
-    build: ./DB
+    image: postgres:17
     volumes:
-      - ./pgdata:/var/lib/postgresql
+      - ./data/db:/var/lib/postgresql/data
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
