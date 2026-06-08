@@ -155,7 +155,7 @@ EMAIL_HOST_PASSWORD = os.getenv('NOTIFICATIONS_EMAIL_PASSWORD', os.getenv('EMAIL
 EMAIL_HOST_USER = os.getenv('NOTIFICATIONS_EMAIL_USER', 'tutorias.beta.uamc@gmail.com')
 EMAIL_PORT = int(os.getenv('NOTIFICATIONS_EMAIL_PORT', '587'))
 EMAIL_USE_TLS = os.getenv('NOTIFICATIONS_EMAIL_USE_TLS', 'True').strip().lower() in ('1', 'true', 'yes', 'on')
-EMAIL_TIMEOUT = int(os.getenv('NOTIFICATIONS_EMAIL_TIMEOUT', '8'))
+EMAIL_TIMEOUT = int(os.getenv('NOTIFICATIONS_EMAIL_TIMEOUT') or '8')
 DEFAULT_FROM_EMAIL = os.getenv('NOTIFICATIONS_EMAIL_FROM', EMAIL_HOST_USER)
 
 # Notificaciones: identidad visual y datos institucionales

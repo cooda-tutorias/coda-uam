@@ -228,6 +228,18 @@ def _send_email_notification_async(
     tutoria_id: int,
 ) -> None:
     """Despacha el envío de correo en segundo plano para evitar bloquear la respuesta."""
+    backend = getattr(settings, "EMAIL_BACKEND", "")
+    if backend.endswith("locmem.EmailBackend"):
+        _send_email_notification(
+            subject=subject,
+            message=message,
+            from_email=from_email,
+            recipient_list=recipient_list,
+            html_message=html_message,
+            tutoria_id=tutoria_id,
+        )
+        return
+
     Thread(
         target=_send_email_notification,
         kwargs={
