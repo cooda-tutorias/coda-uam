@@ -20,15 +20,13 @@ from .constants import TEMAS
 
 from .models import Tutoria, HistorialCambioTutoria
 from .forms import FormTutorias, FormSeguimiento, FormReporte, FormCartasDeAsignacion, FormReporteDeTutorias, ComunicacionMasivaForm, FormVerTutorias
+from .signals import tutoria_notification_requested
 # from .forms import FormSeguimiento # de nuevo, no estoy seguro, FormReporte
-from .constants import PENDIENTE, ACEPTADO, RECHAZADO, DURACION_ASESORIA, CANCELADO # de nuevo, no estoy seguro
-from Usuarios.constants import TUTOR, ALUMNO, COORDINADOR, TEMPLATES, CORREO
+from .constants import PENDIENTE, ACEPTADO, RECHAZADO, DURACION_ASESORIA, CANCELADO, ESTADO # de nuevo, no estoy seguro
+from Usuarios.constants import TUTOR, ALUMNO, COORDINADOR, TEMPLATES
 from Usuarios.views import BaseAccessMixin, CodaViewMixin, TutorViewMixin, AlumnoViewMixin, CordinadorViewMixin
 from Usuarios.models import Tutor, Alumno, Cordinador, Coda
 from Usuarios.models import Documento
-from notifications.signals import notify
-from smtplib import SMTPException
-
 from django.http import FileResponse
 from django.utils import timezone
 from reportlab.pdfgen import canvas
@@ -283,6 +281,7 @@ def index(request):
     return HttpResponse("Tutorias app index placeholder")
 
 def normalizar_numero_oficio(oficio_ingresado, fecha_documento) -> str:
+    """Normaliza el número de oficio al formato institucional esperado."""
     if oficio_ingresado in (None, ""):
         return ""
 
@@ -292,15 +291,39 @@ def normalizar_numero_oficio(oficio_ingresado, fecha_documento) -> str:
 class AceptarTutoriaView(View):
     def post(self, request, pk):
         tutoria = get_object_or_404(Tutoria, pk=pk)
+        if not request.user.has_role("TUT") or tutoria.tutor_id != request.user.pk:
+            raise PermissionDenied("No tienes permiso para modificar esta tutoría")
+
+        if tutoria.estado == ACEPTADO:
+            return redirect('Tutorias-tutor')
+
         tutoria.estado = ACEPTADO
-        tutoria.save()
+        tutoria.save(update_fields=["estado"])
+        tutoria_notification_requested.send(
+            sender=self.__class__,
+            event="aceptada",
+            tutoria=tutoria,
+            actor=request.user,
+        )
         return redirect('Tutorias-tutor')  
 
 class RechazarTutoriaView(View):
     def post(self, request, pk):
         tutoria = get_object_or_404(Tutoria, pk=pk)
+        if not request.user.has_role("TUT") or tutoria.tutor_id != request.user.pk:
+            raise PermissionDenied("No tienes permiso para modificar esta tutoría")
+
+        if tutoria.estado == RECHAZADO:
+            return redirect('Tutorias-tutor')
+
         tutoria.estado = RECHAZADO
-        tutoria.save()
+        tutoria.save(update_fields=["estado"])
+        tutoria_notification_requested.send(
+            sender=self.__class__,
+            event="rechazada",
+            tutoria=tutoria,
+            actor=request.user,
+        )
         return redirect('Tutorias-tutor')
 
 class CancelarTutoriaView(View):
@@ -336,16 +359,19 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
         context["historial_cambios"] = self.object.historial_cambios.all()[:20]
         return context
 
-    def _build_change_summary(self, original: Tutoria, form: BaseModelForm) -> str:
+    def _build_change_summary(self, original: Tutoria, form: BaseModelForm, changed_fields: list[str]) -> str:
+        """Resume los campos modificados de la tutoría para guardarlos en el historial."""
         field_labels = {
             "tema": "Tema(s)",
             "fecha": "Fecha y Hora",
             "descripcion": "Observaciones",
+            "estado": "Estado de la tutoría",
         }
         tema_map = dict(TEMAS)
+        estado_map = dict(ESTADO)
         changes = []
 
-        for field in form.changed_data:
+        for field in changed_fields:
             if field == "tema":
                 old_value = ", ".join(original.get_tema_display())
                 new_codes = form.cleaned_data.get("tema", [])
@@ -356,6 +382,10 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
             elif field == "descripcion":
                 old_value = original.descripcion or ""
                 new_value = form.cleaned_data.get("descripcion") or ""
+            elif field == "estado":
+                old_value = estado_map.get(original.estado, original.estado)
+                new_state = form.cleaned_data.get("estado") or getattr(form.instance, "estado", None)
+                new_value = estado_map.get(new_state, new_state)
             else:
                 old_value = str(getattr(original, field, ""))
                 new_value = str(form.cleaned_data.get(field, ""))
@@ -368,7 +398,21 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
     def form_valid(self, form: BaseModelForm) -> HttpResponse:
         original = self.get_object()
         changed_fields = list(form.changed_data)
-        change_summary = self._build_change_summary(original, form) if changed_fields else "Sin cambios detectados"
+        fecha_changed_by_tutor = self.request.user.has_role("TUT") and "fecha" in changed_fields
+        estado_changed_by_tutor = False
+        estado_notification_event = None
+
+        if self.request.user.has_role("TUT"):
+            nuevo_estado_tutoria = self.request.POST.get("estado_tutoria")
+            allowed_states = {ACEPTADO, RECHAZADO}
+            if nuevo_estado_tutoria in allowed_states and nuevo_estado_tutoria != original.estado:
+                form.instance.estado = nuevo_estado_tutoria
+                if "estado" not in changed_fields:
+                    changed_fields.append("estado")
+                estado_changed_by_tutor = True
+                estado_notification_event = "aceptada" if nuevo_estado_tutoria == ACEPTADO else "rechazada"
+
+        change_summary = self._build_change_summary(original, form, changed_fields) if changed_fields else "Sin cambios detectados"
         actor = self.request.user
 
         # Manejar cambio de estado histórico si viene en el POST y el usuario tiene permiso
@@ -397,8 +441,31 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
         else:
             recipient = Tutor.objects.none()
 
-        notify.send(actor, recipient=recipient, verb='Tutoria Modificada')
+        tutoria_notification_requested.send(
+            sender=self.__class__,
+            event="tutoria_modificada",
+            tutoria=self.object,
+            actor=actor,
+            recipient=recipient,
+            verb="Tutoria Modificada",
+        )
         response = super().form_valid(form)
+
+        if fecha_changed_by_tutor:
+            tutoria_notification_requested.send(
+                sender=self.__class__,
+                event="cita_programada",
+                tutoria=self.object,
+                actor=actor,
+            )
+
+        if estado_changed_by_tutor and estado_notification_event:
+            tutoria_notification_requested.send(
+                sender=self.__class__,
+                event=estado_notification_event,
+                tutoria=self.object,
+                actor=actor,
+            )
 
         HistorialCambioTutoria.objects.create(
             tutoria=self.object,
@@ -444,9 +511,16 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
         if self.request.user.has_role("ALU"):
             recipient = Tutor.objects.get(pk=alumno.tutor_asignado)
 
-        # notify.send(alumno, recipient=recipient, verb='Nueva solicitud de tutoria', description=f'{form.instance.get_tema_display()}')
         # Eliminar corchetes de la lista
-        notify.send(alumno, recipient=recipient, verb='Nueva solicitud de tutoria', description=f'{", ".join(form.instance.get_tema_display())}')
+        tutoria_notification_requested.send(
+            sender=self.__class__,
+            event="solicitud_creada",
+            tutoria=form.instance,
+            actor=alumno,
+            recipient=recipient,
+            verb='Nueva solicitud de tutoria',
+            description=f'{", ".join(form.instance.get_tema_display())}',
+        )
         
         # TODO utilizar una rutina para mandar los correos
         #send_mail(
@@ -1310,7 +1384,14 @@ class QuickCreateTutoriaView(AlumnoViewMixin, CreateView):
         else:
             recipient = Alumno.objects.filter(pk=self.get_object().alumno)
         
-        notify.send(alumno, recipient=recipient, verb='Tutoria registrada con QR')
+        tutoria_notification_requested.send(
+            sender=self.__class__,
+            event="qr_generada",
+            tutoria=form.instance,
+            actor=alumno,
+            recipient=recipient,
+            verb='Tutoria registrada con QR',
+        )
 
         return super().form_valid(form)
 
@@ -1411,10 +1492,14 @@ class RealizarSeguimientoView(TutorViewMixin, UpdateView):
 
     def form_valid(self, form: BaseModelForm) -> HttpResponse:
         tutor = Tutor.objects.get(pk=self.request.user)
-        recipient = Alumno.objects.filter(pk=self.get_object().alumno)
-
-        notify.send(tutor, recipient=recipient, verb='Seguimiento de tutoria realizado')
-        return super().form_valid(form)
+        response = super().form_valid(form)
+        tutoria_notification_requested.send(
+            sender=self.__class__,
+            event="seguimiento_registrado",
+            tutoria=self.object,
+            actor=tutor,
+        )
+        return response
 
 
 class EditarEstadoAlumnoHistoricoView(BaseAccessMixin, View):
@@ -1473,9 +1558,23 @@ class EditarEstadoAlumnoHistoricoView(BaseAccessMixin, View):
             alumno = Alumno.objects.filter(pk=tutoria.alumno_id)
             
             if request.user.has_role("TUT"):
-                notify.send(request.user, recipient=alumno, verb='Estado histórico de tutoría actualizado')
+                tutoria_notification_requested.send(
+                    sender=self.__class__,
+                    event="estado_historico_actualizado",
+                    tutoria=tutoria,
+                    actor=request.user,
+                    recipient=alumno,
+                    verb='Estado histórico de tutoría actualizado',
+                )
             else:
-                notify.send(request.user, recipient=tutor, verb='Estado histórico de tutoría actualizado por administración')
+                tutoria_notification_requested.send(
+                    sender=self.__class__,
+                    event="estado_historico_actualizado",
+                    tutoria=tutoria,
+                    actor=request.user,
+                    recipient=tutor,
+                    verb='Estado histórico de tutoría actualizado por administración',
+                )
             
             # Mostrar mensaje de éxito
             messages.success(request, f"Estado histórico actualizado: {etiqueta_anterior} → {etiqueta_nueva}")
@@ -1545,7 +1644,7 @@ class ExportarTutoriasAceptadasExcelView(CodaViewMixin, View):
 class ComunicacionMasivaTutoriasView(FormView):
 
     print("Inicializando vista de comunicación masiva")
-    
+
     template_name = 'Tutorias/comunicacionMasiva.html'
     form_class = ComunicacionMasivaForm
     success_url = reverse_lazy('tutorias-comunicacion-masiva')
@@ -1556,21 +1655,19 @@ class ComunicacionMasivaTutoriasView(FormView):
         print("Contexto:", ctx)
         return ctx
 
-    
     def get_form_kwargs(self):
-        
         kwargs = super().get_form_kwargs()
         usuario_actual = self.request.user
-        
+
         tutor_instance = None
         if hasattr(usuario_actual, 'tutor'):
-            tutor_instance = usuario_actual.tutor 
+            tutor_instance = usuario_actual.tutor
         else:
             try:
                 tutor_instance = Tutor.objects.get(pk=usuario_actual.pk)
             except Tutor.DoesNotExist:
                 print("El usuario logueado no es un Tutor válido")
-        
+
         kwargs['tutor'] = tutor_instance
         return kwargs
 
@@ -1578,7 +1675,7 @@ class ComunicacionMasivaTutoriasView(FormView):
         asunto = form.cleaned_data['asunto']
         mensaje = form.cleaned_data['mensaje']
         tutorados = form.cleaned_data['tutorados']
-        
+
         lista_correos = [alumno.email for alumno in tutorados if alumno.email]
         if lista_correos:
             try:
@@ -1587,7 +1684,7 @@ class ComunicacionMasivaTutoriasView(FormView):
                     subject=asunto,
                     body=mensaje,
                     from_email=settings.DEFAULT_FROM_EMAIL,
-                    to=[self.request.user.email], 
+                    to=[self.request.user.email],
                     bcc=lista_correos
                 )
 
@@ -1598,7 +1695,7 @@ class ComunicacionMasivaTutoriasView(FormView):
                     email.attach(f.name, f.read(), f.content_type)
 
                 email.send(fail_silently=False)
-                
+
                 cantidad = len(lista_correos)
                 destinatario_texto = "tutorado" if cantidad == 1 else "tutorados"
                 messages.success(self.request, f'Correo enviado a {cantidad} {destinatario_texto}.')

@@ -59,7 +59,7 @@ INSTALLED_APPS = [
     'storages',
 
     #Internal
-    'Tutorias',
+    'Tutorias.apps.TutoriasConfig',
     'Usuarios',
     'notifications',
 ]
@@ -150,26 +150,23 @@ USE_I18N = True
 
 USE_TZ = True
 
-""" Configuracion para prod, con carrier SMTP de Gmail """
-""" EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_HOST_PASSWORD = os.environ['EMAIL_HOST_PASSWORD']
-EMAIL_HOST_USER = 'tutorias.beta.uamc@gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-DEFAULT_FROM_EMAIL = EMAIL_HOST_USER """
+EMAIL_HOST = os.getenv('NOTIFICATIONS_EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_HOST_PASSWORD = os.getenv('NOTIFICATIONS_EMAIL_PASSWORD', os.getenv('EMAIL_HOST_PASSWORD', ''))
+EMAIL_HOST_USER = os.getenv('NOTIFICATIONS_EMAIL_USER', 'tutorias.beta.uamc@gmail.com')
+EMAIL_PORT = int(os.getenv('NOTIFICATIONS_EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.getenv('NOTIFICATIONS_EMAIL_USE_TLS', 'True').strip().lower() in ('1', 'true', 'yes', 'on')
+EMAIL_TIMEOUT = int(os.getenv('NOTIFICATIONS_EMAIL_TIMEOUT') or '8')
+DEFAULT_FROM_EMAIL = os.getenv('NOTIFICATIONS_EMAIL_FROM', EMAIL_HOST_USER)
 
-""" Configuracion para desarrollo, usando un SMTP fake para enviar y recibir correos """
-""" Ojo, el protocolo SMTP SÍ funciona, cuando digo fake, me refiero a que no es un carrier real que termina enviando correos a carriers reales """
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.sendgrid.net'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_USE_SSL = False
-EMAIL_HOST_USER = 'apikey'
-EMAIL_HOST_PASSWORD = os.environ.get('SENDGRID_API_KEY', '')
-DEFAULT_FROM_EMAIL = 'fernando.cazares@cua.uam.mx' 
-
+# Notificaciones: identidad visual y datos institucionales
+NOTIFICATIONS_EMAIL_LOGO_URL = os.getenv('NOTIFICATIONS_EMAIL_LOGO_URL', '')
+NOTIFICATIONS_UAM_ADDRESS = os.getenv(
+    'NOTIFICATIONS_UAM_ADDRESS',
+    'Av. Vasco de Quiroga 4871, Santa Fe Cuajimalpa, Cuajimalpa de Morelos, 05348, Ciudad de Mexico, CDMX',
+)
+NOTIFICATIONS_UAM_MAPS_URL = os.getenv('NOTIFICATIONS_UAM_MAPS_URL', 'https://maps.google.com/?q=UAM+Cuajimalpa')
+NOTIFICATIONS_UAM_PHONE = os.getenv('NOTIFICATIONS_UAM_PHONE', '(55) 5814 6500')
+NOTIFICATIONS_CODDAA_PHONE = os.getenv('NOTIFICATIONS_CODDAA_PHONE', '(55) 5814 6500')
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
