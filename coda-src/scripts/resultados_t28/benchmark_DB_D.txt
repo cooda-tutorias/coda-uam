@@ -1,0 +1,179 @@
+==========================================================================================
+BENCHMARK T28 - DB_D
+==========================================================================================
+Marcador: [PRUEBA_T28]_DB_D
+Plantilla: Reporte tutorías atendidas (carta anual)
+Archivo plantilla: documentos/reporte_tutorias_plantilla_2_1.docx
+Tutores sintéticos: 150
+Alumnos sintéticos: 1500
+Tutorías sintéticas: 6000
+Columnas: Alumno, Fecha, Tema, Notas
+==========================================================================================
+0001 | BM | 90114 | tutorias=40 | docx=0.052 MB | tiempo=0.219s
+0002 | BM | 90115 | tutorias=40 | docx=0.052 MB | tiempo=0.174s
+0003 | BM | 90116 | tutorias=40 | docx=0.052 MB | tiempo=0.161s
+0004 | BM | 90117 | tutorias=40 | docx=0.052 MB | tiempo=0.156s
+0005 | BM | 90118 | tutorias=40 | docx=0.052 MB | tiempo=0.153s
+0006 | BM | 90119 | tutorias=40 | docx=0.052 MB | tiempo=0.145s
+0007 | BM | 90120 | tutorias=40 | docx=0.052 MB | tiempo=0.135s
+0008 | BM | 90121 | tutorias=40 | docx=0.052 MB | tiempo=0.142s
+0009 | BM | 90122 | tutorias=40 | docx=0.052 MB | tiempo=0.236s
+0010 | BM | 90123 | tutorias=40 | docx=0.052 MB | tiempo=0.181s
+0011 | BM | 90124 | tutorias=40 | docx=0.052 MB | tiempo=0.162s
+0012 | BM | 90125 | tutorias=40 | docx=0.052 MB | tiempo=0.140s
+0013 | BM | 90126 | tutorias=40 | docx=0.052 MB | tiempo=0.154s
+0014 | BM | 90127 | tutorias=40 | docx=0.052 MB | tiempo=0.147s
+0015 | BM | 90128 | tutorias=40 | docx=0.052 MB | tiempo=0.159s
+0016 | BM | 90129 | tutorias=40 | docx=0.052 MB | tiempo=0.200s
+0017 | BM | 90130 | tutorias=40 | docx=0.052 MB | tiempo=0.329s
+0018 | BM | 90131 | tutorias=40 | docx=0.052 MB | tiempo=0.137s
+0019 | BM | 90132 | tutorias=40 | docx=0.052 MB | tiempo=0.144s
+0020 | BM | 90133 | tutorias=40 | docx=0.052 MB | tiempo=0.166s
+0021 | BM | 90134 | tutorias=40 | docx=0.052 MB | tiempo=0.104s
+0022 | BM | 90135 | tutorias=40 | docx=0.052 MB | tiempo=0.110s
+0023 | BM | 90136 | tutorias=40 | docx=0.052 MB | tiempo=0.103s
+0024 | BM | 90137 | tutorias=40 | docx=0.052 MB | tiempo=0.111s
+0025 | BM | 90138 | tutorias=40 | docx=0.052 MB | tiempo=0.102s
+0026 | BM | 90139 | tutorias=40 | docx=0.052 MB | tiempo=0.112s
+0027 | BM | 90140 | tutorias=40 | docx=0.052 MB | tiempo=0.104s
+0028 | BM | 90141 | tutorias=40 | docx=0.052 MB | tiempo=0.113s
+0029 | BM | 90142 | tutorias=40 | docx=0.052 MB | tiempo=0.103s
+0030 | BM | 90143 | tutorias=40 | docx=0.052 MB | tiempo=0.214s
+0031 | BM | 90144 | tutorias=40 | docx=0.052 MB | tiempo=0.147s
+0032 | BM | 90145 | tutorias=40 | docx=0.052 MB | tiempo=0.175s
+0033 | BM | 90146 | tutorias=40 | docx=0.052 MB | tiempo=0.159s
+0034 | BM | 90147 | tutorias=40 | docx=0.052 MB | tiempo=0.111s
+0035 | BM | 90148 | tutorias=40 | docx=0.052 MB | tiempo=0.100s
+0036 | BM | 90149 | tutorias=40 | docx=0.052 MB | tiempo=0.101s
+0037 | BM | 90150 | tutorias=40 | docx=0.052 MB | tiempo=0.104s
+0038 | COM | 90001 | tutorias=40 | docx=0.052 MB | tiempo=0.113s
+0039 | COM | 90002 | tutorias=40 | docx=0.052 MB | tiempo=0.101s
+0040 | COM | 90003 | tutorias=40 | docx=0.052 MB | tiempo=0.105s
+0041 | COM | 90004 | tutorias=40 | docx=0.052 MB | tiempo=0.109s
+0042 | COM | 90005 | tutorias=40 | docx=0.052 MB | tiempo=0.113s
+0043 | COM | 90006 | tutorias=40 | docx=0.052 MB | tiempo=0.190s
+0044 | COM | 90007 | tutorias=40 | docx=0.052 MB | tiempo=0.113s
+0045 | COM | 90008 | tutorias=40 | docx=0.052 MB | tiempo=0.103s
+0046 | COM | 90009 | tutorias=40 | docx=0.052 MB | tiempo=0.111s
+0047 | COM | 90010 | tutorias=40 | docx=0.052 MB | tiempo=0.215s
+0048 | COM | 90011 | tutorias=40 | docx=0.052 MB | tiempo=0.119s
+0049 | COM | 90012 | tutorias=40 | docx=0.052 MB | tiempo=0.102s
+0050 | COM | 90013 | tutorias=40 | docx=0.052 MB | tiempo=0.110s
+0051 | COM | 90014 | tutorias=40 | docx=0.052 MB | tiempo=0.115s
+0052 | COM | 90015 | tutorias=40 | docx=0.052 MB | tiempo=0.176s
+0053 | COM | 90016 | tutorias=40 | docx=0.052 MB | tiempo=0.141s
+0054 | COM | 90017 | tutorias=40 | docx=0.052 MB | tiempo=0.115s
+0055 | COM | 90018 | tutorias=40 | docx=0.052 MB | tiempo=0.103s
+0056 | COM | 90019 | tutorias=40 | docx=0.052 MB | tiempo=0.103s
+0057 | COM | 90020 | tutorias=40 | docx=0.052 MB | tiempo=0.114s
+0058 | COM | 90021 | tutorias=40 | docx=0.052 MB | tiempo=0.107s
+0059 | COM | 90022 | tutorias=40 | docx=0.052 MB | tiempo=0.105s
+0060 | COM | 90023 | tutorias=40 | docx=0.052 MB | tiempo=0.103s
+0061 | COM | 90024 | tutorias=40 | docx=0.052 MB | tiempo=0.108s
+0062 | COM | 90025 | tutorias=40 | docx=0.052 MB | tiempo=0.375s
+0063 | COM | 90026 | tutorias=40 | docx=0.052 MB | tiempo=0.227s
+0064 | COM | 90027 | tutorias=40 | docx=0.052 MB | tiempo=0.153s
+0065 | COM | 90028 | tutorias=40 | docx=0.052 MB | tiempo=0.102s
+0066 | COM | 90029 | tutorias=40 | docx=0.052 MB | tiempo=0.104s
+0067 | COM | 90030 | tutorias=40 | docx=0.052 MB | tiempo=0.104s
+0068 | COM | 90031 | tutorias=40 | docx=0.052 MB | tiempo=0.102s
+0069 | COM | 90032 | tutorias=40 | docx=0.052 MB | tiempo=0.112s
+0070 | COM | 90033 | tutorias=40 | docx=0.052 MB | tiempo=0.105s
+0071 | COM | 90034 | tutorias=40 | docx=0.052 MB | tiempo=0.179s
+0072 | COM | 90035 | tutorias=40 | docx=0.052 MB | tiempo=0.226s
+0073 | COM | 90036 | tutorias=40 | docx=0.052 MB | tiempo=0.101s
+0074 | COM | 90037 | tutorias=40 | docx=0.052 MB | tiempo=0.102s
+0075 | COM | 90038 | tutorias=40 | docx=0.052 MB | tiempo=0.104s
+0076 | IB | 90076 | tutorias=40 | docx=0.052 MB | tiempo=0.120s
+0077 | IB | 90077 | tutorias=40 | docx=0.052 MB | tiempo=0.112s
+0078 | IB | 90078 | tutorias=40 | docx=0.052 MB | tiempo=0.102s
+0079 | IB | 90079 | tutorias=40 | docx=0.052 MB | tiempo=0.152s
+0080 | IB | 90080 | tutorias=40 | docx=0.052 MB | tiempo=0.114s
+0081 | IB | 90081 | tutorias=40 | docx=0.052 MB | tiempo=0.166s
+0082 | IB | 90082 | tutorias=40 | docx=0.052 MB | tiempo=0.159s
+0083 | IB | 90083 | tutorias=40 | docx=0.052 MB | tiempo=0.112s
+0084 | IB | 90084 | tutorias=40 | docx=0.052 MB | tiempo=0.107s
+0085 | IB | 90085 | tutorias=40 | docx=0.052 MB | tiempo=0.105s
+0086 | IB | 90086 | tutorias=40 | docx=0.052 MB | tiempo=0.201s
+0087 | IB | 90087 | tutorias=40 | docx=0.052 MB | tiempo=0.124s
+0088 | IB | 90088 | tutorias=40 | docx=0.052 MB | tiempo=0.125s
+0089 | IB | 90089 | tutorias=40 | docx=0.052 MB | tiempo=0.104s
+0090 | IB | 90090 | tutorias=40 | docx=0.052 MB | tiempo=0.138s
+0091 | IB | 90091 | tutorias=40 | docx=0.052 MB | tiempo=0.195s
+0092 | IB | 90092 | tutorias=40 | docx=0.052 MB | tiempo=0.183s
+0093 | IB | 90093 | tutorias=40 | docx=0.052 MB | tiempo=0.176s
+0094 | IB | 90094 | tutorias=40 | docx=0.052 MB | tiempo=0.513s
+0095 | IB | 90095 | tutorias=40 | docx=0.052 MB | tiempo=0.148s
+0096 | IB | 90096 | tutorias=40 | docx=0.052 MB | tiempo=0.191s
+0097 | IB | 90097 | tutorias=40 | docx=0.052 MB | tiempo=0.109s
+0098 | IB | 90098 | tutorias=40 | docx=0.052 MB | tiempo=0.182s
+0099 | IB | 90099 | tutorias=40 | docx=0.052 MB | tiempo=0.114s
+0100 | IB | 90100 | tutorias=40 | docx=0.052 MB | tiempo=0.120s
+0101 | IB | 90101 | tutorias=40 | docx=0.052 MB | tiempo=0.113s
+0102 | IB | 90102 | tutorias=40 | docx=0.052 MB | tiempo=0.099s
+0103 | IB | 90103 | tutorias=40 | docx=0.052 MB | tiempo=0.110s
+0104 | IB | 90104 | tutorias=40 | docx=0.052 MB | tiempo=0.167s
+0105 | IB | 90105 | tutorias=40 | docx=0.052 MB | tiempo=0.182s
+0106 | IB | 90106 | tutorias=40 | docx=0.052 MB | tiempo=0.124s
+0107 | IB | 90107 | tutorias=40 | docx=0.052 MB | tiempo=0.145s
+0108 | IB | 90108 | tutorias=40 | docx=0.052 MB | tiempo=0.107s
+0109 | IB | 90109 | tutorias=40 | docx=0.052 MB | tiempo=0.112s
+0110 | IB | 90110 | tutorias=40 | docx=0.052 MB | tiempo=0.110s
+0111 | IB | 90111 | tutorias=40 | docx=0.052 MB | tiempo=0.105s
+0112 | IB | 90112 | tutorias=40 | docx=0.052 MB | tiempo=0.119s
+0113 | IB | 90113 | tutorias=40 | docx=0.052 MB | tiempo=0.114s
+0114 | MAT | 90039 | tutorias=40 | docx=0.052 MB | tiempo=0.261s
+0115 | MAT | 90040 | tutorias=40 | docx=0.052 MB | tiempo=0.173s
+0116 | MAT | 90041 | tutorias=40 | docx=0.052 MB | tiempo=0.109s
+0117 | MAT | 90042 | tutorias=40 | docx=0.052 MB | tiempo=0.100s
+0118 | MAT | 90043 | tutorias=40 | docx=0.052 MB | tiempo=0.110s
+0119 | MAT | 90044 | tutorias=40 | docx=0.052 MB | tiempo=0.103s
+0120 | MAT | 90045 | tutorias=40 | docx=0.052 MB | tiempo=0.105s
+0121 | MAT | 90046 | tutorias=40 | docx=0.052 MB | tiempo=0.149s
+0122 | MAT | 90047 | tutorias=40 | docx=0.052 MB | tiempo=0.175s
+0123 | MAT | 90048 | tutorias=40 | docx=0.052 MB | tiempo=0.157s
+0124 | MAT | 90049 | tutorias=40 | docx=0.052 MB | tiempo=0.191s
+0125 | MAT | 90050 | tutorias=40 | docx=0.052 MB | tiempo=0.109s
+0126 | MAT | 90051 | tutorias=40 | docx=0.052 MB | tiempo=0.122s
+0127 | MAT | 90052 | tutorias=40 | docx=0.052 MB | tiempo=0.108s
+0128 | MAT | 90053 | tutorias=40 | docx=0.052 MB | tiempo=0.108s
+0129 | MAT | 90054 | tutorias=40 | docx=0.052 MB | tiempo=0.107s
+0130 | MAT | 90055 | tutorias=40 | docx=0.052 MB | tiempo=0.177s
+0131 | MAT | 90056 | tutorias=40 | docx=0.052 MB | tiempo=0.109s
+0132 | MAT | 90057 | tutorias=40 | docx=0.052 MB | tiempo=0.117s
+0133 | MAT | 90058 | tutorias=40 | docx=0.052 MB | tiempo=0.123s
+0134 | MAT | 90059 | tutorias=40 | docx=0.052 MB | tiempo=0.162s
+0135 | MAT | 90060 | tutorias=40 | docx=0.052 MB | tiempo=0.108s
+0136 | MAT | 90061 | tutorias=40 | docx=0.052 MB | tiempo=0.114s
+0137 | MAT | 90062 | tutorias=40 | docx=0.052 MB | tiempo=0.106s
+0138 | MAT | 90063 | tutorias=40 | docx=0.052 MB | tiempo=0.170s
+0139 | MAT | 90064 | tutorias=40 | docx=0.052 MB | tiempo=0.142s
+0140 | MAT | 90065 | tutorias=40 | docx=0.052 MB | tiempo=0.101s
+0141 | MAT | 90066 | tutorias=40 | docx=0.052 MB | tiempo=0.103s
+0142 | MAT | 90067 | tutorias=40 | docx=0.052 MB | tiempo=0.108s
+0143 | MAT | 90068 | tutorias=40 | docx=0.052 MB | tiempo=0.187s
+0144 | MAT | 90069 | tutorias=40 | docx=0.052 MB | tiempo=0.384s
+0145 | MAT | 90070 | tutorias=40 | docx=0.052 MB | tiempo=0.167s
+0146 | MAT | 90071 | tutorias=40 | docx=0.052 MB | tiempo=0.123s
+0147 | MAT | 90072 | tutorias=40 | docx=0.052 MB | tiempo=0.155s
+0148 | MAT | 90073 | tutorias=40 | docx=0.052 MB | tiempo=0.154s
+0149 | MAT | 90074 | tutorias=40 | docx=0.052 MB | tiempo=0.187s
+0150 | MAT | 90075 | tutorias=40 | docx=0.052 MB | tiempo=0.270s
+==========================================================================================
+RESUMEN
+==========================================================================================
+Fase: DB_D
+Tutores procesados: 150
+Alumnos sintéticos en base: 1500
+Tutorías sintéticas en base: 6000
+Tutorías incluidas en reportes: 6000
+Tamaño ZIP: 7.818 MB
+Tiempo total: 21.468s
+DOCX mínimo: 0.052 MB
+DOCX máximo: 0.052 MB
+DOCX promedio: 0.052 MB
+Tiempo promedio por tutor: 0.143s
+Tiempo máximo por tutor: 0.513s
+ZIP generado: /tmp/benchmark_DB_D.zip
+Reporte TXT: scripts/resultados_t28/benchmark_DB_D.txt
+==========================================================================================

@@ -1,0 +1,49 @@
+==========================================================================================
+BENCHMARK T28 - DB_A
+==========================================================================================
+Marcador: [PRUEBA_T28]_DB_A
+Plantilla: Reporte tutorías atendidas (carta anual)
+Archivo plantilla: documentos/reporte_tutorias_plantilla_2_1.docx
+Tutores sintéticos: 20
+Alumnos sintéticos: 100
+Tutorías sintéticas: 200
+Columnas: Alumno, Fecha, Tema, Notas
+==========================================================================================
+0001 | BM | 90016 | tutorias=10 | docx=0.051 MB | tiempo=0.086s
+0002 | BM | 90017 | tutorias=10 | docx=0.051 MB | tiempo=0.061s
+0003 | BM | 90018 | tutorias=10 | docx=0.051 MB | tiempo=0.075s
+0004 | BM | 90019 | tutorias=10 | docx=0.051 MB | tiempo=0.069s
+0005 | BM | 90020 | tutorias=10 | docx=0.051 MB | tiempo=0.063s
+0006 | COM | 90001 | tutorias=10 | docx=0.051 MB | tiempo=0.062s
+0007 | COM | 90002 | tutorias=10 | docx=0.051 MB | tiempo=0.062s
+0008 | COM | 90003 | tutorias=10 | docx=0.051 MB | tiempo=0.065s
+0009 | COM | 90004 | tutorias=10 | docx=0.051 MB | tiempo=0.079s
+0010 | COM | 90005 | tutorias=10 | docx=0.051 MB | tiempo=0.058s
+0011 | IB | 90011 | tutorias=10 | docx=0.051 MB | tiempo=0.058s
+0012 | IB | 90012 | tutorias=10 | docx=0.051 MB | tiempo=0.073s
+0013 | IB | 90013 | tutorias=10 | docx=0.051 MB | tiempo=0.081s
+0014 | IB | 90014 | tutorias=10 | docx=0.051 MB | tiempo=0.058s
+0015 | IB | 90015 | tutorias=10 | docx=0.051 MB | tiempo=0.066s
+0016 | MAT | 90006 | tutorias=10 | docx=0.051 MB | tiempo=0.080s
+0017 | MAT | 90007 | tutorias=10 | docx=0.051 MB | tiempo=0.081s
+0018 | MAT | 90008 | tutorias=10 | docx=0.051 MB | tiempo=0.071s
+0019 | MAT | 90009 | tutorias=10 | docx=0.051 MB | tiempo=0.085s
+0020 | MAT | 90010 | tutorias=10 | docx=0.051 MB | tiempo=0.070s
+==========================================================================================
+RESUMEN
+==========================================================================================
+Fase: DB_A
+Tutores procesados: 20
+Alumnos sintéticos en base: 100
+Tutorías sintéticas en base: 200
+Tutorías incluidas en reportes: 200
+Tamaño ZIP: 1.019 MB
+Tiempo total: 1.408s
+DOCX mínimo: 0.051 MB
+DOCX máximo: 0.051 MB
+DOCX promedio: 0.051 MB
+Tiempo promedio por tutor: 0.070s
+Tiempo máximo por tutor: 0.086s
+ZIP generado: /tmp/benchmark_DB_A.zip
+Reporte TXT: scripts/resultados_t28/benchmark_DB_A.txt
+==========================================================================================
