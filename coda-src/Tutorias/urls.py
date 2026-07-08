@@ -49,6 +49,7 @@ urlpatterns = [
     path('tutorados-coda/<int:pk>', views.VerTutoradosCodaListView.as_view(), name='Tutorados-Coda'),
     path('tutorias-aceptadas/', views.TutoriasAceptadasListView.as_view(), name='tutorias-aceptadas'),
     path('exportar-tutorias-aceptadas', views.ExportarTutoriasAceptadasExcelView.as_view(), name='exportar-tutorias-aceptadas'),
+    path('reporte-status-alumno/', views.ReporteStatusAlumnoExcelView.as_view(), name='reporte-status-alumno'),
 
 
     path('ruta-pdf/', views.generar_pdf, name='generar_pdf'),
