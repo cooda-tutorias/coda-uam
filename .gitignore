@@ -42,6 +42,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+pgdata/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -175,3 +176,4 @@ cython_debug/
 coda-src/ssocial/env_vars.py
 
 data
+.env.test

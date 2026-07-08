@@ -37,7 +37,6 @@ import pandas as pd
 from .models import Documento
 from .forms import DocumentoForm
 
-
 # Test Views (Remove for production)
 def login_view_test(request):
     return render(request, 'Usuarios/login.html')
@@ -431,4 +430,4 @@ class VerAlumnosCODDAAView(FormView):
     def get(self, request, *args, **kwargs):
         form = self.get_form()
         alumnos = Alumno.objects.all()  # por defecto muestra todos
-        return self.render_to_response(self.get_context_data(form=form, alumnos=alumnos))
+        return self.render_to_response(self.get_context_data(form=form, alumnos=alumnos));

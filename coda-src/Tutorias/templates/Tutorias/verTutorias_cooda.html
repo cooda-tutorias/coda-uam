@@ -52,10 +52,11 @@
                                 <th>Id</th>
                                 <th>Matricula</th>
                                 <th>Alumno</th>
+                                <th>Estado Guardado</th>
+                                <th>Estado Actual</th>
                                 <th>Fecha</th>
                                 <th>Hora</th>
                                 <th>Tema(s)</th>
-                                <th>Notas u Observaciones</th>
                                 <th>¿Asistió?</th>
                             </tr>
                         </thead>
@@ -65,10 +66,11 @@
                                 <td class="text-body" >{{tutoria.pk}}</td>
                                 <td class="text-body text-center" >{{tutoria.alumno.matricula}}</td>
                                 <td class="text-body " >{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}</td>
+                                <td class="text-body" >{{ tutoria.get_estado_alumno_historico_display }}</td>
+                                <td class="text-body" >{{ tutoria.alumno.get_estado_display }}</td>
                                 <td class="text-body" >{{ tutoria.fecha|date }}</td>
                                 <td class="text-body" >{{ tutoria.fecha|date:"h:m" }}</td>
                                 <td class="text-body" >{{ tutoria.get_tema_display|join:", " }}</td>
-                                <td class="text-body" >{{ tutoria.descripcion}}</td>
                                 <td class="text-body text-center" >
                                   {% if tutoria.asistencia %}Sí{% else %} No {% endif %}
                                   {% comment %} {{ tutoria.asistencia}} {% endcomment %}
