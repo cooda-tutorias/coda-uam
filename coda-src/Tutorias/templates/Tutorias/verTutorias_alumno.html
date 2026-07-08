@@ -29,6 +29,7 @@
                                                     <th>Hora</th>
                                                     <th>Tema</th>
                                                     <th>Tutor(a)</th>
+                                                    <th>Acciones</th>
                                                     <th>Estado de Aceptación</th>
                                                 </tr>
                                             </thead>
@@ -43,6 +44,9 @@
                                                     <!--Se agregó |join:", " para quitar notación de lista-->
                                                     <td>{{ tutoria.get_tema_display |join:", " }} </td>
                                                     <td>{{ tutoria.tutor.first_name }} {{ tutoria.tutor.last_name }} {{ tutoria.tutor.second_last_name }} </td>
+                                                    <td class="text-center text-body-bold">
+                                                        <a href="{% url 'Tutorias-update' pk=tutoria.pk %}">Editar</a>
+                                                    </td>
                                                     <td class="text-center text-title-bold">
                                                         {% if tutoria.estado == 'ACE' %}
                                                         <span class="badge bg-success">Aceptada</span>

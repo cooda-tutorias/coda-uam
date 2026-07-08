@@ -11,46 +11,14 @@ Usando el plugin compose (integrado en docker), podemos configurar el entorno de
 ### Instalación y configuración del entorno
 La configuración del entorno se hace en el archivo `compose.yaml` encontrado en la raiz de este repositorio.
 
-1. Cambia los valores en `enviroment:` dentro de `services:` y `web:` para que se ajusten a las necesidades de tu entorno. Especialmente las variable de entorno `DJANGO_SECRET_KEY`,  `EMAIL_HOST_PASSWORD` y `EMAIL_DOMAIN`.
+1. Genera un nuevo archivo `.env` tomando como referecia el archivo `.env.example`, cambia los valores y personalizalos según sea necesario para un despliegue local toma especial enfásis en  las variable de entorno `DJANGO_SECRET_KEY`,  `EMAIL_HOST_PASSWORD` y `EMAIL_DOMAIN`.
 - Para `DJANGO_SECRET_KEY` se puede usar la biblioteca de python secrets y generar un token de 100 caracteres.
 ```sh
 python3 -c 'import secrets; print(secrets.token_hex(100))'
 ```
 
-2. Para el despliegue en producción es necesario que cambies las variables de entorno el los servicios `db:` y `web:`, además de la ubicación en tu equipo donde se almacenaran la base de datos y el código del servidor `volumes:`
-```yaml
-#Configuración base del entorno y contenedores
-services:
-  db:
-    image: postgres
-    volumes: 
-      - ./data/db:/var/lib/postgresql/data # <ruta_en_disco>:<ruta_postgres_contenedor(no cambiar)>
-    environment:
-      - POSTGRES_DB=coda
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-  web:
-    build: ./coda-src
-    command: ./docker-entrypoint.sh
-    volumes:
-      - ./coda-src:/app
-    ports:
-      - "8000:8000"
-    environment:
-      - DJANGO_SECRET_KEY=django-insecure-0ea983f4d69ba8061a684379fee776c5118e0a16aa305c153a
-      - RDS_DB_NAME=coda
-      - RDS_USERNAME=postgres
-      - RDS_PASSWORD=postgres
-      - RDS_HOSTNAME=db
-      - RDS_PORT=5432
-      - DJANGO_DEBUG=True
-      - IP_COMPUTADORA=127.0.0.1
-      - TUTORIAS_DOMINIO=localhost
-      - EMAIL_DOMAIN=a@a.com
-      - EMAIL_HOST_PASSWORD=1234
-    depends_on:
-      - db
-``` 
+2. Para el despliegue en producción es necesario que verifiqeus que las variables de entorno estén correctamente aplicadas, sino estás trabajando sobre el archivo `compose.yaml`, no realices cambios
+
 3. Finalmente, desde la carpeta raíz (coda-uam), ejecuta el comando `docker compose up` para iniciar y correr los contenedores correspondientes al entorno.
 
 4. Para detener la ejecución del entorno, utiliza el comando `docker compose down`
@@ -64,12 +32,29 @@ CONTAINER ID   IMAGE          COMMAND                  CREATED         STATUS   
 2845f8985f73   coda-uam-web   "./docker-entrypoint…"   5 seconds ago   Up 4 seconds   0.0.0.0:8000->8000/tcp, :::8000->8000/tcp   coda-uam-web-1
 f502f0615497   postgres       "docker-entrypoint.s…"   5 seconds ago   Up 4 seconds   5432/tcp                                    coda-uam-db-1
 ```
+
 2. Busca el contenedor llamado `coda-uam-web` y copia el `CONTAINER ID` que aparece.
-3. Ejecuta el comando `docker exec -it <CONTAINER_ID> python manage.py createsuperuser` colocando el ID que copiaste en lugar de `<CONTAINER_ID>`
+
+3. Ejecuta el comanto `docker compose exec -it <CONTAINER_ID> python python manage.py migrate` para generar las tablas necesarias para el proyecto cuando se está generando el contenedor nuevo.
+
+4. Ejecuta el comando `docker exec -it <CONTAINER_ID> python manage.py createsuperuser` colocando el ID que copiaste en lugar de `<CONTAINER_ID>`
 ```sh
 docker exec -it 2845f8985f73 python manage.py createsuperuser
 ```
-4. Llena los datos para crear un superusuario
+
+5. Llena los datos para crear un superusuario
+
+6. Para esquema de pruebas, requeriras realizar el levantamiento de todos los perfiles de usuario, pide apoyo al `Product Owner / Poject Manager ` para que te apoye en el llenado de la base de datos.
+
+### Migraciones al actualizar el código
+
+Si ya tienes el entorno corriendo y se incorporó una nueva funcionalidad que modifica los modelos (por ejemplo, nuevos campos), debes ejecutar las migraciones manualmente para aplicar los cambios a la base de datos:
+
+```sh
+docker compose exec web python manage.py migrate
+```
+
+> **Nota:** Las tutorías creadas **antes** de correr una migración que agrega nuevos campos opcionales mostrarán `Sin registro` en esos campos. Esto es normal y esperado — el dato simplemente no estaba disponible cuando se creó el registro. Las tutorías nuevas capturarán el dato automáticamente.
 
 
 ## Docker manual

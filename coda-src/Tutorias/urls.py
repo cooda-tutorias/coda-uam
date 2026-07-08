@@ -31,6 +31,7 @@ urlpatterns = [
     path('tutoria/<int:pk>/rechazar/', views.RechazarTutoriaView.as_view(), name='rechazar_tutoria'),
     path('tutoria/<int:pk>/cancelar/', views.CancelarTutoriaView.as_view(), name='cancelar-tutoria'),
     path('historial-tutorias/', views.HistorialTutoriasListView.as_view(), name='Tutorias-historial'),
+    path('tutorias-comunicacion-masiva/', views.ComunicacionMasivaTutoriasView.as_view(), name='tutorias-comunicacion-masiva'),
     path('historial-tutorias-generar/', views.HistorialTutoriasGenerateView.as_view(), name='Tutorias-historial-generar'),
     path('tutorados-tutor/', views.VerTutoradosTutorListView.as_view(), name='Tutorados-tutor'),
     path('tutorias-tutor/', views.VerTutoriasTutorListView.as_view(),name='Tutorias-tutor'),
@@ -38,6 +39,8 @@ urlpatterns = [
     # In urls.py
     path('tutoria/seguimiento/<int:pk>/', views.RealizarSeguimientoView.as_view(), name='save_seguimiento'),
 
+    # Editar estado histórico del alumno
+    path('tutoria/<int:pk>/editar-estado-historico/', views.EditarEstadoAlumnoHistoricoView.as_view(), name='editar-estado-historico'),
     
     # URLS CODA 
     path('tutores-coda/', views.VerTutoresListView.as_view(), name='Tutores-Coda'),

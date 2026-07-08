@@ -1,5 +1,4 @@
-# Usa la imagen oficial de PostgreSQL como base
-FROM postgres:latest
+# La imagen base de PostgreSQL está en el compose.yaml, por lo que no es necesario especificarla aquí.
 
 # Establece la contraseña de PostgreSQL
 ENV POSTGRES_PASSWORD=postgres
@@ -7,8 +6,7 @@ ENV POSTGRES_PASSWORD=postgres
 # Expone el puerto 8484 para acceder desde la máquina local
 EXPOSE 5432
 
-# ojooooooooo modifica esto para que apunte a una carpeta existente en tu máquina local
-VOLUME ./data/db:/var/lib/postgresql/data
+# El volumen persistente se define en compose.yaml para reutilizar data/db
 
 # Inicializa la base de datos y crea una base de datos llamada "prueba"
 COPY init.sql /docker-entrypoint-initdb.d/

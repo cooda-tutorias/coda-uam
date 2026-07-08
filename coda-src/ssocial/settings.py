@@ -33,7 +33,11 @@ SESSION_COOKIE_SECURE=False
 DEBUG = True
 
 ALLOWED_HOSTS = ['127.0.0.1', os.environ['TUTORIAS_DOMINIO'], os.environ['IP_COMPUTADORA']]
+if os.getenv('LOCAL_HOST_NAME'):
+    ALLOWED_HOSTS.append(os.environ['LOCAL_HOST_NAME'])
+
 CSRF_TRUSTED_ORIGINS = ['http://'+os.environ['TUTORIAS_DOMINIO']]
+
 
 #Custom user model
 AUTH_USER_MODEL = "Usuarios.Usuario"
@@ -55,7 +59,7 @@ INSTALLED_APPS = [
     'storages',
 
     #Internal
-    'Tutorias',
+    'Tutorias.apps.TutoriasConfig',
     'Usuarios',
     'notifications',
 ]
@@ -146,11 +150,23 @@ USE_I18N = True
 
 USE_TZ = True
 
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_HOST_PASSWORD = os.environ['EMAIL_HOST_PASSWORD']
-EMAIL_HOST_USER = 'tutorias.beta.uamc@gmail.com'
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
+EMAIL_HOST = os.getenv('NOTIFICATIONS_EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_HOST_PASSWORD = os.getenv('NOTIFICATIONS_EMAIL_PASSWORD', os.getenv('EMAIL_HOST_PASSWORD', ''))
+EMAIL_HOST_USER = os.getenv('NOTIFICATIONS_EMAIL_USER', 'tutorias.beta.uamc@gmail.com')
+EMAIL_PORT = int(os.getenv('NOTIFICATIONS_EMAIL_PORT', '587'))
+EMAIL_USE_TLS = os.getenv('NOTIFICATIONS_EMAIL_USE_TLS', 'True').strip().lower() in ('1', 'true', 'yes', 'on')
+EMAIL_TIMEOUT = int(os.getenv('NOTIFICATIONS_EMAIL_TIMEOUT') or '8')
+DEFAULT_FROM_EMAIL = os.getenv('NOTIFICATIONS_EMAIL_FROM', EMAIL_HOST_USER)
+
+# Notificaciones: identidad visual y datos institucionales
+NOTIFICATIONS_EMAIL_LOGO_URL = os.getenv('NOTIFICATIONS_EMAIL_LOGO_URL', '')
+NOTIFICATIONS_UAM_ADDRESS = os.getenv(
+    'NOTIFICATIONS_UAM_ADDRESS',
+    'Av. Vasco de Quiroga 4871, Santa Fe Cuajimalpa, Cuajimalpa de Morelos, 05348, Ciudad de Mexico, CDMX',
+)
+NOTIFICATIONS_UAM_MAPS_URL = os.getenv('NOTIFICATIONS_UAM_MAPS_URL', 'https://maps.google.com/?q=UAM+Cuajimalpa')
+NOTIFICATIONS_UAM_PHONE = os.getenv('NOTIFICATIONS_UAM_PHONE', '(55) 5814 6500')
+NOTIFICATIONS_CODDAA_PHONE = os.getenv('NOTIFICATIONS_CODDAA_PHONE', '(55) 5814 6500')
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
