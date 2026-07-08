@@ -18,7 +18,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            cd /opt/mi-proyecto
+            cd /opt/coda-uam
 
             cat > .env <<EOF
             DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
