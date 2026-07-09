@@ -1,4 +1,5 @@
 import qrcode
+from collections import Counter
 from typing import Any, Dict
 from django.shortcuts import get_object_or_404, redirect
 from django.db.models.query import QuerySet
@@ -18,12 +19,12 @@ from datetime import datetime, timedelta
 import pandas as pd
 from .constants import TEMAS
 
-from .models import Tutoria, HistorialCambioTutoria
+from .models import Tutoria, HistorialCambioTutoria, Asesoria
 from .forms import FormTutorias, FormSeguimiento, FormReporte, FormCartasDeAsignacion, FormReporteDeTutorias, ComunicacionMasivaForm, FormVerTutorias
 from .signals import tutoria_notification_requested
 # from .forms import FormSeguimiento # de nuevo, no estoy seguro, FormReporte
 from .constants import PENDIENTE, ACEPTADO, RECHAZADO, DURACION_ASESORIA, CANCELADO, ESTADO # de nuevo, no estoy seguro
-from Usuarios.constants import TUTOR, ALUMNO, COORDINADOR, TEMPLATES
+from Usuarios.constants import TUTOR, ALUMNO, COORDINADOR, TEMPLATES, ESTADOS_ALUMNO
 from Usuarios.views import BaseAccessMixin, CodaViewMixin, TutorViewMixin, AlumnoViewMixin, CordinadorViewMixin
 from Usuarios.models import Tutor, Alumno, Cordinador, Coda
 from Usuarios.models import Documento
@@ -1490,9 +1491,205 @@ class RealizarSeguimientoView(TutorViewMixin, UpdateView):
     template_name = 'Tutorias/seguimientoTutoria.html'
     success_url =  reverse_lazy('Tutorias-historial')
 
+    seguimiento_fields = [
+        'asistencia',
+        'duracion',
+        'firma_documentos_beca',
+        'beca_otorgada',
+        'asesoria_especializada',
+        'observaciones',
+        'impacto_tutoria',
+        'resultados_tutoria',
+    ]
+
+    def _has_existing_report(self, tutoria: Tutoria) -> bool:
+        # Evita falsos positivos por defaults del modelo (False/0/"" en tutorias nuevas).
+        if tutoria.asistencia is not True:
+            return False
+
+        has_duracion = tutoria.duracion not in (None, 0)
+        has_impacto = tutoria.impacto_tutoria not in (None, 0)
+        has_text_details = any(
+            bool((value or '').strip())
+            for value in [tutoria.beca_otorgada, tutoria.observaciones, tutoria.resultados_tutoria]
+        )
+        has_positive_flags = any([
+            tutoria.firma_documentos_beca is True,
+            tutoria.asesoria_especializada is True,
+        ])
+
+        return (has_duracion and has_impacto) or (has_duracion and (has_text_details or has_positive_flags))
+
+    def _format_bool(self, value: Any) -> str:
+        if value is True:
+            return 'Sí'
+        if value is False:
+            return 'No'
+        return 'Sin registro'
+
+    def _build_seguimiento_change_summary(
+        self,
+        original: Tutoria,
+        form: BaseModelForm,
+        estado_anterior: Any,
+        estado_nuevo: Any,
+    ) -> str:
+        field_labels = {
+            'asistencia': 'Asistencia',
+            'duracion': 'Duración de la tutoría',
+            'firma_documentos_beca': 'Firma de documentos de beca',
+            'beca_otorgada': 'Beca otorgada',
+            'asesoria_especializada': 'Asesoría especializada',
+            'observaciones': 'Observaciones',
+            'impacto_tutoria': 'Impacto de la tutoría',
+            'resultados_tutoria': 'Resultados de la tutoría',
+            'estado_alumno_actual': 'Estado actual del alumno',
+        }
+
+        duracion_map = dict(DURACION_ASESORIA)
+        estados_map = dict(ESTADOS_ALUMNO)
+        changes = []
+
+        for field in form.changed_data:
+            if field not in field_labels:
+                continue
+
+            if field == 'duracion':
+                old_value = duracion_map.get(original.duracion, 'Sin registro')
+                new_duracion = form.cleaned_data.get(field)
+                try:
+                    new_duracion = int(new_duracion)
+                except (TypeError, ValueError):
+                    pass
+                new_value = duracion_map.get(new_duracion, 'Sin registro')
+            elif field in {'asistencia', 'firma_documentos_beca', 'asesoria_especializada'}:
+                old_value = self._format_bool(getattr(original, field, None))
+                new_value = self._format_bool(form.cleaned_data.get(field))
+            elif field == 'estado_alumno_actual':
+                old_value = estados_map.get(estado_anterior, 'Sin registro')
+                new_value = estados_map.get(estado_nuevo, 'Sin registro')
+            else:
+                old_value = getattr(original, field, '') or ''
+                new_value = form.cleaned_data.get(field, '') or ''
+
+            if str(old_value) != str(new_value):
+                label = field_labels[field]
+                changes.append(f"{label}: '{old_value}' -> '{new_value}'")
+
+        return ' | '.join(changes) if changes else 'Se editó el reporte sin cambios detectables.'
+
+    def get_queryset(self):
+        return (
+            super()
+            .get_queryset()
+            .select_related('alumno', 'tutor', 'alumno__tutor_asignado')
+            .prefetch_related('historial_cambios')
+        )
+
+    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+
+        tutoria_actual = self.object
+        alumno = tutoria_actual.alumno
+
+        tutorias_alumno_qs = (
+            Tutoria.objects.filter(alumno=alumno)
+            .select_related('tutor')
+            .order_by('-fecha')
+        )
+
+        tutorias_recientes = list(tutorias_alumno_qs[:10])
+        historial_cambios_actual = list(tutoria_actual.historial_cambios.all()[:10])
+        asesorias_recientes = list(
+            Asesoria.objects.filter(alumno=alumno)
+            .select_related('tutor')
+            .order_by('-fecha')[:10]
+        )
+
+        # Contador por tema para mostrar un resumen util al tutor.
+        tema_counter = Counter()
+        for temas in tutorias_alumno_qs.values_list('tema', flat=True):
+            for codigo_tema in temas or []:
+                tema_counter[codigo_tema] += 1
+
+        tema_labels = dict(TEMAS)
+        resumen_temas = [
+            {
+                'codigo': codigo,
+                'etiqueta': tema_labels.get(codigo, codigo),
+                'total': total,
+            }
+            for codigo, total in tema_counter.most_common()
+        ]
+
+        impactos_ultimas_5 = [
+            t.impacto_tutoria
+            for t in tutorias_recientes
+            if t.impacto_tutoria not in (None, 0)
+        ][:5]
+        promedio_impacto = None
+        if impactos_ultimas_5:
+            promedio_impacto = round(sum(impactos_ultimas_5) / len(impactos_ultimas_5), 1)
+
+        total_tutorias = tutorias_alumno_qs.count()
+        total_asistidas = tutorias_alumno_qs.filter(asistencia=True).count()
+
+        becas_registradas = [
+            t for t in tutorias_recientes if t.firma_documentos_beca and t.beca_otorgada
+        ]
+
+        context.update({
+            'tutorias_recientes': tutorias_recientes,
+            'resumen_temas': resumen_temas,
+            'historial_cambios_actual': historial_cambios_actual,
+            'asesorias_recientes': asesorias_recientes,
+            'becas_registradas': becas_registradas,
+            'promedio_impacto': promedio_impacto,
+            'total_tutorias_alumno': total_tutorias,
+            'total_tutorias_asistidas': total_asistidas,
+            'seguimiento_completado': self._has_existing_report(tutoria_actual),
+        })
+
+        return context
+
     def form_valid(self, form: BaseModelForm) -> HttpResponse:
         tutor = Tutor.objects.get(pk=self.request.user)
+        original_tutoria = self.get_object()
+        seguimiento_completado = self._has_existing_report(original_tutoria)
+        edit_confirmed = self.request.POST.get('edit_confirmed') == 'true'
+
+        alumno = form.instance.alumno
+        estado_actual_anterior = alumno.estado
+        estado_actual_nuevo = form.cleaned_data.get('estado_alumno_actual')
+        estado_actual_cambio = estado_actual_nuevo != estado_actual_anterior
+
+        has_edit_changes = bool(form.changed_data) or estado_actual_cambio
+        if seguimiento_completado and has_edit_changes and not edit_confirmed:
+            messages.error(
+                self.request,
+                'Confirma la edición del reporte para guardar cambios y enviar la notificación al alumno.',
+            )
+            return self.form_invalid(form)
+
+        if estado_actual_cambio:
+            alumno.estado = estado_actual_nuevo
+            alumno.save(update_fields=['estado'])
+
         response = super().form_valid(form)
+
+        if has_edit_changes:
+            change_summary = self._build_seguimiento_change_summary(
+                original_tutoria,
+                form,
+                estado_actual_anterior,
+                estado_actual_nuevo,
+            )
+            HistorialCambioTutoria.objects.create(
+                tutoria=self.object,
+                correo_editor=self.request.user.email,
+                cambios_realizados=change_summary,
+            )
+
         tutoria_notification_requested.send(
             sender=self.__class__,
             event="seguimiento_registrado",
