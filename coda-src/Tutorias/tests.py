@@ -34,6 +34,7 @@ class FormSeguimientoTests(TestCase):
             first_name='Alumno',
             last_name='Test',
             carrera='COM',
+            estado=1,
             tutor_asignado=self.tutor,
         )
 
@@ -50,6 +51,7 @@ class FormSeguimientoTests(TestCase):
     def test_form_seguimiento_valid_data(self):
         """Test que FormSeguimiento acepta datos válidos"""
         form_data = {
+            'estado_alumno_actual': 1,
             'asistencia': True,
             'duracion': '2',  # 1 hora
             'firma_documentos_beca': True,
@@ -67,6 +69,7 @@ class FormSeguimientoTests(TestCase):
     def test_form_seguimiento_missing_required_asistencia(self):
         """Test que FormSeguimiento falla sin asistencia"""
         form_data = {
+            'estado_alumno_actual': 1,
             'duracion': '2',
             'firma_documentos_beca': True,
             'asesoria_especializada': True,
@@ -79,6 +82,7 @@ class FormSeguimientoTests(TestCase):
     def test_form_seguimiento_missing_required_duracion(self):
         """Test que FormSeguimiento falla sin duración"""
         form_data = {
+            'estado_alumno_actual': 1,
             'asistencia': True,
             'firma_documentos_beca': True,
             'asesoria_especializada': True,
@@ -91,6 +95,7 @@ class FormSeguimientoTests(TestCase):
     def test_form_seguimiento_optional_observaciones(self):
         """Test que observaciones es opcional"""
         form_data = {
+            'estado_alumno_actual': 1,
             'asistencia': True,
             'duracion': '2',
             'firma_documentos_beca': True,
@@ -103,6 +108,7 @@ class FormSeguimientoTests(TestCase):
     def test_form_seguimiento_invalid_impacto_tutoria(self):
         """Test que impacto_tutoria debe ser entero"""
         form_data = {
+            'estado_alumno_actual': 1,
             'asistencia': True,
             'duracion': '2',
             'firma_documentos_beca': True,
@@ -116,6 +122,7 @@ class FormSeguimientoTests(TestCase):
     def test_form_seguimiento_max_length_beca_otorgada(self):
         """Test que beca_otorgada respeta max_length=255"""
         form_data = {
+            'estado_alumno_actual': 1,
             'asistencia': True,
             'duracion': '2',
             'firma_documentos_beca': True,
@@ -130,6 +137,7 @@ class FormSeguimientoTests(TestCase):
     def test_form_seguimiento_max_length_observaciones(self):
         """Test que observaciones respeta max_length=1000"""
         form_data = {
+            'estado_alumno_actual': 1,
             'asistencia': True,
             'duracion': '2',
             'firma_documentos_beca': True,
@@ -173,6 +181,7 @@ class NotificacionesTutoriaTests(TestCase):
             first_name='Alumno',
             last_name='Uno',
             carrera='COM',
+            estado=1,
             tutor_asignado=self.tutor,
         )
         self.tutoria = Tutoria.objects.create(
@@ -252,6 +261,7 @@ class NotificacionesTutoriaTests(TestCase):
         response = self.client.post(
             reverse('save_seguimiento', args=[self.tutoria.pk]),
             {
+                'estado_alumno_actual': 1,
                 'asistencia': True,
                 'duracion': '2',
                 'firma_documentos_beca': True,

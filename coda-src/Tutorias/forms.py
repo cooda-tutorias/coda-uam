@@ -4,6 +4,12 @@ from Usuarios.models import Documento, Alumno
 from .constants import TEMAS, ESTADO, ACEPTADO, PENDIENTE, DURACION_ASESORIA, ROLES, CARRERAS
 from Usuarios.constants import ESTADOS_ALUMNO
 
+
+def str_to_bool(value):
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() == 'true'
+
 class FormTutorias(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
@@ -51,11 +57,29 @@ class FormEditarEstadoAlumnoHistorico(forms.Form):
 
 
 class FormSeguimiento(forms.ModelForm):
-    asistencia = forms.BooleanField(required=True)
+    estado_alumno_actual = forms.TypedChoiceField(
+        choices=ESTADOS_ALUMNO[1:],
+        required=True,
+        coerce=int,
+        label="Estado actual del alumno",
+    )
+    asistencia = forms.TypedChoiceField(
+        choices=((True, 'Sí'), (False, 'No')),
+        required=True,
+        coerce=str_to_bool,
+    )
     duracion = forms.ChoiceField(choices=DURACION_ASESORIA, required=True)
-    firma_documentos_beca = forms.BooleanField(required=True)
+    firma_documentos_beca = forms.TypedChoiceField(
+        choices=((True, 'Sí'), (False, 'No')),
+        required=True,
+        coerce=str_to_bool,
+    )
     beca_otorgada = forms.CharField(max_length=255, required=False)
-    asesoria_especializada = forms.BooleanField(required=True)
+    asesoria_especializada = forms.TypedChoiceField(
+        choices=((True, 'Sí'), (False, 'No')),
+        required=True,
+        coerce=str_to_bool,
+    )
     observaciones = forms.CharField(widget=forms.Textarea, max_length=1000, required=False)
     impacto_tutoria = forms.IntegerField(required=True)
     resultados_tutoria = forms.CharField(widget=forms.Textarea, max_length=1000, required=False)
@@ -64,6 +88,12 @@ class FormSeguimiento(forms.ModelForm):
         model = Tutoria
         fields = ['asistencia', 'duracion', 'firma_documentos_beca', 'beca_otorgada', 'asesoria_especializada', 'observaciones', 'impacto_tutoria', 'resultados_tutoria']
         exclude = ['alumno', 'tutor', 'tema', 'fecha', 'descripcion', 'estado']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        if self.instance and self.instance.pk and self.instance.alumno_id:
+            self.fields['estado_alumno_actual'].initial = self.instance.alumno.estado
 
 
 class FormReporte(forms.ModelForm):

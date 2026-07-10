@@ -1,181 +1,1095 @@
-{% extends "Usuarios/HeaderAndFooterFachada.html"%}
+{% extends "Usuarios/HeaderAndFooterFachada.html" %}
+{% load widget_tweaks %}
 
 {% with titulo_reporte="Reporte de Tutoría" %}
-{% block title %} {{ titulo_reporte }} {% endblock %}
+{% block title %}{{ titulo_reporte }}{% endblock %}
 
 {% block body %}
-<section id="section" style="background-color: #eee;">
-        <div class="row d-flex justify-content-center align-items-center w-100">
-            <div class="col-lg-8 col-xl-6">
-                <div class="card border-top border-bottom border-4 overflow-y-scroll my-5" style="border-color: #f08200 !important; height: 720px;">
-                    
-                    {% load widget_tweaks %}
-                    <form method="POST" action="{% url 'save_seguimiento' tutoria.pk %}">
-                        {% csrf_token %}
-                        <div class="card-body px-5 py-5 text-body">
-                            <h3 class="b-4 text-primary text-title-bold">{{ titulo_reporte }}</h3>
+<section id="section" class="seguimiento-page py-3 py-md-4">
+    <button type="button" id="floating-back-btn" class="floating-back-btn" aria-label="Volver a la página anterior" title="Volver">
+        <span aria-hidden="true" class="floating-back-icon">←</span>
+        <span class="floating-back-label">Atrás</span>
+    </button>
 
-                            <!-- Sección de Estados del Alumno (Informativa) -->
-                            <div class="alert alert-info mb-4" role="alert">
-                              <h6 class="alert-heading">Estado del Alumno</h6>
-                              <div class="row">
-                                <div class="col-md-6">
-                                  <strong>Estado Guardado (al momento de crear la tutoría):</strong><br>
-                                  {{ tutoria.get_estado_alumno_historico_display }}
-                                </div>
-                                <div class="col-md-6">
-                                  <strong>Estado Actual (en la base de datos):</strong><br>
-                                  {{ tutoria.alumno.get_estado_display }}
-                                </div>
-                              </div>
-                            </div>
+    <div class="container-fluid px-2 px-md-4 px-xl-5">
+        <div class="row g-3 g-xl-4 align-items-start">
+            <div class="col-12 col-xl-4 order-1">
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-body p-3 p-md-4">
+                        <h4 class="text-title-bold mb-3">Ficha del alumno</h4>
+                        <dl class="row mb-0 small student-info-list">
+                            <dt class="col-5 text-muted">Nombre</dt>
+                            <dd class="col-7 mb-2">{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}</dd>
 
-                            <!-- Muestra información de tutoría seleccionada -->
-                            <div class="d-flex w-100 justify-content-evenly align-items-center">
-                                <div class="w-50 me-2 d-flex flex-row align-items-center">
-                                    <label class=" me-1">Alumno:</label>
-                                    <input type="text" class="form-control" value="{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }}  {{ tutoria.alumno.second_last_name }}" readonly>
-                                </div>
-                                <div class="w-50 ms-2 d-flex align-items-center">
-                                    <label class="form-label  mt-3">Fecha y Hora:</label>
-                                    <input type="text" class="form-control" value="{{ tutoria.fecha|date:'d/m/Y H:i' }}" readonly>
-                                </div>
-                            </div>
+                            <dt class="col-5 text-muted">Matrícula</dt>
+                            <dd class="col-7 mb-2">{{ tutoria.alumno.matricula }}</dd>
 
-                            <div class="w-100 d-flex flex-row align-items-center justify-content-evenly mb-3">
-                                <label class="text-body-bold form-label me-2">Tema:</label>
-                                <input type="text" class="form-control ms-2" value="{{ tutoria.get_tema_display|join:', ' }}" readonly>
-                            </div>
+                            <dt class="col-5 text-muted">Correo</dt>
+                            <dd class="col-7 mb-2 text-break student-email">{{ tutoria.alumno.email }}</dd>
 
-                            <div class="w-100 d-flex flex-row align-items-center mb-3">
-                                <label class="form-label  w-50">¿El alumno asistió a la tutoría?:</label><br>
-                                <div class="w-50 d-flex align-items-center">
-                                    <input type="radio" name="asistencia" value="True" class="me-1" checked>Sí</input>
-                                    <input type="radio" name="asistencia" value="False" class="ms-5 me-1">  No </input>
+                            <dt class="col-5 text-muted">Carrera</dt>
+                            <dd class="col-7 mb-2">{{ tutoria.alumno.get_carrera_display }}</dd>
+
+                            <dt class="col-5 text-muted">Ingreso</dt>
+                            <dd class="col-7 mb-0">{{ tutoria.alumno.trimestre_ingreso|default:"Sin registro" }}</dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <div class="card border-0 shadow-sm mb-3">
+                    <div class="card-body p-3 p-md-4">
+                        <h5 class="text-title-bold mb-3">Métricas rápidas</h5>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <div class="metric-box">
+                                    <p class="metric-label">Tutorías</p>
+                                    <p class="metric-value">{{ total_tutorias_alumno }}</p>
                                 </div>
                             </div>
-
-                            <!-- Agrupamos las preguntas adicionales en un contenedor -->
-                            <div id="extra-fields">
-                                <div class="mb-3">
-                                    <label class="form-label ">Duración de la tutoría:</label>
-                                    {% render_field form.duracion class="form-select" %}
-                                    <label class="form-label" for="id_duracion">Selecciona una opción</label>
+                            <div class="col-6">
+                                <div class="metric-box">
+                                    <p class="metric-label">Asistidas</p>
+                                    <p class="metric-value">{{ total_tutorias_asistidas }}</p>
                                 </div>
-
-                                <div class="w-100 d-flex flex-row align-items-center mb-3">
-                                    <label class="form-label  w-50">¿Se firmó algún formato de solicitud de beca?</label><br>
-                                    <div class="w-50 d-flex align-items-center">
-                                        <input type="radio" name="firma_documentos_beca" value="True" required class="me-1" > Sí
-                                        <input type="radio" name="firma_documentos_beca" value="False" class="ms-5 me-1" > No
-                                    </div>
-                                </div>
-
-                                <div class="mb-3" id="beca-field">
-                                    <label class="form-label ">Nombre de la beca otorgada al alumno:</label>
-                                    <input type="text" name="beca_otorgada" class="form-control" maxlength="255">
-                                </div>
-
-                                <div class="w-100 d-flex flex-row align-items-center mb-3">
-                                    <label class="form-label  w-50">¿Requirió asesoría especializada?:</label><br>
-                                    <div class="w-50 d-flex align-items-center">
-                                        <input type="radio" name="asesoria_especializada" value="True" required class="me-1"> Sí
-                                        <input type="radio" name="asesoria_especializada" value="False"  class="ms-5 me-1" > No
-                                    </div>
-                                </div>
-
-                                <!-- Aspectos tratados (se oculta si "No" en asesoría) -->
-                                <div class="mb-3"  id="aspectos-field">
-                                    <label class="form-label ">Aspectos tratados en la tutoría, acuerdos o acciones establecidas, canalizaciones</label>
-                                    <textarea name="observaciones" class="form-control" maxlength="1000"></textarea>
-                                </div>
-
-                                <div class="w-100 d-flex flex-row align-items-center mb-3">
-                                    <label class="form-label  w-50">¿Nivel de impacto de la tutoría en el desempeño académico del alumno?:</label><br>
-                                    <div class="w-50 d-flex align-items-center">
-                                        <div class="d-flex align-items-center me-3">
-                                            <input type="radio" name="impacto_tutoria" value="1" class="me-1" required> 1</input>
-                                        </div>
-                                        <div class="d-flex align-items-center me-3">
-                                            <input type="radio" name="impacto_tutoria" value="2" class="me-1"> 2 </input>
-                                        </div>
-                                        <div class="d-flex align-items-center me-3">
-                                            <input type="radio" name="impacto_tutoria" value="3" class="me-1"> 3 </input>
-                                        </div>
-                                        <div class="d-flex align-items-center me-3">
-                                            <input type="radio" name="impacto_tutoria" value="4" class="me-1"> 4 </input>
-                                        </div>
-                                        <div class="d-flex align-items-center me-3">
-                                            <input type="radio" name="impacto_tutoria" value="5" class="me-1"> 5 </input>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="mb-3">
-                                    <label class="form-label ">Resultados de la tutoría:</label>
-                                    <textarea name="resultados_tutoria" class="form-control" maxlength="1000"></textarea>
-                                </div>
-                                <div class="py-4 d-flex w-100 justify-content-center text-title">
-                                    <button type="submit" class="btn btn-primary ms-2" id="guardar-btn">Guardar Reporte</button>
-                                </div>   
                             </div>
-                        </form>
-                        <div class="py-4 d-flex w-100 justify-content-center text-title" style="display: none;">
-                            <form method="post" action="{% url 'cancelar-tutoria' tutoria.pk %}" id="cancelar-form">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-danger" id="cancel-btn">Cancelar tutoría</button>
-                            </form>
+                            <div class="col-12">
+                                <div class="metric-box">
+                                    <p class="metric-label">Promedio de impacto últimas 5</p>
+                                    <p class="metric-value">
+                                        {% if promedio_impacto %}
+                                            {{ promedio_impacto }}/5
+                                        {% else %}
+                                            Sin datos
+                                        {% endif %}
+                                    </p>
+                                </div>
+                            </div>
                         </div>
+                    </div>
+                </div>
+
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body p-3 p-md-4">
+                        <h5 class="text-title-bold mb-3">Estado del alumno</h5>
+                        <div class="alert alert-info mb-0" role="alert">
+                            <p class="mb-2"><strong>Estado guardado:</strong> {{ tutoria.get_estado_alumno_historico_display }}</p>
+                            <p class="mb-0"><strong>Estado actual:</strong> {{ tutoria.alumno.get_estado_display }}</p>
+                        </div>
+                    </div>
                 </div>
             </div>
+
+            <div class="col-12 col-xl-8 order-2">
+                <div class="card border-top border-bottom border-4 shadow-sm" style="border-color: #f08200 !important;">
+                    <div class="card-body p-3 p-md-4 p-xl-5 text-body">
+                        <div class="reporte-header mb-3">
+                            <div class="d-flex justify-content-between align-items-center gap-2 mb-2 flex-wrap">
+                                <h3 class="text-primary text-title-bold mb-0">{{ titulo_reporte }}</h3>
+                                <a href="{% url 'Tutorias-historial' %}" class="btn btn-outline-secondary btn-sm" id="header-back-link">Regresar</a>
+                            </div>
+                            <div class="reporte-header-meta">
+                                <p class="reporte-header-meta-title mb-2">Datos de la tutoría</p>
+                                <div class="reporte-header-meta-row">
+                                    <span class="reporte-header-meta-label">Fecha y hora programada en tutoría</span>
+                                    <span class="reporte-header-meta-value">{{ tutoria.fecha|date:'l d/m/Y H:i' }}</span>
+                                </div>
+                                <div class="reporte-header-meta-row">
+                                    <span class="reporte-header-meta-label">Tema(s) de la tutoría</span>
+                                    <span class="reporte-header-meta-value">{{ tutoria.get_tema_display|join:', ' }}</span>
+                                </div>
+                                <div class="reporte-header-meta-row">
+                                    <span class="reporte-header-meta-label">Estado de la tutoría</span>
+                                    <span class="reporte-header-meta-value">{{ tutoria.get_estado_display }}</span>
+                                </div>
+                                <div class="reporte-header-meta-row">
+                                    <span class="reporte-header-meta-label">Descripción inicial</span>
+                                    <span class="reporte-header-meta-value">{{ tutoria.descripcion|default:'Sin descripción registrada' }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="accordion mb-4" id="historialAlumnoAccordion">
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingTemaResumen">
+                                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTemaResumen" aria-expanded="true" aria-controls="collapseTemaResumen">
+                                        Resumen por tema de solicitudes
+                                    </button>
+                                </h2>
+                                <div id="collapseTemaResumen" class="accordion-collapse collapse show" aria-labelledby="headingTemaResumen" data-bs-parent="#historialAlumnoAccordion">
+                                    <div class="accordion-body">
+                                        {% if resumen_temas %}
+                                            <div class="d-flex flex-wrap gap-2">
+                                                {% for tema in resumen_temas %}
+                                                    <span class="badge rounded-pill tema-badge">{{ tema.etiqueta }}: {{ tema.total }}</span>
+                                                {% endfor %}
+                                            </div>
+                                        {% else %}
+                                            <p class="mb-0 text-muted">No hay temas registrados para este alumno.</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingTutoriasRecientes">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTutoriasRecientes" aria-expanded="false" aria-controls="collapseTutoriasRecientes">
+                                        Últimas tutorías del alumno
+                                    </button>
+                                </h2>
+                                <div id="collapseTutoriasRecientes" class="accordion-collapse collapse" aria-labelledby="headingTutoriasRecientes" data-bs-parent="#historialAlumnoAccordion">
+                                    <div class="accordion-body p-0">
+                                        {% if tutorias_recientes %}
+                                            <div class="table-responsive">
+                                                <table class="table table-sm table-hover mb-0 align-middle">
+                                                    <thead>
+                                                        <tr>
+                                                            <th>Fecha</th>
+                                                            <th>Tema</th>
+                                                            <th>Estado</th>
+                                                            <th>Asistencia</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                        {% for item in tutorias_recientes %}
+                                                            <tr>
+                                                                <td>{{ item.fecha|date:'d/m/Y' }}</td>
+                                                                <td>{{ item.get_tema_display|join:', ' }}</td>
+                                                                <td>{{ item.get_estado_display }}</td>
+                                                                <td>
+                                                                    {% if item.asistencia == True %}
+                                                                        Sí
+                                                                    {% elif item.asistencia == False %}
+                                                                        No
+                                                                    {% else %}
+                                                                        Sin dato
+                                                                    {% endif %}
+                                                                </td>
+                                                            </tr>
+                                                        {% endfor %}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        {% else %}
+                                            <p class="p-3 mb-0 text-muted">No hay tutorías previas para mostrar.</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingAsesorias">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAsesorias" aria-expanded="false" aria-controls="collapseAsesorias">
+                                        Asesorías registradas
+                                    </button>
+                                </h2>
+                                <div id="collapseAsesorias" class="accordion-collapse collapse" aria-labelledby="headingAsesorias" data-bs-parent="#historialAlumnoAccordion">
+                                    <div class="accordion-body">
+                                        {% if asesorias_recientes %}
+                                            <ul class="list-group list-group-flush">
+                                                {% for asesoria in asesorias_recientes %}
+                                                    <li class="list-group-item px-0">
+                                                        <p class="mb-1"><strong>{{ asesoria.tema }}</strong></p>
+                                                        <p class="mb-0 small text-muted">{{ asesoria.fecha|date:'d/m/Y H:i' }} | {{ asesoria.tutor.first_name }} {{ asesoria.tutor.last_name }}</p>
+                                                    </li>
+                                                {% endfor %}
+                                            </ul>
+                                        {% else %}
+                                            <p class="mb-0 text-muted">No hay asesorías registradas.</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingBecas">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseBecas" aria-expanded="false" aria-controls="collapseBecas">
+                                        Becas registradas en tutorías
+                                    </button>
+                                </h2>
+                                <div id="collapseBecas" class="accordion-collapse collapse" aria-labelledby="headingBecas" data-bs-parent="#historialAlumnoAccordion">
+                                    <div class="accordion-body">
+                                        {% if becas_registradas %}
+                                            <ul class="list-group list-group-flush">
+                                                {% for beca in becas_registradas %}
+                                                    <li class="list-group-item px-0">
+                                                        <p class="mb-1"><strong>{{ beca.beca_otorgada }}</strong></p>
+                                                        <p class="mb-0 small text-muted">{{ beca.fecha|date:'d/m/Y H:i' }} | {{ beca.get_estado_display }}</p>
+                                                    </li>
+                                                {% endfor %}
+                                            </ul>
+                                        {% else %}
+                                            <p class="mb-0 text-muted">No hay becas registradas en tutorías previas.</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="headingCambios">
+                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCambios" aria-expanded="false" aria-controls="collapseCambios">
+                                        Auditoría de cambios de esta tutoría
+                                    </button>
+                                </h2>
+                                <div id="collapseCambios" class="accordion-collapse collapse" aria-labelledby="headingCambios" data-bs-parent="#historialAlumnoAccordion">
+                                    <div class="accordion-body">
+                                        {% if historial_cambios_actual %}
+                                            <ul class="list-group list-group-flush">
+                                                {% for cambio in historial_cambios_actual %}
+                                                    <li class="list-group-item px-0">
+                                                        <p class="mb-1">{{ cambio.cambios_realizados }}</p>
+                                                        <p class="mb-0 small text-muted">{{ cambio.fecha_cambio|date:'d/m/Y H:i' }} | {{ cambio.correo_editor }}</p>
+                                                    </li>
+                                                {% endfor %}
+                                            </ul>
+                                        {% else %}
+                                            <p class="mb-0 text-muted">No hay cambios registrados para esta tutoría.</p>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <form method="POST" action="{% url 'save_seguimiento' tutoria.pk %}" id="seguimiento-form" novalidate>
+                            {% csrf_token %}
+                            <input type="hidden" name="edit_confirmed" id="edit-confirmed" value="false">
+
+                            <div class="row g-3 mb-3">
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label">Alumno</label>
+                                    <input type="text" class="form-control" value="{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}" readonly>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label">Temas</label>
+                                    <input type="text" class="form-control" value="{{ tutoria.get_tema_display|join:', ' }}" readonly>
+                                </div>
+                                <div class="col-12 col-md-6">
+                                    <label class="form-label" for="id_estado_alumno_actual">Estado actual del alumno</label>
+                                    {% render_field form.estado_alumno_actual class="form-select" %}
+                                </div>
+                            </div>
+
+                            <fieldset class="mb-3 section-box">
+                                <legend class="form-label mb-2">¿El alumno asistió a la tutoría?</legend>
+                                <div class="d-flex flex-wrap gap-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="asistencia" id="asistencia-si" value="True" {% if tutoria.asistencia != False %}checked{% endif %}>
+                                        <label class="form-check-label" for="asistencia-si">Sí</label>
+                                    </div>
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="radio" name="asistencia" id="asistencia-no" value="False" {% if tutoria.asistencia == False %}checked{% endif %}>
+                                        <label class="form-check-label" for="asistencia-no">No</label>
+                                    </div>
+                                </div>
+                            </fieldset>
+
+                            <div id="extra-fields">
+                                <div class="mb-3 section-box">
+                                    <label class="form-label" for="id_duracion">Duración de la tutoría</label>
+                                    {% render_field form.duracion class="form-select" %}
+                                </div>
+
+                                <fieldset class="mb-3 section-box">
+                                    <legend class="form-label mb-2">¿Se firmó algún formato de solicitud de beca?</legend>
+                                    <div class="d-flex flex-wrap gap-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="firma_documentos_beca" id="firma-beca-si" value="True" {% if tutoria.firma_documentos_beca == True %}checked{% endif %} required>
+                                            <label class="form-check-label" for="firma-beca-si">Sí</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="firma_documentos_beca" id="firma-beca-no" value="False" {% if tutoria.firma_documentos_beca == False %}checked{% endif %} required>
+                                            <label class="form-check-label" for="firma-beca-no">No</label>
+                                        </div>
+                                    </div>
+                                </fieldset>
+
+                                <div class="mb-3 section-box" id="beca-field">
+                                    <label class="form-label" for="beca-otorgada-input">Nombre de la beca otorgada al alumno</label>
+                                    <input type="text" id="beca-otorgada-input" name="beca_otorgada" class="form-control" maxlength="255" value="{{ tutoria.beca_otorgada|default_if_none:'' }}">
+                                </div>
+
+                                <fieldset class="mb-3 section-box">
+                                    <legend class="form-label mb-2">¿Requirió asesoría especializada?</legend>
+                                    <div class="d-flex flex-wrap gap-3">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="asesoria_especializada" id="asesoria-si" value="True" {% if tutoria.asesoria_especializada == True %}checked{% endif %} required>
+                                            <label class="form-check-label" for="asesoria-si">Sí</label>
+                                        </div>
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="asesoria_especializada" id="asesoria-no" value="False" {% if tutoria.asesoria_especializada == False %}checked{% endif %} required>
+                                            <label class="form-check-label" for="asesoria-no">No</label>
+                                        </div>
+                                    </div>
+                                </fieldset>
+
+                                <div class="mb-3 section-box" id="aspectos-field">
+                                    <label class="form-label" for="observaciones-input">Aspectos tratados, acuerdos o canalizaciones</label>
+                                    <textarea id="observaciones-input" name="observaciones" class="form-control" maxlength="1000" rows="4">{{ tutoria.observaciones|default_if_none:'' }}</textarea>
+                                </div>
+
+                                <fieldset class="mb-3 section-box">
+                                    <legend class="form-label mb-2">Nivel de impacto en desempeño académico (1-5)</legend>
+                                    <div class="row row-cols-2 row-cols-sm-3 row-cols-md-5 g-2">
+                                        <div class="col">
+                                            <div class="impact-option">
+                                                <input class="form-check-input" type="radio" name="impacto_tutoria" value="1" id="impacto-1" {% if tutoria.impacto_tutoria == 1 %}checked{% endif %} required>
+                                                <label for="impacto-1">1</label>
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <div class="impact-option">
+                                                <input class="form-check-input" type="radio" name="impacto_tutoria" value="2" id="impacto-2" {% if tutoria.impacto_tutoria == 2 %}checked{% endif %} required>
+                                                <label for="impacto-2">2</label>
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <div class="impact-option">
+                                                <input class="form-check-input" type="radio" name="impacto_tutoria" value="3" id="impacto-3" {% if tutoria.impacto_tutoria == 3 %}checked{% endif %} required>
+                                                <label for="impacto-3">3</label>
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <div class="impact-option">
+                                                <input class="form-check-input" type="radio" name="impacto_tutoria" value="4" id="impacto-4" {% if tutoria.impacto_tutoria == 4 %}checked{% endif %} required>
+                                                <label for="impacto-4">4</label>
+                                            </div>
+                                        </div>
+                                        <div class="col">
+                                            <div class="impact-option">
+                                                <input class="form-check-input" type="radio" name="impacto_tutoria" value="5" id="impacto-5" {% if tutoria.impacto_tutoria == 5 %}checked{% endif %} required>
+                                                <label for="impacto-5">5</label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </fieldset>
+
+                                <div class="mb-3 section-box">
+                                    <label class="form-label" for="resultados-input">Resultados de la tutoría</label>
+                                    <textarea id="resultados-input" name="resultados_tutoria" class="form-control" maxlength="1000" rows="4">{{ tutoria.resultados_tutoria|default_if_none:'' }}</textarea>
+                                </div>
+                            </div>
+
+                        </form>
+
+                        <div class="action-buttons pt-3" id="action-buttons">
+                            <button type="submit" form="seguimiento-form" class="btn btn-primary action-btn" id="guardar-btn" data-seguimiento-completado="{% if seguimiento_completado %}true{% else %}false{% endif %}">{% if seguimiento_completado %}Editar reporte{% else %}Guardar Reporte{% endif %}</button>
+
+                            <div id="cancel-form-wrapper">
+                                <form method="post" action="{% url 'cancelar-tutoria' tutoria.pk %}" id="cancelar-form" class="m-0">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-danger action-btn" id="cancel-btn" disabled>Cancelar tutoría</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </section>
 
-<!-- JavaScript para ocultar/mostrar los campos -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script>
-  $(document).ready(function () {
-    function toggleFields() {
-      const asistencia = $("input[name='asistencia']:checked").val();
+<div id="neutral-confirm-dialog" class="neutral-dialog" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="neutral-dialog-title">
+    <div class="neutral-dialog-panel" role="document">
+        <h5 id="neutral-dialog-title" class="neutral-dialog-title">Confirmar acción</h5>
+        <p id="neutral-dialog-message" class="neutral-dialog-message">¿Deseas continuar?</p>
+        <div class="neutral-dialog-actions">
+            <button type="button" id="neutral-dialog-cancel" class="neutral-dialog-btn neutral-dialog-btn-secondary">Cancelar</button>
+            <button type="button" id="neutral-dialog-confirm" class="neutral-dialog-btn neutral-dialog-btn-primary">Confirmar</button>
+        </div>
+    </div>
+</div>
 
-      const extraFields = $("#extra-fields").find("input, select, textarea");
-      const guardarBtn = $("#guardar-btn");
-      const cancelarBtn = $("#cancel-btn");
-
-      if (asistencia === "False") {
-        extraFields.prop("disabled", true);
-        guardarBtn.prop("disabled", true);
-        cancelarBtn.prop("disabled", false);
-      } else {
-        extraFields.prop("disabled", false);
-        guardarBtn.prop("disabled", false);
-        cancelarBtn.prop("disabled", true);
-      }
+<style>
+    body.dialog-open {
+        overflow: hidden;
     }
 
-    // Ejecutar al cambiar la opción de asistencia
-    $("input[name='asistencia']").on("change", toggleFields);
+    .neutral-dialog {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        background: rgba(21, 26, 33, 0.44);
+        z-index: 2000;
+    }
 
-    // Ejecutar al cargar
-    toggleFields();
-  });
+    .neutral-dialog.is-open {
+        display: flex;
+    }
 
-  document.addEventListener('DOMContentLoaded', function () {
-    const cancelForm = document.getElementById('cancelar-form');
-    if (cancelForm) {
-        cancelForm.addEventListener('submit', function (e) {
-            const confirmacion = confirm("¿Estás seguro de que deseas cancelar esta tutoría?");
-            if (!confirmacion) {
-                e.preventDefault();  // Cancela el envío si el usuario presiona "Cancelar"
+    .neutral-dialog-panel {
+        width: min(92vw, 420px);
+        border: 1px solid #d8dde5;
+        border-radius: 0.75rem;
+        background: #ffffff;
+        box-shadow: 0 18px 40px rgba(25, 31, 40, 0.2);
+        padding: 1rem 1rem 0.9rem;
+        text-align: center;
+    }
+
+    .neutral-dialog-title {
+        margin: 0 0 0.45rem;
+        color: #26303d;
+        font-size: 1rem;
+        font-weight: 700;
+        text-align: center;
+    }
+
+    .neutral-dialog-message {
+        margin: 0;
+        color: #495566;
+        font-size: 0.93rem;
+        line-height: 1.45;
+        text-align: center;
+    }
+
+    .neutral-dialog-actions {
+        margin-top: 0.95rem;
+        display: flex;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .neutral-dialog-btn {
+        border: 1px solid transparent;
+        border-radius: 0.55rem;
+        padding: 0.42rem 0.82rem;
+        font-size: 0.86rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+
+    .neutral-dialog-btn-secondary {
+        background: #eef2f7;
+        border-color: #c7d2e0;
+        color: #334155;
+    }
+
+    .neutral-dialog-btn-secondary:hover,
+    .neutral-dialog-btn-secondary:focus-visible {
+        background: #e2e8f0;
+        border-color: #afc0d6;
+    }
+
+    .neutral-dialog-btn-primary {
+        background: #2f6fcb;
+        border-color: #2f6fcb;
+        color: #ffffff;
+    }
+
+    .neutral-dialog-btn-primary:hover,
+    .neutral-dialog-btn-primary:focus-visible {
+        background: #275ead;
+        border-color: #275ead;
+    }
+
+    .neutral-dialog-btn-danger {
+        background: #c74343;
+        border-color: #c74343;
+        color: #ffffff;
+    }
+
+    .neutral-dialog-btn-danger:hover,
+    .neutral-dialog-btn-danger:focus-visible {
+        background: #a93434;
+        border-color: #a93434;
+    }
+
+    .seguimiento-page {
+        background: linear-gradient(180deg, #fff9f2 0%, #f4f6f8 45%, #eef2f5 100%);
+        min-height: calc(100vh - 70px);
+    }
+
+    .section-box {
+        background-color: #fbfcfd;
+        border: 1px solid #e8edf1;
+        border-radius: 0.75rem;
+        padding: 1rem;
+    }
+
+    .seguimiento-page .container-fluid {
+        margin-top: var(--floating-back-clearance, 0px);
+        transition: margin-top 0.15s ease;
+    }
+
+    .metric-box {
+        background-color: #fff7ef;
+        border: 1px solid #ffe2c0;
+        border-radius: 0.75rem;
+        padding: 0.75rem;
+        height: 100%;
+    }
+
+    .metric-label {
+        margin-bottom: 0.15rem;
+        color: #6a737d;
+        font-size: 0.8rem;
+    }
+
+    .metric-value {
+        margin-bottom: 0;
+        color: #cc6f00;
+        font-size: 1.25rem;
+        font-weight: 700;
+    }
+
+    .tema-badge {
+        background-color: #fff3e4;
+        color: #8e4f00;
+        border: 1px solid #ffd4a5;
+    }
+
+    .impact-option {
+        border: 1px solid #d5dce2;
+        border-radius: 0.65rem;
+        min-height: 48px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 0.5rem;
+        background-color: #ffffff;
+    }
+
+    .impact-option label {
+        margin: 0;
+        font-weight: 600;
+    }
+
+    .floating-back-btn {
+        position: fixed;
+        top: var(--floating-back-top, clamp(72px, 9vh, 84px));
+        left: clamp(10px, 1.4vw, 16px);
+        right: auto;
+        width: clamp(86px, 11.5vw, 102px);
+        min-width: 86px;
+        height: clamp(36px, 4.2vw, 42px);
+        padding: 0 clamp(10px, 1vw, 12px);
+        border: 0;
+        border-radius: 999px;
+        background: #b43f3a;
+        color: #fff;
+        font-size: clamp(0.8rem, 0.9vw, 0.9rem);
+        font-weight: 600;
+        line-height: 1;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: clamp(5px, 0.6vw, 7px);
+        box-shadow: 0 8px 16px rgba(180, 63, 58, 0.22);
+        z-index: 1050;
+        transform: translateY(0);
+        transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+    }
+
+    .floating-back-icon {
+        font-size: clamp(0.9rem, 1.1vw, 1.05rem);
+        line-height: 1;
+    }
+
+    .floating-back-label {
+        font-size: clamp(0.78rem, 0.85vw, 0.88rem);
+        letter-spacing: 0.01em;
+    }
+
+    .floating-back-btn:hover,
+    .floating-back-btn:focus-visible {
+        background: #95332f;
+        box-shadow: 0 12px 22px rgba(149, 51, 47, 0.35);
+        transform: translateY(-1px);
+    }
+
+    .floating-back-btn:focus-visible {
+        outline: 2px solid #fff;
+        outline-offset: 2px;
+    }
+
+    .reporte-header-meta {
+        width: 100%;
+        background-color: #fff7ef;
+        border: 1px solid #ffe2c0;
+        border-radius: 0.75rem;
+        padding: 0.9rem 1rem;
+    }
+
+    .reporte-header-meta-title {
+        color: #8e4f00;
+        font-size: 0.9rem;
+        font-weight: 700;
+    }
+
+    .reporte-header-meta-row {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 0.35rem;
+        border-top: 1px dashed #f2cba0;
+        padding-top: 0.6rem;
+    }
+
+    .reporte-header-meta-label {
+        color: #6f5a44;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    .reporte-header-meta-value {
+        color: #3e4248;
+        font-size: 0.95rem;
+        font-weight: 600;
+        line-height: 1.35;
+        word-break: break-word;
+    }
+
+    .action-buttons {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .action-buttons > .action-btn,
+    .action-buttons > div,
+    .action-buttons > div form {
+        width: 100%;
+    }
+
+    .action-buttons .action-btn {
+        width: 100%;
+        min-height: 46px;
+    }
+
+    .student-email {
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
+    @media (max-width: 1199.98px) {
+        .student-info-list dt,
+        .student-info-list dd {
+            flex: 0 0 100%;
+            max-width: 100%;
+        }
+
+        .student-info-list dt {
+            margin-bottom: 0.2rem;
+        }
+
+        .student-info-list dd {
+            margin-bottom: 0.7rem;
+        }
+
+        .student-info-list dd:last-child {
+            margin-bottom: 0;
+        }
+    }
+
+    @media (min-width: 992px) {
+        #header-back-link {
+            display: none !important;
+        }
+    }
+
+    @media (min-width: 768px) {
+        .reporte-header-meta-row {
+            grid-template-columns: minmax(230px, 320px) 1fr;
+            align-items: center;
+        }
+
+        .action-buttons {
+            flex-direction: row;
+            justify-content: center;
+            align-items: stretch;
+        }
+
+        .action-buttons > .action-btn,
+        .action-buttons > div {
+            flex: 0 1 260px;
+            max-width: 320px;
+        }
+    }
+
+    @media (max-width: 575.98px) {
+        .floating-back-btn {
+            width: min(28vw, 92px);
+            height: min(11vw, 40px);
+        }
+
+        .floating-back-icon {
+            font-size: min(4.6vw, 1rem);
+        }
+
+        .floating-back-label {
+            font-size: min(3.9vw, 0.84rem);
+        }
+
+        .card-body {
+            padding: 1rem !important;
+        }
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const asistenciaInputs = document.querySelectorAll("input[name='asistencia']");
+        const firmaBecaInputs = document.querySelectorAll("input[name='firma_documentos_beca']");
+        const asesoriaInputs = document.querySelectorAll("input[name='asesoria_especializada']");
+
+        const extraFields = document.getElementById('extra-fields');
+        const becaField = document.getElementById('beca-field');
+        const aspectosField = document.getElementById('aspectos-field');
+        const becaInput = document.getElementById('beca-otorgada-input');
+        const observacionesInput = document.getElementById('observaciones-input');
+        const guardarBtn = document.getElementById('guardar-btn');
+        const cancelFormWrapper = document.getElementById('cancel-form-wrapper');
+        const cancelarBtn = document.getElementById('cancel-btn');
+        const cancelForm = document.getElementById('cancelar-form');
+        const seguimientoForm = document.getElementById('seguimiento-form');
+        const editConfirmedInput = document.getElementById('edit-confirmed');
+        const floatingBackBtn = document.getElementById('floating-back-btn');
+        const headerBackLink = document.getElementById('header-back-link');
+        const topNavigation = document.querySelector('nav');
+        const pageContentStart = document.querySelector('.seguimiento-page .container-fluid');
+        const dialogRoot = document.getElementById('neutral-confirm-dialog');
+        const dialogTitle = document.getElementById('neutral-dialog-title');
+        const dialogMessage = document.getElementById('neutral-dialog-message');
+        const dialogCancelBtn = document.getElementById('neutral-dialog-cancel');
+        const dialogConfirmBtn = document.getElementById('neutral-dialog-confirm');
+        const leaveMessage = 'Los cambios no guardados se perderán. ¿Desea continuar?';
+        const fallbackUrl = "{% url 'Tutorias-historial' %}";
+
+        let allowPageExit = false;
+        let resolveDialog = null;
+
+        function closeConfirmDialog(result) {
+            if (!resolveDialog) {
+                return;
+            }
+
+            dialogRoot.classList.remove('is-open');
+            dialogRoot.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('dialog-open');
+            const resolver = resolveDialog;
+            resolveDialog = null;
+            resolver(result);
+        }
+
+        function showConfirmDialog(options) {
+            const dialogOptions = options || {};
+            if (!dialogRoot || !dialogTitle || !dialogMessage || !dialogCancelBtn || !dialogConfirmBtn) {
+                return Promise.resolve(window.confirm(dialogOptions.message || '¿Deseas continuar?'));
+            }
+
+            function applyTone(button, tone, fallbackTone) {
+                const selectedTone = tone || fallbackTone;
+                button.classList.remove('neutral-dialog-btn-secondary', 'neutral-dialog-btn-primary', 'neutral-dialog-btn-danger');
+                if (selectedTone === 'primary') {
+                    button.classList.add('neutral-dialog-btn-primary');
+                } else if (selectedTone === 'danger') {
+                    button.classList.add('neutral-dialog-btn-danger');
+                } else {
+                    button.classList.add('neutral-dialog-btn-secondary');
+                }
+            }
+
+            dialogTitle.textContent = dialogOptions.title || 'Confirmar acción';
+            dialogMessage.textContent = dialogOptions.message || '¿Deseas continuar?';
+            dialogCancelBtn.textContent = dialogOptions.cancelLabel || 'Cancelar';
+            dialogConfirmBtn.textContent = dialogOptions.confirmLabel || 'Confirmar';
+            applyTone(dialogCancelBtn, dialogOptions.cancelTone, 'secondary');
+            applyTone(dialogConfirmBtn, dialogOptions.confirmTone, 'primary');
+
+            dialogRoot.classList.add('is-open');
+            dialogRoot.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('dialog-open');
+
+            return new Promise(function (resolve) {
+                resolveDialog = resolve;
+                dialogConfirmBtn.focus();
+            });
+        }
+
+        if (dialogCancelBtn) {
+            dialogCancelBtn.addEventListener('click', function () {
+                closeConfirmDialog(false);
+            });
+        }
+
+        if (dialogConfirmBtn) {
+            dialogConfirmBtn.addEventListener('click', function () {
+                closeConfirmDialog(true);
+            });
+        }
+
+        if (dialogRoot) {
+            dialogRoot.addEventListener('click', function (event) {
+                if (event.target === dialogRoot) {
+                    closeConfirmDialog(false);
+                }
+            });
+        }
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape' && resolveDialog) {
+                closeConfirmDialog(false);
             }
         });
-    }
-});
 
+        function getPreviousUrl() {
+            if (!document.referrer) {
+                return null;
+            }
+
+            try {
+                const previous = new URL(document.referrer);
+                const current = new URL(window.location.href);
+                if (previous.origin !== current.origin) {
+                    return null;
+                }
+                if (previous.pathname === current.pathname && previous.search === current.search) {
+                    return null;
+                }
+                return previous.href;
+            } catch (error) {
+                return null;
+            }
+        }
+
+        function goToPreviousPage() {
+            const previousUrl = getPreviousUrl();
+            window.location.href = previousUrl || fallbackUrl;
+        }
+
+        async function confirmExitAndNavigate(navigateFn) {
+            const confirmarSalida = await showConfirmDialog({
+                title: 'Salir del reporte',
+                message: leaveMessage,
+                cancelLabel: 'Quedarme',
+                confirmLabel: 'Salir',
+                cancelTone: 'primary',
+                confirmTone: 'danger',
+            });
+            if (!confirmarSalida) {
+                return false;
+            }
+
+            allowPageExit = true;
+            navigateFn();
+            return true;
+        }
+
+        function updateFloatingBackTop() {
+            if (!floatingBackBtn) {
+                return;
+            }
+
+            const baseTop = 6;
+            const navSpacing = 8;
+            let computedTop = baseTop;
+
+            if (topNavigation) {
+                const navRect = topNavigation.getBoundingClientRect();
+                if (navRect.bottom > 0) {
+                    const btnHeight = floatingBackBtn.offsetHeight || 40;
+                    const contentTop = pageContentStart ? pageContentStart.getBoundingClientRect().top : (navRect.bottom + 40);
+
+                    // Al cargar, ubica el botón al centro del espacio entre barra y contenido.
+                    const gapMidpoint = ((navRect.bottom + contentTop) / 2) - (btnHeight / 2);
+                    const minTopBelowNav = navRect.bottom + navSpacing;
+                    computedTop = Math.max(minTopBelowNav, Math.round(gapMidpoint));
+
+                    // Si el espacio vertical no alcanza, agrega separación al contenido para evitar traslape.
+                    if (pageContentStart) {
+                        const overlap = (computedTop + btnHeight + navSpacing) - contentTop;
+                        const clearance = Math.max(0, Math.round(overlap));
+                        pageContentStart.style.setProperty('--floating-back-clearance', clearance + 'px');
+                    }
+                } else if (pageContentStart) {
+                    pageContentStart.style.setProperty('--floating-back-clearance', '0px');
+                }
+            } else if (pageContentStart) {
+                pageContentStart.style.setProperty('--floating-back-clearance', '0px');
+            }
+
+            floatingBackBtn.style.setProperty('--floating-back-top', computedTop + 'px');
+        }
+
+        const seguimientoCompletado = guardarBtn.dataset.seguimientoCompletado === 'true';
+        let editingUnlocked = !seguimientoCompletado;
+
+        function getCheckedValue(name) {
+            const checked = document.querySelector("input[name='" + name + "']:checked");
+            return checked ? checked.value : null;
+        }
+
+        function toggleBecaField() {
+            const firmaBeca = getCheckedValue('firma_documentos_beca');
+            const showBeca = firmaBeca === 'True';
+            becaField.style.display = showBeca ? 'block' : 'none';
+            becaInput.required = showBeca;
+            if (!showBeca) {
+                becaInput.value = '';
+            }
+        }
+
+        function toggleAspectosField() {
+            const asesoriaEspecializada = getCheckedValue('asesoria_especializada');
+            const showAspectos = asesoriaEspecializada === 'True';
+            aspectosField.style.display = showAspectos ? 'block' : 'none';
+            observacionesInput.required = showAspectos;
+            if (!showAspectos) {
+                observacionesInput.value = '';
+            }
+        }
+
+        function setExtraFieldsDisabled(disabled) {
+            const controls = extraFields.querySelectorAll('input, select, textarea');
+            controls.forEach(function (control) {
+                control.disabled = disabled;
+            });
+        }
+
+        function setFormReadOnly(readOnly) {
+            const controls = seguimientoForm.querySelectorAll('input, select, textarea');
+            controls.forEach(function (control) {
+                const isHidden = control.type === 'hidden';
+                if (!isHidden) {
+                    control.disabled = readOnly;
+                }
+            });
+        }
+
+        function toggleAsistencia() {
+            const asistencia = getCheckedValue('asistencia');
+            const noAsistio = asistencia === 'False';
+
+            if (seguimientoCompletado && !editingUnlocked) {
+                setFormReadOnly(true);
+                guardarBtn.disabled = false;
+                cancelFormWrapper.style.display = 'none';
+                cancelarBtn.disabled = true;
+                return;
+            }
+
+            setExtraFieldsDisabled(noAsistio);
+            guardarBtn.disabled = noAsistio;
+            cancelFormWrapper.style.display = 'block';
+            cancelarBtn.disabled = !noAsistio;
+
+            if (!noAsistio) {
+                toggleBecaField();
+                toggleAspectosField();
+            }
+        }
+
+        asistenciaInputs.forEach(function (input) {
+            input.addEventListener('change', toggleAsistencia);
+        });
+
+        guardarBtn.addEventListener('click', function (event) {
+            if (!seguimientoCompletado || editingUnlocked) {
+                editConfirmedInput.value = editingUnlocked ? 'true' : 'false';
+                return;
+            }
+
+            event.preventDefault();
+            showConfirmDialog({
+                title: 'Confirmar edición',
+                message: 'Los cambios se enviarán por correo al alumno y quedarán en historial. ¿Continuar con la edición?',
+                cancelLabel: 'Cancelar',
+                confirmLabel: 'Editar reporte',
+            }).then(function (confirmarEdicion) {
+                if (!confirmarEdicion) {
+                    return;
+                }
+
+                editingUnlocked = true;
+                editConfirmedInput.value = 'true';
+                guardarBtn.textContent = 'Guardar cambios';
+                setFormReadOnly(false);
+                toggleAsistencia();
+            });
+        });
+
+        firmaBecaInputs.forEach(function (input) {
+            input.addEventListener('change', toggleBecaField);
+        });
+
+        asesoriaInputs.forEach(function (input) {
+            input.addEventListener('change', toggleAspectosField);
+        });
+
+        if (cancelForm) {
+            cancelForm.addEventListener('submit', function (event) {
+                event.preventDefault();
+                showConfirmDialog({
+                    title: 'Cancelar tutoría',
+                    message: '¿Estás seguro de que deseas cancelar esta tutoría?',
+                    cancelLabel: 'No cancelar',
+                    confirmLabel: 'Sí, cancelar',
+                }).then(function (confirmacion) {
+                    if (!confirmacion) {
+                        return;
+                    }
+
+                    allowPageExit = true;
+                    cancelForm.submit();
+                });
+            });
+        }
+
+        if (seguimientoForm) {
+            seguimientoForm.addEventListener('submit', function () {
+                allowPageExit = true;
+            });
+        }
+
+        if (floatingBackBtn) {
+            floatingBackBtn.addEventListener('click', function () {
+                confirmExitAndNavigate(goToPreviousPage);
+            });
+        }
+
+        updateFloatingBackTop();
+        window.addEventListener('scroll', updateFloatingBackTop, { passive: true });
+        window.addEventListener('resize', updateFloatingBackTop);
+
+        if (headerBackLink) {
+            headerBackLink.addEventListener('click', function (event) {
+                event.preventDefault();
+                confirmExitAndNavigate(goToPreviousPage);
+            });
+        }
+
+        // Captura botón atrás del navegador y muestra el mismo diálogo antes de salir.
+        window.history.pushState({ seguimientoGuard: true }, '', window.location.href);
+        window.addEventListener('popstate', function () {
+            if (allowPageExit) {
+                return;
+            }
+
+            confirmExitAndNavigate(goToPreviousPage).then(function (salio) {
+                if (!salio) {
+                    window.history.pushState({ seguimientoGuard: true }, '', window.location.href);
+                }
+            });
+        });
+
+        // En recarga/cierre, los navegadores solo permiten diálogo nativo.
+        window.addEventListener('beforeunload', function (event) {
+            if (allowPageExit) {
+                return;
+            }
+
+            event.preventDefault();
+            event.returnValue = leaveMessage;
+        });
+
+        if (seguimientoCompletado) {
+            setFormReadOnly(true);
+        }
+        toggleAsistencia();
+    });
 </script>
-
-
-
 
 {% endblock %}
 {% endwith %}
