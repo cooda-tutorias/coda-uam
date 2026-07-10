@@ -9,8 +9,12 @@
           <div class="col-lg-8 col-xl-10 w-100">
               <div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
                   <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
                       <h3 class=" text-primary text-title-bold">Lista de tutores</h3>
-                      
+                      <a href="{% url 'Reporte-tutorias-masivo' %}" class="btn btn-primary">
+                        Generar reportes masivos
+                      </a>
+                      </div>
                       <!--Inicio de table-->
                       <div class="table-responsive">
                         <table id="tabla-tutores" class="table table-striped table-hover">

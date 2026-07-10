@@ -1,0 +1,444 @@
+{% extends "Usuarios/HeaderAndFooterFachada.html"%}
+
+{% block title %} Generar reportes masivos de tutorías {% endblock %}
+
+{% block body %}
+<section class="min-vh-100" style="background-color: #eee;">
+    <div class="container py-5 h-100">
+        <div class="row d-flex justify-content-center align-items-center h-100">
+            <div class="col-lg-8 col-xl-8">
+                <div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
+                    {% load widget_tweaks %}
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="card-body p-5">
+                            <h3 class="mb-4 text-primary text-title-bold">Generar reportes masivos de tutorías</h3>
+
+                            {% if form.non_field_errors %}
+                                <div class="alert alert-danger mb-3">
+                                    {% for error in form.non_field_errors %}
+                                        <div>{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+
+                            <div class="mb-4">
+                                <label class="form-label">Licenciaturas y tutores</label>
+
+                                <div class="mb-3">
+                                    {% render_field form.incluir_todas class="form-check-input" id="id_incluir_todas" %}
+                                    <label class="form-check-label" for="id_incluir_todas">
+                                        Incluir todas las licenciaturas
+                                    </label>
+                                </div>
+
+                                {{ form.coordinaciones.errors }}
+                                {{ form.tutores.errors }}
+
+                                <div class="border rounded p-3 bg-light">
+                                    {% for grupo in tutores_por_coordinacion %}
+                                        <div class="mb-3 bloque-licenciatura" data-coordinacion="{{ grupo.codigo }}">
+                                            <div class="form-check">
+                                                <input
+                                                    type="checkbox"
+                                                    name="coordinaciones"
+                                                    value="{{ grupo.codigo }}"
+                                                    id="coord_{{ grupo.codigo }}"
+                                                    class="form-check-input coord-checkbox"
+                                                    data-coordinacion="{{ grupo.codigo }}"
+                                                >
+                                                <label class="form-check-label fw-bold" for="coord_{{ grupo.codigo }}">
+                                                    {{ grupo.nombre }}
+                                                </label>
+                                            </div>
+
+                                            <div class="ms-4 mt-2 opciones-tutores d-none" data-coordinacion="{{ grupo.codigo }}">
+                                                <div class="form-check">
+                                                    <input
+                                                        type="radio"
+                                                        name="modo_tutores_{{ grupo.codigo }}"
+                                                        id="modo_todos_{{ grupo.codigo }}"
+                                                        value="todos"
+                                                        class="form-check-input modo-tutores"
+                                                        data-coordinacion="{{ grupo.codigo }}"
+                                                        checked
+                                                    >
+                                                    <label class="form-check-label" for="modo_todos_{{ grupo.codigo }}">
+                                                        Todos los tutores de esta licenciatura
+                                                    </label>
+                                                </div>
+
+                                                <div class="form-check">
+                                                    <input
+                                                        type="radio"
+                                                        name="modo_tutores_{{ grupo.codigo }}"
+                                                        id="modo_especificos_{{ grupo.codigo }}"
+                                                        value="especificos"
+                                                        class="form-check-input modo-tutores"
+                                                        data-coordinacion="{{ grupo.codigo }}"
+                                                    >
+                                                    <label class="form-check-label" for="modo_especificos_{{ grupo.codigo }}">
+                                                        Seleccionar tutores específicos
+                                                    </label>
+                                                </div>
+
+                                                <div class="ms-4 mt-2 lista-tutores d-none" data-coordinacion="{{ grupo.codigo }}">
+                                                    {% if grupo.tutores %}
+                                                        {% for tutor in grupo.tutores %}
+                                                            <div class="form-check">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    name="tutores"
+                                                                    value="{{ tutor.pk }}"
+                                                                    id="tutor_{{ tutor.pk }}"
+                                                                    class="form-check-input tutor-checkbox"
+                                                                    data-coordinacion="{{ grupo.codigo }}"
+                                                                >
+                                                                <label class="form-check-label" for="tutor_{{ tutor.pk }}">
+                                                                    {{ tutor.matricula }} - {{ tutor.first_name }} {{ tutor.last_name }}
+                                                                </label>
+                                                            </div>
+                                                        {% endfor %}
+                                                    {% else %}
+                                                        <small class="text-muted">No hay tutores registrados en esta licenciatura.</small>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+
+                                <small class="form-text text-muted">
+                                    Selecciona una o más licenciaturas. Puedes generar reportes para todos sus tutores
+                                    o elegir tutores específicos por licenciatura.
+                                </small>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label">Número de Oficio inicial</label>
+                                {% render_field form.oficio_inicial class="form-control" placeholder="Ej. 900" %}
+                                {{ form.oficio_inicial.errors }}
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label">Fecha de inicio</label>
+                                {% render_field form.fecha_inicio class="form-control" %}
+                                {{ form.fecha_inicio.errors }}
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label">Fecha de fin</label>
+                                {% render_field form.fecha_fin class="form-control" %}
+                                {{ form.fecha_fin.errors }}
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label">Fecha de emisión</label>
+                                {% render_field form.fecha class="form-control" %}
+                                {{ form.fecha.errors }}
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label">Plantilla utilizada</label>
+                                <div class="form-control bg-light">
+                                    {{ plantilla_masiva_nombre }}
+                                </div>
+
+                                <small class="form-text text-muted">
+                                    Esta plantilla se usa automáticamente para la generación masiva.
+                                    Si necesitas modificarla, actualízala desde Ajustes y conserva exactamente el nombre:
+                                    <strong>{{ plantilla_masiva_nombre }}</strong>.
+                                </small>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label">Columnas del reporte</label>
+                                <div>{{ form.col_alumno }} Alumno</div>
+                                <div>{{ form.col_fecha }} Fecha</div>
+                                <div>{{ form.col_hora }} Hora</div>
+                                <div>{{ form.col_tema }} Tema</div>
+                                <div>{{ form.col_notas }} Notas</div>
+                            </div>
+
+                            <button type="submit" id="btn_generar_reportes" class="btn btn-primary btn-block">Generar reportes</button>
+                            <small class="form-text text-muted"> La generación puede tardar desde algunos segundos hasta varios minutos,
+                                dependiendo del número de tutores y tutorías. Durante el proceso no cierres
+                                esta pestaña ni presiones nuevamente el botón.
+                            </small>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const incluirTodas = document.getElementById("id_incluir_todas");
+    const coordCheckboxes = document.querySelectorAll(".coord-checkbox");
+    const modoRadios = document.querySelectorAll(".modo-tutores");
+
+    function actualizarGrupo(codigo) {
+        const coord = document.querySelector(`.coord-checkbox[data-coordinacion="${codigo}"]`);
+        const opciones = document.querySelector(`.opciones-tutores[data-coordinacion="${codigo}"]`);
+        const lista = document.querySelector(`.lista-tutores[data-coordinacion="${codigo}"]`);
+        const modoEspecificos = document.getElementById(`modo_especificos_${codigo}`);
+        const tutoresGrupo = document.querySelectorAll(`.tutor-checkbox[data-coordinacion="${codigo}"]`);
+
+        if (!coord || !opciones || !lista) {
+            return;
+        }
+
+        if (coord.checked) {
+            opciones.classList.remove("d-none");
+
+            if (modoEspecificos && modoEspecificos.checked) {
+                lista.classList.remove("d-none");
+            } else {
+                lista.classList.add("d-none");
+                tutoresGrupo.forEach(function (checkbox) {
+                    checkbox.checked = false;
+                });
+            }
+        } else {
+            opciones.classList.add("d-none");
+            lista.classList.add("d-none");
+
+            tutoresGrupo.forEach(function (checkbox) {
+                checkbox.checked = false;
+            });
+        }
+    }
+
+    function actualizarTodo() {
+        const marcarTodas = incluirTodas && incluirTodas.checked;
+
+        coordCheckboxes.forEach(function (checkbox) {
+            if (marcarTodas) {
+                checkbox.checked = true;
+            }
+
+            actualizarGrupo(checkbox.dataset.coordinacion);
+        });
+    }
+
+    coordCheckboxes.forEach(function (checkbox) {
+        checkbox.addEventListener("change", function () {
+            if (incluirTodas && !checkbox.checked) {
+                incluirTodas.checked = false;
+            }
+
+            actualizarGrupo(checkbox.dataset.coordinacion);
+        });
+    });
+
+    modoRadios.forEach(function (radio) {
+        radio.addEventListener("change", function () {
+            actualizarGrupo(radio.dataset.coordinacion);
+        });
+    });
+
+    if (incluirTodas) {
+        incluirTodas.addEventListener("change", actualizarTodo);
+    }
+    actualizarTodo();
+});
+
+const form = document.querySelector("form[method='post']");
+const botonGenerar = document.getElementById("btn_generar_reportes");
+
+if (form && botonGenerar) {
+    form.addEventListener("submit", async function (event) {
+        event.preventDefault();
+
+        // Impide que se envíe dos veces mientras la descarga está en proceso.
+        if (form.dataset.enviado === "true") {
+            return;
+        }
+
+        form.dataset.enviado = "true";
+        botonGenerar.disabled = true;
+        botonGenerar.innerHTML = `
+            <span
+                class="spinner-border spinner-border-sm me-2"
+                role="status"
+                aria-hidden="true"
+            ></span>
+            Procesando descarga...
+        `;
+
+        // Eliminar un aviso anterior, en caso de que exista.
+        const avisoAnterior = document.getElementById(
+            "aviso-procesando-descarga"
+        );
+
+        if (avisoAnterior) {
+            avisoAnterior.remove();
+        }
+
+        const aviso = document.createElement("div");
+        aviso.id = "aviso-procesando-descarga";
+        aviso.className = "alert alert-info mt-3";
+        aviso.innerHTML = `
+            <strong>Tu descarga se está procesando.</strong><br>
+            No cierres esta pestaña.
+
+            <div class="mt-2">
+                Tiempo transcurrido:
+                <strong id="contador-descarga">00:00</strong>
+            </div>
+
+            <div class="progress mt-3">
+                <div
+                    class="progress-bar progress-bar-striped progress-bar-animated"
+                    role="progressbar"
+                    style="width: 100%"
+                    aria-label="Generando reportes"
+                ></div>
+            </div>
+        `;
+
+        botonGenerar.insertAdjacentElement("afterend", aviso);
+
+        let segundos = 0;
+
+        const contador = window.setInterval(function () {
+            segundos += 1;
+
+            const minutosTexto = Math.floor(segundos / 60)
+                .toString()
+                .padStart(2, "0");
+
+            const segundosTexto = (segundos % 60)
+                .toString()
+                .padStart(2, "0");
+
+            const elementoContador = document.getElementById(
+                "contador-descarga"
+            );
+
+            if (elementoContador) {
+                elementoContador.textContent =
+                    `${minutosTexto}:${segundosTexto}`;
+            }
+        }, 1000);
+
+        try {
+            const formData = new FormData(form);
+
+            const respuesta = await fetch(form.action || window.location.href, {
+                method: "POST",
+                body: formData,
+                credentials: "same-origin",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+            });
+
+            if (!respuesta.ok) {
+                throw new Error(
+                    `El servidor respondió con estado ${respuesta.status}.`
+                );
+            }
+
+            const contentType =
+                respuesta.headers.get("Content-Type") || "";
+
+            /*
+             * Si Django devuelve HTML en lugar del ZIP, normalmente significa
+             * que el formulario fue inválido y volvió a renderizar la página
+             * con mensajes de validación.
+             */
+            if (!contentType.includes("application/zip")) {
+                const html = await respuesta.text();
+
+                window.clearInterval(contador);
+
+                document.open();
+                document.write(html);
+                document.close();
+
+                return;
+            }
+
+            /*
+             * blob() termina cuando el navegador recibió completamente
+             * la respuesta generada por Django.
+             */
+            const archivoBlob = await respuesta.blob();
+
+            const contentDisposition =
+                respuesta.headers.get("Content-Disposition") || "";
+
+            const coincidenciaNombre = contentDisposition.match(
+                /filename="?([^";]+)"?/i
+            );
+
+            const nombreArchivo = coincidenciaNombre
+                ? coincidenciaNombre[1]
+                : "reportes_tutorias_masivos.zip";
+
+            const urlTemporal = window.URL.createObjectURL(archivoBlob);
+            const enlace = document.createElement("a");
+
+            enlace.href = urlTemporal;
+            enlace.download = nombreArchivo;
+            enlace.style.display = "none";
+
+            document.body.appendChild(enlace);
+            enlace.click();
+            enlace.remove();
+
+            /*
+             * Se revoca después de iniciar la descarga, no inmediatamente
+             * antes, para que el navegador alcance a consumir el Blob.
+             */
+            window.setTimeout(function () {
+                window.URL.revokeObjectURL(urlTemporal);
+            }, 1000);
+
+            window.clearInterval(contador);
+
+            aviso.className = "alert alert-success mt-3";
+            aviso.innerHTML = `
+                <strong>El archivo fue generado correctamente.</strong><br>
+                La descarga del ZIP ha comenzado.
+            `;
+
+            botonGenerar.disabled = false;
+            botonGenerar.textContent = "Generar reportes";
+            form.dataset.enviado = "false";
+
+            /*
+             * El mensaje de éxito se retira automáticamente.
+             * De esta forma no queda visible un aviso de tardanza
+             * después de que la descarga ya fue generada.
+             */
+            window.setTimeout(function () {
+                aviso.remove();
+            }, 5000);
+        } catch (error) {
+            window.clearInterval(contador);
+
+            console.error(
+                "Error al generar los reportes masivos:",
+                error
+            );
+
+            aviso.className = "alert alert-danger mt-3";
+            aviso.innerHTML = `
+                <strong>No fue posible generar la descarga.</strong><br>
+                Intenta nuevamente. Si el problema continúa, revisa
+                los registros del servidor.
+            `;
+
+            botonGenerar.disabled = false;
+            botonGenerar.textContent = "Generar reportes";
+            form.dataset.enviado = "false";
+        }
+    });
+}
+
+</script>
+{% endblock %}

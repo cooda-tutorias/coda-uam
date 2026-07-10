@@ -20,7 +20,16 @@ import pandas as pd
 from .constants import TEMAS
 
 from .models import Tutoria, HistorialCambioTutoria, Asesoria
-from .forms import FormTutorias, FormSeguimiento, FormReporte, FormCartasDeAsignacion, FormReporteDeTutorias, ComunicacionMasivaForm, FormVerTutorias
+from .forms import (
+    FormTutorias,
+    FormSeguimiento,
+    FormReporte,
+    FormCartasDeAsignacion,
+    FormReporteDeTutorias,
+    ComunicacionMasivaForm,
+    FormVerTutorias,
+    FormReporteTutoriasMasivo,
+)
 from .signals import tutoria_notification_requested
 # from .forms import FormSeguimiento # de nuevo, no estoy seguro, FormReporte
 from .constants import PENDIENTE, ACEPTADO, RECHAZADO, DURACION_ASESORIA, CANCELADO, ESTADO # de nuevo, no estoy seguro
@@ -40,7 +49,6 @@ from django.shortcuts import get_object_or_404, get_list_or_404
 
 import re, docx, os
 from zipfile import ZipFile
-from io import BytesIO
 from .services.docx_reportes import generar_docx_reporte_tutorias_brindadas
 
 from django.views.generic import TemplateView, FormView
@@ -1125,6 +1133,145 @@ class ReporteTutoriasBrindadasView(CodaViewMixin, CreateView):
             mostrar_col_notas=mostrar_col_notas,
             tema_dict=tema_dict,
         )
+
+
+class ReporteTutoriasBrindadasMasivoView(CodaViewMixin, FormView):
+    template_name = 'Tutorias/generarhistorialtutorias_masivo.html'
+    form_class = FormReporteTutoriasMasivo
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        coordinaciones = [
+            ("MAT", "Matemáticas Aplicadas"),
+            ("COM", "Ingeniería en Computación"),
+            ("IB", "Ingeniería Biológica"),
+            ("BM", "Biología Molecular"),
+        ]
+
+        tutores_por_coordinacion = []
+
+        for codigo, nombre in coordinaciones:
+            tutores = Tutor.objects.filter(
+                coordinacion=codigo
+            ).order_by("last_name", "first_name")
+
+            tutores_por_coordinacion.append({
+                "codigo": codigo,
+                "nombre": nombre,
+                "tutores": tutores,
+            })
+
+        context["tutores_por_coordinacion"] = tutores_por_coordinacion
+        context["plantilla_masiva_nombre"] = FormReporteTutoriasMasivo.PLANTILLA_REPORTE_TUTORIAS_MASIVO
+        return context
+
+    def form_invalid(self, form):
+        return self.render_to_response(self.get_context_data(form=form))
+
+    def form_valid(self, form):
+        coordinaciones = form.cleaned_data.get('coordinaciones') or []
+        incluir_todas = form.cleaned_data.get('incluir_todas')
+        oficio_inicial = form.cleaned_data.get('oficio_inicial')
+        fecha_inicio = form.cleaned_data.get('fecha_inicio')
+        fecha_fin = form.cleaned_data.get('fecha_fin')
+        fecha_emision = form.cleaned_data.get('fecha')
+        fecha_emision_str = fecha_emision.strftime('%Y-%m-%dT%H:%M')
+        plantilla_nombre = FormReporteTutoriasMasivo.PLANTILLA_REPORTE_TUTORIAS_MASIVO
+        #Con lo siguiente se busca que si esté la plantilla como parte de las plantillas agregadas
+        #solo se acepta con el nombre exacto
+        try:
+            plantilla = Documento.objects.get(nombre=plantilla_nombre)
+        except Documento.DoesNotExist:
+            form.add_error(
+                None,
+                f'No se encontró la plantilla "{plantilla_nombre}". '
+                'Debe cargarse desde Ajustes con ese nombre exacto.'
+            )
+            return self.form_invalid(form)
+        tutores_seleccionados = form.cleaned_data.get('tutores')
+        mostrar_col_alumno = form.cleaned_data.get('col_alumno')
+        mostrar_col_fecha = form.cleaned_data.get('col_fecha')
+        mostrar_col_hora = form.cleaned_data.get('col_hora')
+        mostrar_col_tema = form.cleaned_data.get('col_tema')
+        mostrar_col_notas = form.cleaned_data.get('col_notas')
+
+        columnas_activas = []
+        if mostrar_col_alumno:
+            columnas_activas.append('Alumno')
+        if mostrar_col_fecha:
+            columnas_activas.append('Fecha')
+        if mostrar_col_hora:
+            columnas_activas.append('Hora')
+        if mostrar_col_tema:
+            columnas_activas.append('Tema')
+        if mostrar_col_notas:
+            columnas_activas.append('Notas')
+
+        if incluir_todas:
+            tutores = Tutor.objects.all()
+        elif coordinaciones:
+            tutores = Tutor.objects.filter(coordinacion__in=coordinaciones)
+        else:
+            tutores = Tutor.objects.all()
+
+        if tutores_seleccionados.exists():
+            tutores = tutores.filter(pk__in=tutores_seleccionados.values_list('pk', flat=True))
+
+        tutores = tutores.order_by('coordinacion', 'last_name', 'first_name').distinct()
+
+        fecha_inicio_dt = timezone.datetime.combine(fecha_inicio, datetime.min.time())
+        fecha_fin_dt = timezone.datetime.combine(fecha_fin, datetime.min.time()) + timedelta(days=1)
+
+        tema_dict = dict(TEMAS)
+        zip_buffer = BytesIO()
+
+        with ZipFile(zip_buffer, 'w') as zip_file:
+            consecutivo = oficio_inicial
+
+            for tutor in tutores:
+                tutorias = Tutoria.objects.filter(
+                    tutor=tutor,
+                    fecha__range=(fecha_inicio_dt, fecha_fin_dt)
+                )
+
+                oficio = normalizar_numero_oficio(consecutivo, fecha_emision.date())
+
+                response = generar_docx_reporte_tutorias_brindadas(
+                    tutor=tutor,
+                    tutorias=tutorias,
+                    plantilla=plantilla,
+                    oficio=oficio,
+                    fecha_emision=fecha_emision_str,
+                    columnas_activas=columnas_activas,
+                    mostrar_col_alumno=mostrar_col_alumno,
+                    mostrar_col_fecha=mostrar_col_fecha,
+                    mostrar_col_hora=mostrar_col_hora,
+                    mostrar_col_tema=mostrar_col_tema,
+                    mostrar_col_notas=mostrar_col_notas,
+                    tema_dict=tema_dict,
+                )
+
+                carpetas_licenciatura = {
+                    "COM": "Ingenieria_en_Computacion",
+                    "MAT": "Matematicas_Aplicadas",
+                    "IB": "Ingenieria_Biologica",
+                    "BM": "Biologia_Molecular",
+                }
+
+                nombre_carpeta = carpetas_licenciatura.get(tutor.coordinacion, "Sin_licenciatura")
+                nombre_archivo = f"{tutor.matricula}_{tutor.last_name}_{tutor.first_name}_TUTORIAS_BRINDADAS.docx"
+                ruta_zip = f"{nombre_carpeta}/{nombre_archivo}"
+
+                zip_file.writestr(ruta_zip, response.content)
+
+                consecutivo += 1
+
+        zip_buffer.seek(0)
+        response = HttpResponse(zip_buffer.getvalue(), content_type='application/zip')
+        response['Content-Disposition'] = 'attachment; filename="reportes_tutorias_masivos.zip"'
+        return response
+
 
 # Ver Tutorias
 # TODO Añadir verificación de permisos de acceso a la tutoria

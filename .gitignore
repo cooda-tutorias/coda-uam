@@ -177,3 +177,10 @@ coda-src/ssocial/env_vars.py
 
 data
 .env.test
+
+# Resultados generados por benchmarks T28
+coda-src/scripts/resultados_t28/*.txt
+coda-src/scripts/resultados_t28/*.zip
+
+# Dumps sintéticos generados para pruebas T28
+dumps_t28/*.sql
