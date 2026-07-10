@@ -54,3 +54,29 @@ DURACION_ASESORIA = [
     (3, '2 horas'),
     (4, 'Más de dos horas')
 ]
+
+TUTOR = "TUT"
+COORDINADOR = "COR"
+ALUMNO = "ALU"
+CODA = "CODA"
+
+MATEMATICAS = "MAT"
+COMPUTACION = "COM"
+IBIOLOGICA = "IB"
+BMOLECULAR = "BM"
+
+CARRERAS = [
+        ('', "Seleccione una"),
+        (MATEMATICAS, "Matemáticas Aplicadas"),
+        (COMPUTACION, "Ingeniería en Computación"),
+        (IBIOLOGICA, "Ingeniería Biológica"),
+        (BMOLECULAR, "Biología Molecular")
+]
+
+ROLES = [
+    ('', "Seleccione Rol"),
+    (TUTOR, "Tutor"),
+    (COORDINADOR, "Coordinador"),
+    (ALUMNO, "Alumno"),
+    (CODA, "CODDAA"),
+]

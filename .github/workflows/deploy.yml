@@ -1,0 +1,35 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy to Rocky Linux
+        uses: appleboy/ssh-action@v1.2.0
+
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd /opt/coda-uam
+
+            cat > .env <<EOF
+            DJANGO_SECRET_KEY=${{ secrets.DJANGO_SECRET_KEY }}
+            RDS_HOSTNAME=${{ secrets.RDS_HOSTNAME }}
+            RDS_DB_NAME=${{ secrets.RDS_DB_NAME }}
+            RDS_USERNAME=${{ secrets.RDS_USERNAME }}
+            RDS_PASSWORD=${{ secrets.RDS_PASSWORD }}
+            EMAIL_HOST_PASSWORD=${{ secrets.EMAIL_HOST_PASSWORD }}
+            EOF
+
+            git fetch origin
+            git reset --hard origin/main
+
+            docker compose up -d --build

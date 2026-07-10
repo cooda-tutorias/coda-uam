@@ -12,9 +12,8 @@ from django.views.generic import View, FormView
 from django.urls import reverse_lazy
 from django.utils.text import slugify
 from django.core.exceptions import PermissionDenied
-from django.core.mail import send_mail
+from django.core.mail import send_mail, EmailMessage
 from django.contrib import messages
-
 from datetime import datetime, timedelta
 import pandas as pd
 from .constants import TEMAS
@@ -25,17 +24,18 @@ from .forms import (
     FormSeguimiento,
     FormReporte,
     FormCartasDeAsignacion,
-    FormReporteDeTutorias, FormVerTutorias,
+    FormReporteDeTutorias,
+    ComunicacionMasivaForm,
+    FormVerTutorias,
     FormReporteTutoriasMasivo,
 )
-from .constants import PENDIENTE, ACEPTADO, RECHAZADO, DURACION_ASESORIA, CANCELADO
-from Usuarios.constants import TUTOR, ALUMNO, COORDINADOR, TEMPLATES, CORREO
+from .signals import tutoria_notification_requested
+# from .forms import FormSeguimiento # de nuevo, no estoy seguro, FormReporte
+from .constants import PENDIENTE, ACEPTADO, RECHAZADO, DURACION_ASESORIA, CANCELADO, ESTADO # de nuevo, no estoy seguro
+from Usuarios.constants import TUTOR, ALUMNO, COORDINADOR, TEMPLATES
 from Usuarios.views import BaseAccessMixin, CodaViewMixin, TutorViewMixin, AlumnoViewMixin, CordinadorViewMixin
 from Usuarios.models import Tutor, Alumno, Cordinador, Coda
 from Usuarios.models import Documento
-from notifications.signals import notify
-from smtplib import SMTPException
-
 from django.http import FileResponse
 from django.utils import timezone
 from reportlab.pdfgen import canvas
@@ -48,8 +48,10 @@ from django.shortcuts import get_object_or_404, get_list_or_404
 
 import re, docx, os
 from zipfile import ZipFile
-from io import BytesIO
 from .services.docx_reportes import generar_docx_reporte_tutorias_brindadas
+
+from django.views.generic import TemplateView, FormView
+from django.conf import settings
 
 #Funcion para descargar pdf
 def carta_tutorados_pdf(request):
@@ -86,10 +88,10 @@ def carta_tutorados_pdf(request):
     elements.append(Spacer(1, 12))  # Ajusta el segundo valor para controlar la altura de la separación
 
     # Agregar párrafo
-    parrafo = f"""Estimado doctor {tutor.last_name}, como parte del Sistema de Acompañamiento al
+    parrafo = f"""Estimado doctor {tutor.last_name}, como parte del Sistema de Acompañamiento al 
     Alumnado que desarrolla la Universidad Autónoma Metropolitana Unidad Cuajimalpa y con la finalidad de
-    propiciar el buen desempeño académico de nuestros alumnos y alumnas desde su ingreso a la Universidad y
-    hasta la conclusión de sus estudios, le comunico que tiene asignados los siguientes miembros del alumnado de
+    propiciar el buen desempeño académico de nuestros alumnos y alumnas desde su ingreso a la Universidad y 
+    hasta la conclusión de sus estudios, le comunico que tiene asignados los siguientes miembros del alumnado de 
     la licenciatura en Ingeniería en Computación para su Tutoría y Asesoría."""
     parr_paragraph = Paragraph(parrafo, header_style)
     elements.append(parr_paragraph)
@@ -114,11 +116,11 @@ def carta_tutorados_pdf(request):
     style = TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.orange),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-        ('GRID', (0, 0), (-1, -1), 1, colors.black),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.white), 
+        ('GRID', (0, 0), (-1, -1), 1, colors.black), 
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'), 
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'), 
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12), 
     ])
 
     # Crear la tabla
@@ -139,13 +141,13 @@ def generar_pdf(request):
 
     # Obtener las fechas seleccionadas del formulario HTML
     fecha_inicio_str = request.GET.get('fecha_inicio')
-    fecha_fin_str = request.GET.get('fecha_fin')
+    fecha_fin_str = request.GET.get('fecha_fin') 
     # Obtención de los checkbox
-    alumno = request.GET.get('alumno')
-    fecha = request.GET.get('fecha')
-    hora = request.GET.get('hora')
-    tema = request.GET.get('tema')
-    notas = request.GET.get('notas')
+    alumno = request.GET.get('alumno') 
+    fecha = request.GET.get('fecha') 
+    hora = request.GET.get('hora') 
+    tema = request.GET.get('tema') 
+    notas = request.GET.get('notas') 
     todo = request.GET.get('todo')
 
     # Convertir las fechas de cadena a objetos de fecha si se han proporcionado
@@ -214,17 +216,17 @@ def generar_pdf(request):
         if notas == None:
             ind = data[0].index("Notas")
             for i in range(len(data)):
-                data[i].remove(data[i][ind])
+                data[i].remove(data[i][ind]) 
 
     # Estilo de la tabla
     style = TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.white),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.black),
-        ('BACKGROUND', (0, 1), (-1, -1), colors.white),
-        ('GRID', (0, 0), (-1, -1), 1, colors.orange),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
-        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.white), 
+        ('GRID', (0, 0), (-1, -1), 1, colors.orange), 
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'), 
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'), 
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12), 
     ])
 
     # Crear la tabla
@@ -250,7 +252,7 @@ def generar_archivo_txt(request,pk):
 
     # Obtener las fechas seleccionadas del formulario HTML
     fecha_inicio_str = request.GET.get('fecha_inicio')
-    fecha_fin_str = request.GET.get('fecha_fin')
+    fecha_fin_str = request.GET.get('fecha_fin') 
 
     # Convertir las fechas de cadena a objetos de fecha si se han proporcionado
     if fecha_inicio_str and fecha_fin_str:
@@ -262,7 +264,7 @@ def generar_archivo_txt(request,pk):
     else:
         # Si no se han proporcionado fechas, obtener todas las tutorías del tutor
         tutorias = Tutoria.objects.filter(tutor=tutor)
-
+    
     contenido = "Tutorias \n"
     for tutoria in tutorias:
         contenido += f"Alumno: {tutoria.alumno.first_name} {tutoria.alumno.last_name} {tutoria.alumno.second_last_name}\n"
@@ -287,6 +289,7 @@ def index(request):
     return HttpResponse("Tutorias app index placeholder")
 
 def normalizar_numero_oficio(oficio_ingresado, fecha_documento) -> str:
+    """Normaliza el número de oficio al formato institucional esperado."""
     if oficio_ingresado in (None, ""):
         return ""
 
@@ -296,15 +299,39 @@ def normalizar_numero_oficio(oficio_ingresado, fecha_documento) -> str:
 class AceptarTutoriaView(View):
     def post(self, request, pk):
         tutoria = get_object_or_404(Tutoria, pk=pk)
+        if not request.user.has_role("TUT") or tutoria.tutor_id != request.user.pk:
+            raise PermissionDenied("No tienes permiso para modificar esta tutoría")
+
+        if tutoria.estado == ACEPTADO:
+            return redirect('Tutorias-tutor')
+
         tutoria.estado = ACEPTADO
-        tutoria.save()
-        return redirect('Tutorias-tutor')
+        tutoria.save(update_fields=["estado"])
+        tutoria_notification_requested.send(
+            sender=self.__class__,
+            event="aceptada",
+            tutoria=tutoria,
+            actor=request.user,
+        )
+        return redirect('Tutorias-tutor')  
 
 class RechazarTutoriaView(View):
     def post(self, request, pk):
         tutoria = get_object_or_404(Tutoria, pk=pk)
+        if not request.user.has_role("TUT") or tutoria.tutor_id != request.user.pk:
+            raise PermissionDenied("No tienes permiso para modificar esta tutoría")
+
+        if tutoria.estado == RECHAZADO:
+            return redirect('Tutorias-tutor')
+
         tutoria.estado = RECHAZADO
-        tutoria.save()
+        tutoria.save(update_fields=["estado"])
+        tutoria_notification_requested.send(
+            sender=self.__class__,
+            event="rechazada",
+            tutoria=tutoria,
+            actor=request.user,
+        )
         return redirect('Tutorias-tutor')
 
 class CancelarTutoriaView(View):
@@ -313,7 +340,7 @@ class CancelarTutoriaView(View):
         tutoria.estado = CANCELADO
         tutoria.save()
         return redirect('Tutorias-tutor')
-
+    
 class TutoriaUpdateView(BaseAccessMixin, UpdateView):
     model = Tutoria
     form_class = FormTutorias  # ← Usa tu formulario personalizado
@@ -340,16 +367,19 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
         context["historial_cambios"] = self.object.historial_cambios.all()[:20]
         return context
 
-    def _build_change_summary(self, original: Tutoria, form: BaseModelForm) -> str:
+    def _build_change_summary(self, original: Tutoria, form: BaseModelForm, changed_fields: list[str]) -> str:
+        """Resume los campos modificados de la tutoría para guardarlos en el historial."""
         field_labels = {
             "tema": "Tema(s)",
             "fecha": "Fecha y Hora",
             "descripcion": "Observaciones",
+            "estado": "Estado de la tutoría",
         }
         tema_map = dict(TEMAS)
+        estado_map = dict(ESTADO)
         changes = []
 
-        for field in form.changed_data:
+        for field in changed_fields:
             if field == "tema":
                 old_value = ", ".join(original.get_tema_display())
                 new_codes = form.cleaned_data.get("tema", [])
@@ -360,6 +390,10 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
             elif field == "descripcion":
                 old_value = original.descripcion or ""
                 new_value = form.cleaned_data.get("descripcion") or ""
+            elif field == "estado":
+                old_value = estado_map.get(original.estado, original.estado)
+                new_state = form.cleaned_data.get("estado") or getattr(form.instance, "estado", None)
+                new_value = estado_map.get(new_state, new_state)
             else:
                 old_value = str(getattr(original, field, ""))
                 new_value = str(form.cleaned_data.get(field, ""))
@@ -372,7 +406,21 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
     def form_valid(self, form: BaseModelForm) -> HttpResponse:
         original = self.get_object()
         changed_fields = list(form.changed_data)
-        change_summary = self._build_change_summary(original, form) if changed_fields else "Sin cambios detectados"
+        fecha_changed_by_tutor = self.request.user.has_role("TUT") and "fecha" in changed_fields
+        estado_changed_by_tutor = False
+        estado_notification_event = None
+
+        if self.request.user.has_role("TUT"):
+            nuevo_estado_tutoria = self.request.POST.get("estado_tutoria")
+            allowed_states = {ACEPTADO, RECHAZADO}
+            if nuevo_estado_tutoria in allowed_states and nuevo_estado_tutoria != original.estado:
+                form.instance.estado = nuevo_estado_tutoria
+                if "estado" not in changed_fields:
+                    changed_fields.append("estado")
+                estado_changed_by_tutor = True
+                estado_notification_event = "aceptada" if nuevo_estado_tutoria == ACEPTADO else "rechazada"
+
+        change_summary = self._build_change_summary(original, form, changed_fields) if changed_fields else "Sin cambios detectados"
         actor = self.request.user
 
         # Manejar cambio de estado histórico si viene en el POST y el usuario tiene permiso
@@ -401,8 +449,31 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
         else:
             recipient = Tutor.objects.none()
 
-        notify.send(actor, recipient=recipient, verb='Tutoria Modificada')
+        tutoria_notification_requested.send(
+            sender=self.__class__,
+            event="tutoria_modificada",
+            tutoria=self.object,
+            actor=actor,
+            recipient=recipient,
+            verb="Tutoria Modificada",
+        )
         response = super().form_valid(form)
+
+        if fecha_changed_by_tutor:
+            tutoria_notification_requested.send(
+                sender=self.__class__,
+                event="cita_programada",
+                tutoria=self.object,
+                actor=actor,
+            )
+
+        if estado_changed_by_tutor and estado_notification_event:
+            tutoria_notification_requested.send(
+                sender=self.__class__,
+                event=estado_notification_event,
+                tutoria=self.object,
+                actor=actor,
+            )
 
         HistorialCambioTutoria.objects.create(
             tutoria=self.object,
@@ -411,7 +482,7 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
         )
 
         return response
-
+    
     def editar_tutoria(request, pk):
         tutoria = get_object_or_404(Tutoria, pk=pk)
 
@@ -424,8 +495,8 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
             form = FormTutorias(instance=tutoria)
 
         return render(request, 'tutoria/editar_tutoria.html', {'form': form})
-
-
+    
+    
 # Solicitud Tutorias
 class TutoriaCreateView(AlumnoViewMixin, CreateView):
 
@@ -448,10 +519,17 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
         if self.request.user.has_role("ALU"):
             recipient = Tutor.objects.get(pk=alumno.tutor_asignado)
 
-        # notify.send(alumno, recipient=recipient, verb='Nueva solicitud de tutoria', description=f'{form.instance.get_tema_display()}')
         # Eliminar corchetes de la lista
-        notify.send(alumno, recipient=recipient, verb='Nueva solicitud de tutoria', description=f'{", ".join(form.instance.get_tema_display())}')
-
+        tutoria_notification_requested.send(
+            sender=self.__class__,
+            event="solicitud_creada",
+            tutoria=form.instance,
+            actor=alumno,
+            recipient=recipient,
+            verb='Nueva solicitud de tutoria',
+            description=f'{", ".join(form.instance.get_tema_display())}',
+        )
+        
         # TODO utilizar una rutina para mandar los correos
         #send_mail(
          #   subject='Nueva solicitud de tutoria',
@@ -459,14 +537,14 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
            # from_email=CORREO,
             #recipient_list=[recipient.email],
             #fail_silently=False
-
-
+    
+        
 
         return super().form_valid(form)
 
     def get_initial(self) -> dict[str, Any]:
         return super().get_initial()
-
+    
 # Carta de notificación de tutorados (para el tutor)
 class ReporteCreateView(CodaViewMixin, CreateView):
     model = Coda
@@ -492,7 +570,7 @@ class ReporteCreateView(CodaViewMixin, CreateView):
         form.instance.tutor = tutor
 
         return super().form_valid(form)
-
+    
     def paragraph_replace_text(self,paragraph, regex, replace_str):
         while True:
             text = paragraph.text
@@ -547,10 +625,10 @@ class ReporteCreateView(CodaViewMixin, CreateView):
         fecha_form = datetime.strptime(fecha_form,'%Y-%m-%dT%H:%M').date()
         oficio_form = normalizar_numero_oficio(oficio_form, fecha_form)
         tutor_pk = self.kwargs.get('pk')
-
+        
         plantilla = get_object_or_404(Documento, nombre=plantilla_nombre)
         tutor = get_object_or_404(Tutor, pk=tutor_pk)
-        open_plantilla = docx.Document(plantilla.archivo)
+        open_plantilla = docx.Document(plantilla.archivo)   
 
         # Verifica si el archivo tiene tablas
         if not open_plantilla.tables:
@@ -567,14 +645,14 @@ class ReporteCreateView(CodaViewMixin, CreateView):
         reg_lic = re.compile(r'\{licenciatura\}')
 
         tut_alums = Alumno.objects.filter(tutor_asignado=tutor_pk)
-
+        
         ## EDICIÓN DE LA TABLA
         # Find the table you want to replace (assuming it's the first table)
         old_table = open_plantilla.tables[0]
-
+        
         # Extract headers from the first row
         headers = [cell.text for cell in old_table.rows[0].cells]
-
+        
         # Extract table style
         table_style = old_table.style
 
@@ -592,7 +670,7 @@ class ReporteCreateView(CodaViewMixin, CreateView):
         new_table = open_plantilla.add_table(rows=1, cols=len(headers))
         new_table.style = table_style
         placeholder._element.addnext(new_table._element)
-
+        
         # Extract column widths
         column_widths = [cell.width for cell in old_table.rows[0].cells]
 
@@ -626,7 +704,7 @@ class ReporteCreateView(CodaViewMixin, CreateView):
             row_cells[2].text = str(obj.last_name) #Si el modelo tiene un campo para segundo apellido, agregar
             row_cells[3].text = str(obj.second_last_name) #Si el modelo tiene un campo para segundo apellido, agregar
             row_cells[4].text = str(obj.first_name)  # Replace with actual fields
-
+        
         # Ensure data rows inherit cell formatting from old table
         for row_index, row in enumerate(new_table.rows[1:]):
             old_row = old_table.rows[min(row_index + 1, len(old_table.rows) - 1)]  # Avoid index out of bounds
@@ -667,7 +745,7 @@ class ReporteCreateView(CodaViewMixin, CreateView):
             line = p.text
             result = []
             line_matches = [] if (result := re.findall(reg_placeh,line)) is None else result
-            # print(f'Before cycle: {(line_matches)}') if line_matches else None
+            # print(f'Before cycle: {(line_matches)}') if line_matches else None 
 
             for match in line_matches:
                 print(f'Esta linea: {match} hizo match')
@@ -688,9 +766,9 @@ class ReporteCreateView(CodaViewMixin, CreateView):
 
         response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
         response['Content-Disposition'] = f'attachment; filename={tutor.last_name}_TUTORES_ATENDIDOS.docx'
-
+        
         open_plantilla.save(response)
-
+        
         return response
         # return FileResponse(buffer, as_attachment=True, filename=f'{tutor.last_name.upper()}_TUTORES_ATENDIDOS_21-24.pdf')
         # return super().post(request)
@@ -711,13 +789,13 @@ class Reporte2CreateView(CodaViewMixin, CreateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-
+        
         # Get selected students from URL parameters
         selected_ids = self.request.GET.getlist('selected_alumnos')
         if not selected_ids:
                 selected_ids = self.request.session.get('selected_alumnos', [])
         print(selected_ids)
-
+        
         # Fetch student objects from the database
         alumnos = get_list_or_404(Alumno, pk__in=selected_ids)
 
@@ -741,7 +819,7 @@ class Reporte2CreateView(CodaViewMixin, CreateView):
         form.instance.tutor = tutor
 
         return super().form_valid(form)
-
+    
     def paragraph_replace_text(self,paragraph, regex, replace_str):
         while True:
             text = paragraph.text
@@ -797,13 +875,13 @@ class Reporte2CreateView(CodaViewMixin, CreateView):
         fecha_form = form.get('fecha')
         no_inicio_form = form.get('no_inicio')
         fecha_form = datetime.strptime(fecha_form,'%Y-%m-%dT%H:%M').date()
-
+        
         tutor_pk = self.kwargs.get('pk')
         alumnos = get_list_or_404(Alumno, pk__in=selected_ids)
         plantilla = get_object_or_404(Documento, nombre=plantilla_nombre)
         tutor = get_object_or_404(Tutor, pk=tutor_pk)
-
-        open_plantilla = docx.Document(plantilla.archivo)
+        
+        open_plantilla = docx.Document(plantilla.archivo)   
         if open_plantilla.tables:
             messages.error(request, "Este archivo no es compatible con el tipo de carta que deseas generar")
 
@@ -891,7 +969,7 @@ class Reporte2CreateView(CodaViewMixin, CreateView):
             response['Content-Disposition'] = f'attachment; filename={alumno.first_name}_{alumno.last_name}_TUTOR.docx'
             open_plantilla.save(response)
 
-        else :
+        else :    
             ##EDICIÓN DE LOS PLACEHOLDERS
             zip_buffer = BytesIO()
             oficio_regex = re.search(r'\_[xX]+\_', oficio_form)
@@ -1055,6 +1133,7 @@ class ReporteTutoriasBrindadasView(CodaViewMixin, CreateView):
             tema_dict=tema_dict,
         )
 
+
 class ReporteTutoriasBrindadasMasivoView(CodaViewMixin, FormView):
     template_name = 'Tutorias/generarhistorialtutorias_masivo.html'
     form_class = FormReporteTutoriasMasivo
@@ -1196,7 +1275,7 @@ class ReporteTutoriasBrindadasMasivoView(CodaViewMixin, FormView):
 # Ver Tutorias
 # TODO Añadir verificación de permisos de acceso a la tutoria
 class TutoriasDetailView(BaseAccessMixin, DetailView):
-
+     
     model = Tutoria
 
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
@@ -1205,38 +1284,38 @@ class TutoriasDetailView(BaseAccessMixin, DetailView):
     template_name='Tutorias/verTutorias_tutor.html'
 
     def get_queryset(self) -> QuerySet[Any]:
-
+        
         if Tutor.objects.filter(pk=self.request.user.pk).exists():
             # Tutorias correspondientes al tutor
             queryset = super().get_queryset().filter(tutor=self.request.user)
-        else:
+        else: 
             # Tutorias correspondientes al alumno
             queryset = super().get_queryset().filter(alumno=self.request.user)
-
-        if self.request.user.is_superuser == 1:
+        
+        if self.request.user.is_superuser == 1: 
             # Muestra todas las tutorias para el primer usuario creado (generalmente el primer superuser)
             queryset = super().get_queryset().all()
-
+        
         return queryset
-
+    
 class HistorialTutoriasListView(BaseAccessMixin, ListView):
-
+     
     model = Tutoria
     template_name='Tutorias/historialtutoria.html'
 
     def get_queryset(self) -> QuerySet[Any]:
-
+        
         if Tutor.objects.filter(pk=self.request.user.pk).exists():
             # Tutorias correspondientes al tutor
             queryset = super().get_queryset().filter(tutor=self.request.user.pk)
-        else:
+        else: 
             # Tutorias correspondientes al alumno
             queryset = super().get_queryset().filter(alumno=self.request.user)
-
-        if self.request.user.is_superuser == 1:
+        
+        if self.request.user.is_superuser == 1: 
             # Muestra todas las tutorias para el primer usuario creado (generalmente el primer superuser)
             queryset = super().get_queryset().all()
-
+        
         return queryset
 
 class HistorialTutoriasGenerateView(BaseAccessMixin, ListView):
@@ -1267,7 +1346,7 @@ class VerTutoriasCoordinadorListView(CordinadorViewMixin, FormView):
         tutores = Tutor.objects.all().filter(coordinacion=coord.coordinacion)
         tutorias = Tutoria.objects.filter(tutor__in=tutores)
         return self.render_to_response(self.get_context_data(form=form, object_list=tutorias))
-
+    
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
 
@@ -1276,9 +1355,9 @@ class VerTutoriasCoordinadorListView(CordinadorViewMixin, FormView):
         context["tutores"] = tutores
 
         return context
-
+    
 class VerTutoriasCoordinadorPorTutorListView(CordinadorViewMixin, FormView):
-
+     
     model = Tutoria
     template_name='Tutorias/verTutorias_cordinador_portutor.html'
     form_class = FormVerTutorias
@@ -1298,7 +1377,7 @@ class VerTutoriasCoordinadorPorTutorListView(CordinadorViewMixin, FormView):
         form = self.get_form()
         tutorias = Tutoria.objects.filter(tutor=self.kwargs.get('pk'))
         return self.render_to_response(self.get_context_data(form=form, object_list=tutorias))
-
+    
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
         tutor = Tutor.objects.get(pk=self.kwargs.get('pk'))
@@ -1306,16 +1385,16 @@ class VerTutoriasCoordinadorPorTutorListView(CordinadorViewMixin, FormView):
         return context
 
 
-class VerTutoriasCodaListView(CodaViewMixin, ListView):
+class VerTutoriasCodaListView(CodaViewMixin, ListView):    
     model = Tutoria
     template_name='Tutorias/verTutorias_cooda.html'
-
+    
     def get_queryset(self) -> QuerySet[Any]:
-
-        queryset = super().get_queryset().filter(tutor=self.kwargs.get('pk'))
-
-        return queryset
-
+        
+        queryset = super().get_queryset().filter(tutor=self.kwargs.get('pk'))   
+        
+        return queryset 
+    
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
         tutor = Tutor.objects.get(pk=self.kwargs.get('pk'))
@@ -1339,16 +1418,16 @@ class VerTutoresCoordListView(CordinadorViewMixin, ListView):
 
         queryset = super().get_queryset().filter(coordinacion=coord.coordinacion)
         return queryset
-
+    
 class VerTutoradosCodaListView(CodaViewMixin, ListView):
     model = Alumno
     template_name = 'Tutorias/verTutorados_coda.html'
-
+    
     def get_queryset(self) -> QuerySet[Any]:
-
-        queryset = super().get_queryset().filter(tutor_asignado=self.kwargs.get('pk'))
-
-        return queryset
+        
+        queryset = super().get_queryset().filter(tutor_asignado=self.kwargs.get('pk'))   
+        
+        return queryset 
 
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
@@ -1356,16 +1435,16 @@ class VerTutoradosCodaListView(CodaViewMixin, ListView):
         context["tutor"] = tutor
         print(context)
         return context
-
+    
 class VerTutoradosCoordinadorListView(CordinadorViewMixin, ListView):
     model = Alumno
     template_name = 'Tutorias/verTutorados_cordinador.html'
-
+    
     def get_queryset(self) -> QuerySet[Any]:
-
-        queryset = super().get_queryset().filter(tutor_asignado=self.kwargs.get('pk'))
-
-        return queryset
+        
+        queryset = super().get_queryset().filter(tutor_asignado=self.kwargs.get('pk'))   
+        
+        return queryset 
 
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
@@ -1374,7 +1453,7 @@ class VerTutoradosCoordinadorListView(CordinadorViewMixin, ListView):
         return context
 
 class VerTutoriasTutorListView(TutorViewMixin, FormView):
-
+     
     model = Tutoria
     template_name='Tutorias/verTutorias_tutor.html'
     form_class = FormVerTutorias
@@ -1394,7 +1473,7 @@ class VerTutoriasTutorListView(TutorViewMixin, FormView):
         form = self.get_form()
         tutorias = Tutoria.objects.filter(tutor=request.user)
         return self.render_to_response(self.get_context_data(form=form, object_list=tutorias))
-
+    
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
         tutorados = Alumno.objects.filter(tutor_asignado=self.request.user)
@@ -1403,21 +1482,21 @@ class VerTutoriasTutorListView(TutorViewMixin, FormView):
 
 
 class VerTutoriasAlumnoListView(AlumnoViewMixin, ListView):
-
+     
     model = Tutoria
     template_name='Tutorias/verTutorias_alumno.html'
 
     def get_queryset(self) -> QuerySet[Any]:
-
+        
         # Tutorias correspondientes al alumno
-
+        
         queryset = super().get_queryset().filter(alumno=self.request.user)
-        #if self.request.user.is_superuser == 1:
+        #if self.request.user.is_superuser == 1: 
             # Muestra todas las tutorias para el primer usuario creado (generalmente el primer superuser)
             #queryset = super().get_queryset().all()
-
+        
         return queryset
-
+    
 
 # TODO Eliminar para prod
 # class DebugTutoriasView(LoginRequiredMixin, ListView):
@@ -1427,8 +1506,8 @@ class VerTutoriasAlumnoListView(AlumnoViewMixin, ListView):
 
 #     def get_queryset(self) -> QuerySet[Any]:
 #         return super().get_queryset()
-
-
+    
+    
 class QuickCreateTutoriaView(AlumnoViewMixin, CreateView):
     model = Tutoria
     template_name = 'Tutorias/registrar-tutoria.html'
@@ -1441,18 +1520,25 @@ class QuickCreateTutoriaView(AlumnoViewMixin, CreateView):
         form.instance.alumno = alumno
         form.instance.tutor = alumno.tutor_asignado
         form.instance.estado = ACEPTADO
-
+        
         # Snapshot del estado del alumno al momento de crear la tutoría con QR
         if not form.instance.estado_alumno_historico:
             form.instance.estado_alumno_historico = alumno.estado
-
+        
         # rol = self.request.user.get_rol()
         if self.request.user.has_role("ALU"):
             recipient = alumno.tutor_asignado   # No sé que hace este bloque, pero no lo voy a quitar para que no se rompa. -Alfredo
         else:
             recipient = Alumno.objects.filter(pk=self.get_object().alumno)
-
-        notify.send(alumno, recipient=recipient, verb='Tutoria registrada con QR')
+        
+        tutoria_notification_requested.send(
+            sender=self.__class__,
+            event="qr_generada",
+            tutoria=form.instance,
+            actor=alumno,
+            recipient=recipient,
+            verb='Tutoria registrada con QR',
+        )
 
         return super().form_valid(form)
 
@@ -1473,19 +1559,19 @@ class QuickCreateTutoriaView(AlumnoViewMixin, CreateView):
         print(f'Fecha: {datetime.now().strftime("%Y-%m-%d %H:%M")}')
         self.initial["fecha"] = datetime.now().strftime("%Y-%m-%d %H:%M")
         self.initial["descripcion"] = "Tutoria registrada con QR"
-        return self.initial
-
-
+        return self.initial 
+      
+    
 class VerTutoradosTutorListView(TutorViewMixin, ListView):
-
+     
     model = Alumno
     template_name='Tutorias/list_tutorados.html'
 
     def get_queryset(self) -> QuerySet[Any]:
-
+        
         # Tutorias correspondientes al tutor
         queryset = super().get_queryset().filter(tutor_asignado=self.request.user)
-
+    
         return queryset
 
 # Este es para asesorias, aun no se va a usar
@@ -1553,10 +1639,14 @@ class RealizarSeguimientoView(TutorViewMixin, UpdateView):
 
     def form_valid(self, form: BaseModelForm) -> HttpResponse:
         tutor = Tutor.objects.get(pk=self.request.user)
-        recipient = Alumno.objects.filter(pk=self.get_object().alumno)
-
-        notify.send(tutor, recipient=recipient, verb='Seguimiento de tutoria realizado')
-        return super().form_valid(form)
+        response = super().form_valid(form)
+        tutoria_notification_requested.send(
+            sender=self.__class__,
+            event="seguimiento_registrado",
+            tutoria=self.object,
+            actor=tutor,
+        )
+        return response
 
 
 class EditarEstadoAlumnoHistoricoView(BaseAccessMixin, View):
@@ -1566,7 +1656,7 @@ class EditarEstadoAlumnoHistoricoView(BaseAccessMixin, View):
     """
     def post(self, request, pk):
         tutoria = get_object_or_404(Tutoria, pk=pk)
-
+        
         # Validar permisos
         if request.user.has_role("TUT"):
             # TUT solo puede editar si es el tutor asignado
@@ -1582,26 +1672,26 @@ class EditarEstadoAlumnoHistoricoView(BaseAccessMixin, View):
             pass
         else:
             raise PermissionDenied("No tienes permiso para realizar esta acción")
-
+        
         # Importar el formulario
         from .forms import FormEditarEstadoAlumnoHistorico
         form = FormEditarEstadoAlumnoHistorico(request.POST)
-
+        
         if form.is_valid():
             nuevo_estado = form.cleaned_data['estado_alumno_historico']
             estado_anterior = tutoria.estado_alumno_historico
-
+            
             # Obtener etiquetas del diccionario ESTADOS_ALUMNO
             from Usuarios.constants import ESTADOS_ALUMNO
             estado_dict = {key: value for key, value in ESTADOS_ALUMNO}
-
+            
             etiqueta_anterior = estado_dict.get(estado_anterior, "Sin estado registrado")
             etiqueta_nueva = estado_dict.get(nuevo_estado, "Desconocido")
-
+            
             # Actualizar el estado
             tutoria.estado_alumno_historico = nuevo_estado
             tutoria.save()
-
+            
             # Registrar el cambio en HistorialCambioTutoria
             cambio_mensaje = f"Estado histórico del alumno: '{etiqueta_anterior}' -> '{etiqueta_nueva}'"
             HistorialCambioTutoria.objects.create(
@@ -1609,26 +1699,40 @@ class EditarEstadoAlumnoHistoricoView(BaseAccessMixin, View):
                 correo_editor=request.user.email,
                 cambios_realizados=cambio_mensaje,
             )
-
+            
             # Enviar notificación
             tutor = Tutor.objects.filter(pk=tutoria.tutor_id)
             alumno = Alumno.objects.filter(pk=tutoria.alumno_id)
-
+            
             if request.user.has_role("TUT"):
-                notify.send(request.user, recipient=alumno, verb='Estado histórico de tutoría actualizado')
+                tutoria_notification_requested.send(
+                    sender=self.__class__,
+                    event="estado_historico_actualizado",
+                    tutoria=tutoria,
+                    actor=request.user,
+                    recipient=alumno,
+                    verb='Estado histórico de tutoría actualizado',
+                )
             else:
-                notify.send(request.user, recipient=tutor, verb='Estado histórico de tutoría actualizado por administración')
-
+                tutoria_notification_requested.send(
+                    sender=self.__class__,
+                    event="estado_historico_actualizado",
+                    tutoria=tutoria,
+                    actor=request.user,
+                    recipient=tutor,
+                    verb='Estado histórico de tutoría actualizado por administración',
+                )
+            
             # Mostrar mensaje de éxito
             messages.success(request, f"Estado histórico actualizado: {etiqueta_anterior} → {etiqueta_nueva}")
-
+            
             # Redirigir a la vista de edición de la tutoría
             return redirect('Tutorias-update', pk=pk)
         else:
             # Si el formulario no es válido, redirigir de vuelta
             messages.error(request, "Error al actualizar el estado. Por favor, intenta de nuevo.")
             return redirect('Tutorias-update', pk=pk)
-
+    
 class TutoriasAceptadasListView(CodaViewMixin, ListView):
     model = Tutoria
     template_name = 'Tutorias/ver_tutorias_aceptadas_coda.html'
@@ -1640,7 +1744,7 @@ class TutoriasAceptadasListView(CodaViewMixin, ListView):
 class ExportarTutoriasAceptadasExcelView(CodaViewMixin, View):
 
     def get(self, request, *args, **kwargs):
-        tema_dict = dict(TEMAS)
+        tema_dict = dict(TEMAS) 
         tutorias = Tutoria.objects.filter(estado='ACE').select_related('alumno', 'tutor')
 
         data = []
@@ -1658,7 +1762,7 @@ class ExportarTutoriasAceptadasExcelView(CodaViewMixin, View):
             asistencia = "No"
             if tutoria.asistencia:
                 asistencia = "Sí"
-
+            
             data.append({
                 "Id":tutoria.pk,
                 "Matricula": tutoria.alumno.matricula,
@@ -1683,3 +1787,70 @@ class ExportarTutoriasAceptadasExcelView(CodaViewMixin, View):
 
         return response
 
+
+class ComunicacionMasivaTutoriasView(FormView):
+
+    print("Inicializando vista de comunicación masiva")
+
+    template_name = 'Tutorias/comunicacionMasiva.html'
+    form_class = ComunicacionMasivaForm
+    success_url = reverse_lazy('tutorias-comunicacion-masiva')
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx['header_footer'] = "Usuarios/base.html"
+        print("Contexto:", ctx)
+        return ctx
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        usuario_actual = self.request.user
+
+        tutor_instance = None
+        if hasattr(usuario_actual, 'tutor'):
+            tutor_instance = usuario_actual.tutor
+        else:
+            try:
+                tutor_instance = Tutor.objects.get(pk=usuario_actual.pk)
+            except Tutor.DoesNotExist:
+                print("El usuario logueado no es un Tutor válido")
+
+        kwargs['tutor'] = tutor_instance
+        return kwargs
+
+    def form_valid(self, form):
+        asunto = form.cleaned_data['asunto']
+        mensaje = form.cleaned_data['mensaje']
+        tutorados = form.cleaned_data['tutorados']
+
+        lista_correos = [alumno.email for alumno in tutorados if alumno.email]
+        if lista_correos:
+            try:
+                print(f"Preparando correo con asunto: {asunto}")
+                email = EmailMessage(
+                    subject=asunto,
+                    body=mensaje,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    to=[self.request.user.email],
+                    bcc=lista_correos
+                )
+
+                print(f"Enviando correo a: {lista_correos}")
+
+                archivos = self.request.FILES.getlist('archivos')
+                for f in archivos:
+                    email.attach(f.name, f.read(), f.content_type)
+
+                email.send(fail_silently=False)
+
+                cantidad = len(lista_correos)
+                destinatario_texto = "tutorado" if cantidad == 1 else "tutorados"
+                messages.success(self.request, f'Correo enviado a {cantidad} {destinatario_texto}.')
+
+            except Exception as e:
+                messages.error(self.request, f'Ocurrió un error al enviar el correo: {str(e)}')
+                return super().form_invalid(form)
+        else:
+            messages.warning(self.request, 'No alumnos con correo válido.')
+
+        return super().form_valid(form)
