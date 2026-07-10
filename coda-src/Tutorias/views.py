@@ -14,6 +14,7 @@ from django.utils.text import slugify
 from django.core.exceptions import PermissionDenied
 from django.core.mail import send_mail
 from django.contrib import messages
+
 from datetime import datetime, timedelta
 import pandas as pd
 from .constants import TEMAS
@@ -1082,6 +1083,7 @@ class ReporteTutoriasBrindadasMasivoView(CodaViewMixin, FormView):
             })
 
         context["tutores_por_coordinacion"] = tutores_por_coordinacion
+        context["plantilla_masiva_nombre"] = FormReporteTutoriasMasivo.PLANTILLA_REPORTE_TUTORIAS_MASIVO
         return context
 
     def form_invalid(self, form):
@@ -1095,9 +1097,19 @@ class ReporteTutoriasBrindadasMasivoView(CodaViewMixin, FormView):
         fecha_fin = form.cleaned_data.get('fecha_fin')
         fecha_emision = form.cleaned_data.get('fecha')
         fecha_emision_str = fecha_emision.strftime('%Y-%m-%dT%H:%M')
-        plantilla = form.cleaned_data.get('plantilla')
+        plantilla_nombre = FormReporteTutoriasMasivo.PLANTILLA_REPORTE_TUTORIAS_MASIVO
+        #Con lo siguiente se busca que si esté la plantilla como parte de las plantillas agregadas
+        #solo se acepta con el nombre exacto
+        try:
+            plantilla = Documento.objects.get(nombre=plantilla_nombre)
+        except Documento.DoesNotExist:
+            form.add_error(
+                None,
+                f'No se encontró la plantilla "{plantilla_nombre}". '
+                'Debe cargarse desde Ajustes con ese nombre exacto.'
+            )
+            return self.form_invalid(form)
         tutores_seleccionados = form.cleaned_data.get('tutores')
-
         mostrar_col_alumno = form.cleaned_data.get('col_alumno')
         mostrar_col_fecha = form.cleaned_data.get('col_fecha')
         mostrar_col_hora = form.cleaned_data.get('col_hora')

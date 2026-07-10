@@ -139,9 +139,16 @@
                             </div>
 
                             <div class="mb-4">
-                                <label class="form-label">Plantilla</label>
-                                {% render_field form.plantilla class="form-select" %}
-                                {{ form.plantilla.errors }}
+                                <label class="form-label">Plantilla utilizada</label>
+                                <div class="form-control bg-light">
+                                    {{ plantilla_masiva_nombre }}
+                                </div>
+
+                                <small class="form-text text-muted">
+                                    Esta plantilla se usa automáticamente para la generación masiva.
+                                    Si necesitas modificarla, actualízala desde Ajustes y conserva exactamente el nombre:
+                                    <strong>{{ plantilla_masiva_nombre }}</strong>.
+                                </small>
                             </div>
 
                             <div class="mb-4">
@@ -153,7 +160,11 @@
                                 <div>{{ form.col_notas }} Notas</div>
                             </div>
 
-                            <button type="submit" class="btn btn-primary btn-block">Generar reportes</button>
+                            <button type="submit" id="btn_generar_reportes" class="btn btn-primary btn-block">Generar reportes</button>
+                            <small class="form-text text-muted"> La generación puede tardar desde algunos segundos hasta varios minutos,
+                                dependiendo del número de tutores y tutorías. Durante el proceso no cierres
+                                esta pestaña ni presiones nuevamente el botón.
+                            </small>
                         </div>
                     </form>
                 </div>
@@ -231,8 +242,203 @@ document.addEventListener("DOMContentLoaded", function () {
     if (incluirTodas) {
         incluirTodas.addEventListener("change", actualizarTodo);
     }
-
     actualizarTodo();
 });
+
+const form = document.querySelector("form[method='post']");
+const botonGenerar = document.getElementById("btn_generar_reportes");
+
+if (form && botonGenerar) {
+    form.addEventListener("submit", async function (event) {
+        event.preventDefault();
+
+        // Impide que se envíe dos veces mientras la descarga está en proceso.
+        if (form.dataset.enviado === "true") {
+            return;
+        }
+
+        form.dataset.enviado = "true";
+        botonGenerar.disabled = true;
+        botonGenerar.innerHTML = `
+            <span
+                class="spinner-border spinner-border-sm me-2"
+                role="status"
+                aria-hidden="true"
+            ></span>
+            Procesando descarga...
+        `;
+
+        // Eliminar un aviso anterior, en caso de que exista.
+        const avisoAnterior = document.getElementById(
+            "aviso-procesando-descarga"
+        );
+
+        if (avisoAnterior) {
+            avisoAnterior.remove();
+        }
+
+        const aviso = document.createElement("div");
+        aviso.id = "aviso-procesando-descarga";
+        aviso.className = "alert alert-info mt-3";
+        aviso.innerHTML = `
+            <strong>Tu descarga se está procesando.</strong><br>
+            No cierres esta pestaña.
+
+            <div class="mt-2">
+                Tiempo transcurrido:
+                <strong id="contador-descarga">00:00</strong>
+            </div>
+
+            <div class="progress mt-3">
+                <div
+                    class="progress-bar progress-bar-striped progress-bar-animated"
+                    role="progressbar"
+                    style="width: 100%"
+                    aria-label="Generando reportes"
+                ></div>
+            </div>
+        `;
+
+        botonGenerar.insertAdjacentElement("afterend", aviso);
+
+        let segundos = 0;
+
+        const contador = window.setInterval(function () {
+            segundos += 1;
+
+            const minutosTexto = Math.floor(segundos / 60)
+                .toString()
+                .padStart(2, "0");
+
+            const segundosTexto = (segundos % 60)
+                .toString()
+                .padStart(2, "0");
+
+            const elementoContador = document.getElementById(
+                "contador-descarga"
+            );
+
+            if (elementoContador) {
+                elementoContador.textContent =
+                    `${minutosTexto}:${segundosTexto}`;
+            }
+        }, 1000);
+
+        try {
+            const formData = new FormData(form);
+
+            const respuesta = await fetch(form.action || window.location.href, {
+                method: "POST",
+                body: formData,
+                credentials: "same-origin",
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+            });
+
+            if (!respuesta.ok) {
+                throw new Error(
+                    `El servidor respondió con estado ${respuesta.status}.`
+                );
+            }
+
+            const contentType =
+                respuesta.headers.get("Content-Type") || "";
+
+            /*
+             * Si Django devuelve HTML en lugar del ZIP, normalmente significa
+             * que el formulario fue inválido y volvió a renderizar la página
+             * con mensajes de validación.
+             */
+            if (!contentType.includes("application/zip")) {
+                const html = await respuesta.text();
+
+                window.clearInterval(contador);
+
+                document.open();
+                document.write(html);
+                document.close();
+
+                return;
+            }
+
+            /*
+             * blob() termina cuando el navegador recibió completamente
+             * la respuesta generada por Django.
+             */
+            const archivoBlob = await respuesta.blob();
+
+            const contentDisposition =
+                respuesta.headers.get("Content-Disposition") || "";
+
+            const coincidenciaNombre = contentDisposition.match(
+                /filename="?([^";]+)"?/i
+            );
+
+            const nombreArchivo = coincidenciaNombre
+                ? coincidenciaNombre[1]
+                : "reportes_tutorias_masivos.zip";
+
+            const urlTemporal = window.URL.createObjectURL(archivoBlob);
+            const enlace = document.createElement("a");
+
+            enlace.href = urlTemporal;
+            enlace.download = nombreArchivo;
+            enlace.style.display = "none";
+
+            document.body.appendChild(enlace);
+            enlace.click();
+            enlace.remove();
+
+            /*
+             * Se revoca después de iniciar la descarga, no inmediatamente
+             * antes, para que el navegador alcance a consumir el Blob.
+             */
+            window.setTimeout(function () {
+                window.URL.revokeObjectURL(urlTemporal);
+            }, 1000);
+
+            window.clearInterval(contador);
+
+            aviso.className = "alert alert-success mt-3";
+            aviso.innerHTML = `
+                <strong>El archivo fue generado correctamente.</strong><br>
+                La descarga del ZIP ha comenzado.
+            `;
+
+            botonGenerar.disabled = false;
+            botonGenerar.textContent = "Generar reportes";
+            form.dataset.enviado = "false";
+
+            /*
+             * El mensaje de éxito se retira automáticamente.
+             * De esta forma no queda visible un aviso de tardanza
+             * después de que la descarga ya fue generada.
+             */
+            window.setTimeout(function () {
+                aviso.remove();
+            }, 5000);
+        } catch (error) {
+            window.clearInterval(contador);
+
+            console.error(
+                "Error al generar los reportes masivos:",
+                error
+            );
+
+            aviso.className = "alert alert-danger mt-3";
+            aviso.innerHTML = `
+                <strong>No fue posible generar la descarga.</strong><br>
+                Intenta nuevamente. Si el problema continúa, revisa
+                los registros del servidor.
+            `;
+
+            botonGenerar.disabled = false;
+            botonGenerar.textContent = "Generar reportes";
+            form.dataset.enviado = "false";
+        }
+    });
+}
+
 </script>
 {% endblock %}

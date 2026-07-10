@@ -216,12 +216,7 @@ class FormReporteTutoriasMasivo(forms.Form):
         label="Fecha de emisión"
     )
 
-    plantilla = forms.ModelChoiceField(
-        queryset=Documento.objects.all(),
-        to_field_name='nombre',
-        label="Selecciona una plantilla",
-        required=True
-    )
+    PLANTILLA_REPORTE_TUTORIAS_MASIVO = "Reporte tutorías atendidas (carta anual)"
 
     col_alumno = forms.BooleanField(required=False, initial=True, label="Alumno")
     col_fecha = forms.BooleanField(required=False, initial=True, label="Fecha")
@@ -248,9 +243,6 @@ class FormReporteTutoriasMasivo(forms.Form):
             raise forms.ValidationError(
                 "Selecciona al menos una licenciatura, tutores específicos o marca 'Incluir todas las licenciaturas'."
             )
-
-        if len(coordinaciones) > 3:
-            raise forms.ValidationError("Solo se pueden seleccionar entre 1 y 3 licenciaturas.")
 
         return cleaned_data
 
