@@ -17,7 +17,7 @@
                 <div class="card border-0 shadow-sm mb-3">
                     <div class="card-body p-3 p-md-4">
                         <h4 class="text-title-bold mb-3">Ficha del alumno</h4>
-                        <dl class="row mb-0 small">
+                        <dl class="row mb-0 small student-info-list">
                             <dt class="col-5 text-muted">Nombre</dt>
                             <dd class="col-7 mb-2">{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}</dd>
 
@@ -25,7 +25,7 @@
                             <dd class="col-7 mb-2">{{ tutoria.alumno.matricula }}</dd>
 
                             <dt class="col-5 text-muted">Correo</dt>
-                            <dd class="col-7 mb-2 text-break">{{ tutoria.alumno.email }}</dd>
+                            <dd class="col-7 mb-2 text-break student-email">{{ tutoria.alumno.email }}</dd>
 
                             <dt class="col-5 text-muted">Carrera</dt>
                             <dd class="col-7 mb-2">{{ tutoria.alumno.get_carrera_display }}</dd>
@@ -92,6 +92,18 @@
                                 <div class="reporte-header-meta-row">
                                     <span class="reporte-header-meta-label">Fecha y hora programada en tutoría</span>
                                     <span class="reporte-header-meta-value">{{ tutoria.fecha|date:'l d/m/Y H:i' }}</span>
+                                </div>
+                                <div class="reporte-header-meta-row">
+                                    <span class="reporte-header-meta-label">Tema(s) de la tutoría</span>
+                                    <span class="reporte-header-meta-value">{{ tutoria.get_tema_display|join:', ' }}</span>
+                                </div>
+                                <div class="reporte-header-meta-row">
+                                    <span class="reporte-header-meta-label">Estado de la tutoría</span>
+                                    <span class="reporte-header-meta-value">{{ tutoria.get_estado_display }}</span>
+                                </div>
+                                <div class="reporte-header-meta-row">
+                                    <span class="reporte-header-meta-label">Descripción inicial</span>
+                                    <span class="reporte-header-meta-value">{{ tutoria.descripcion|default:'Sin descripción registrada' }}</span>
                                 </div>
                             </div>
                         </div>
@@ -644,6 +656,31 @@
     .action-buttons .action-btn {
         width: 100%;
         min-height: 46px;
+    }
+
+    .student-email {
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+
+    @media (max-width: 1199.98px) {
+        .student-info-list dt,
+        .student-info-list dd {
+            flex: 0 0 100%;
+            max-width: 100%;
+        }
+
+        .student-info-list dt {
+            margin-bottom: 0.2rem;
+        }
+
+        .student-info-list dd {
+            margin-bottom: 0.7rem;
+        }
+
+        .student-info-list dd:last-child {
+            margin-bottom: 0;
+        }
     }
 
     @media (min-width: 992px) {

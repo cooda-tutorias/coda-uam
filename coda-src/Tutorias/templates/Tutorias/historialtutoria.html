@@ -58,10 +58,9 @@
                                                 <td>-</td>
                                                 <td>-</td>
                                                 <td>-</td>
-                                                <td>
+                                                <td class="seguimiento-action-cell">
                                                     <!-- Se supone que la llave primaria se pasa como parte del url a la página de seguimiento... -->
-                                                    <a href="{% url 'save_seguimiento' pk=tutoria.pk %}" class="btn btn-primary text-title">Realizar</a>
-                                                    </a>
+                                                    <a href="{% url 'save_seguimiento' pk=tutoria.pk %}" class="btn btn-primary text-title seguimiento-action-btn">Realizar</a>
                                                 </td>
                                             {% else %}
                                                 <td>{{ tutoria.get_duracion_display }}</td>
@@ -73,10 +72,10 @@
                                                 <td>{{ tutoria.observaciones }}</td>
                                                 <td>{{ tutoria.impacto_tutoria }}</td>
                                                 <td>{{ tutoria.resultados_tutoria }}</td>
-                                                <td>
-                                                    <div class="d-flex flex-column align-items-start gap-1">
+                                                <td class="seguimiento-action-cell">
+                                                    <div class="d-flex flex-column align-items-center gap-1">
                                                         <span class="text-title fw-semibold">Realizado</span>
-                                                        <a href="{% url 'save_seguimiento' pk=tutoria.pk %}" class="btn btn-outline-primary btn-sm text-title js-confirm-editar-seguimiento">Editar</a>
+                                                        <a href="{% url 'save_seguimiento' pk=tutoria.pk %}" class="btn btn-outline-primary text-title js-confirm-editar-seguimiento seguimiento-action-btn">Editar</a>
                                                     </div>
                                                 </td>
                                             {% endif %}
@@ -186,6 +185,37 @@
     .neutral-dialog-btn-primary:focus-visible {
         background: #275ead;
         border-color: #275ead;
+    }
+
+    .seguimiento-action-cell {
+        text-align: center !important;
+        vertical-align: middle;
+    }
+
+    table.dataTable tbody td.seguimiento-action-cell {
+        text-align: center !important;
+        vertical-align: middle;
+    }
+
+    .seguimiento-action-cell > a,
+    .seguimiento-action-cell .seguimiento-action-btn {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .seguimiento-action-cell .d-flex {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .seguimiento-action-btn {
+        min-width: 110px;
+        font-size: 0.88rem;
+        line-height: 1.2;
+        padding: 0.48rem 0.95rem;
     }
 </style>
 
