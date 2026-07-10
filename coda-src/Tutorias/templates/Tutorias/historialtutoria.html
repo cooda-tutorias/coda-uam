@@ -32,7 +32,7 @@
                                     <th class="w-50">Aspectos tratados en la tutoría</th>
                                     <th class="w-50">Impacto tutoría</th>
                                     <th class="w-50">Resultados de tutoría</th>
-                                    <th>Reporte</th> <!-- New Seguimiento column -->
+                                    <th>Reporte de seguimiento</th>
                                 </thead>
                                 <tbody>
                                     {% for tutoria in object_list %}
@@ -58,10 +58,9 @@
                                                 <td>-</td>
                                                 <td>-</td>
                                                 <td>-</td>
-                                                <td>
+                                                <td class="seguimiento-action-cell">
                                                     <!-- Se supone que la llave primaria se pasa como parte del url a la página de seguimiento... -->
-                                                    <a href="{% url 'save_seguimiento' pk=tutoria.pk %}" class="btn btn-primary text-title">Realizar</a>
-                                                    </a>
+                                                    <a href="{% url 'save_seguimiento' pk=tutoria.pk %}" class="btn btn-primary text-title seguimiento-action-btn">Realizar</a>
                                                 </td>
                                             {% else %}
                                                 <td>{{ tutoria.get_duracion_display }}</td>
@@ -73,10 +72,11 @@
                                                 <td>{{ tutoria.observaciones }}</td>
                                                 <td>{{ tutoria.impacto_tutoria }}</td>
                                                 <td>{{ tutoria.resultados_tutoria }}</td>
-                                                <td>
-                                                    <!-- Se supone que la llave primaria se pasa como parte del url a la página de seguimiento... -->
-                                                    <a  href="{% url 'save_seguimiento' pk=tutoria.pk %}" class="btn text-title disabled">Realizado</a>
-                                                    </a>
+                                                <td class="seguimiento-action-cell">
+                                                    <div class="d-flex flex-column align-items-center gap-1">
+                                                        <span class="text-title fw-semibold">Realizado</span>
+                                                        <a href="{% url 'save_seguimiento' pk=tutoria.pk %}" class="btn btn-outline-primary text-title js-confirm-editar-seguimiento seguimiento-action-btn">Editar</a>
+                                                    </div>
                                                 </td>
                                             {% endif %}
                                         </tr>
@@ -89,7 +89,227 @@
         </div>
 </section>
 
+<div id="neutral-confirm-dialog" class="neutral-dialog" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="neutral-dialog-title">
+    <div class="neutral-dialog-panel" role="document">
+        <h5 id="neutral-dialog-title" class="neutral-dialog-title">Confirmar acción</h5>
+        <p id="neutral-dialog-message" class="neutral-dialog-message">¿Deseas continuar?</p>
+        <div class="neutral-dialog-actions">
+            <button type="button" id="neutral-dialog-cancel" class="neutral-dialog-btn neutral-dialog-btn-secondary">Cancelar</button>
+            <button type="button" id="neutral-dialog-confirm" class="neutral-dialog-btn neutral-dialog-btn-primary">Confirmar</button>
+        </div>
+    </div>
+</div>
+
+<style>
+    body.dialog-open {
+        overflow: hidden;
+    }
+
+    .neutral-dialog {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 1rem;
+        background: rgba(21, 26, 33, 0.44);
+        z-index: 2000;
+    }
+
+    .neutral-dialog.is-open {
+        display: flex;
+    }
+
+    .neutral-dialog-panel {
+        width: min(92vw, 420px);
+        border: 1px solid #d8dde5;
+        border-radius: 0.75rem;
+        background: #ffffff;
+        box-shadow: 0 18px 40px rgba(25, 31, 40, 0.2);
+        padding: 1rem 1rem 0.9rem;
+        text-align: center;
+    }
+
+    .neutral-dialog-title {
+        margin: 0 0 0.45rem;
+        color: #26303d;
+        font-size: 1rem;
+        font-weight: 700;
+        text-align: center;
+    }
+
+    .neutral-dialog-message {
+        margin: 0;
+        color: #495566;
+        font-size: 0.93rem;
+        line-height: 1.45;
+        text-align: center;
+    }
+
+    .neutral-dialog-actions {
+        margin-top: 0.95rem;
+        display: flex;
+        justify-content: center;
+        gap: 0.5rem;
+    }
+
+    .neutral-dialog-btn {
+        border: 1px solid transparent;
+        border-radius: 0.55rem;
+        padding: 0.42rem 0.82rem;
+        font-size: 0.86rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+    }
+
+    .neutral-dialog-btn-secondary {
+        background: #eef2f7;
+        border-color: #c7d2e0;
+        color: #334155;
+    }
+
+    .neutral-dialog-btn-secondary:hover,
+    .neutral-dialog-btn-secondary:focus-visible {
+        background: #e2e8f0;
+        border-color: #afc0d6;
+    }
+
+    .neutral-dialog-btn-primary {
+        background: #2f6fcb;
+        border-color: #2f6fcb;
+        color: #ffffff;
+    }
+
+    .neutral-dialog-btn-primary:hover,
+    .neutral-dialog-btn-primary:focus-visible {
+        background: #275ead;
+        border-color: #275ead;
+    }
+
+    .seguimiento-action-cell {
+        text-align: center !important;
+        vertical-align: middle;
+    }
+
+    table.dataTable tbody td.seguimiento-action-cell {
+        text-align: center !important;
+        vertical-align: middle;
+    }
+
+    .seguimiento-action-cell > a,
+    .seguimiento-action-cell .seguimiento-action-btn {
+        display: inline-flex;
+        justify-content: center;
+        align-items: center;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .seguimiento-action-cell .d-flex {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .seguimiento-action-btn {
+        min-width: 110px;
+        font-size: 0.88rem;
+        line-height: 1.2;
+        padding: 0.48rem 0.95rem;
+    }
+</style>
+
 <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const editLinks = document.querySelectorAll('.js-confirm-editar-seguimiento');
+        const mensajeEdicion = 'Los cambios se enviarán por correo al alumno y quedarán en historial. ¿Continuar con la edición?';
+        const dialogRoot = document.getElementById('neutral-confirm-dialog');
+        const dialogTitle = document.getElementById('neutral-dialog-title');
+        const dialogMessage = document.getElementById('neutral-dialog-message');
+        const dialogCancelBtn = document.getElementById('neutral-dialog-cancel');
+        const dialogConfirmBtn = document.getElementById('neutral-dialog-confirm');
+
+        let resolveDialog = null;
+
+        function closeConfirmDialog(result) {
+            if (!resolveDialog) {
+                return;
+            }
+
+            dialogRoot.classList.remove('is-open');
+            dialogRoot.setAttribute('aria-hidden', 'true');
+            document.body.classList.remove('dialog-open');
+            const resolver = resolveDialog;
+            resolveDialog = null;
+            resolver(result);
+        }
+
+        function showConfirmDialog(options) {
+            const dialogOptions = options || {};
+            if (!dialogRoot || !dialogTitle || !dialogMessage || !dialogCancelBtn || !dialogConfirmBtn) {
+                return Promise.resolve(window.confirm(dialogOptions.message || '¿Deseas continuar?'));
+            }
+
+            dialogTitle.textContent = dialogOptions.title || 'Confirmar acción';
+            dialogMessage.textContent = dialogOptions.message || '¿Deseas continuar?';
+            dialogCancelBtn.textContent = dialogOptions.cancelLabel || 'Cancelar';
+            dialogConfirmBtn.textContent = dialogOptions.confirmLabel || 'Confirmar';
+
+            dialogRoot.classList.add('is-open');
+            dialogRoot.setAttribute('aria-hidden', 'false');
+            document.body.classList.add('dialog-open');
+
+            return new Promise(function (resolve) {
+                resolveDialog = resolve;
+                dialogConfirmBtn.focus();
+            });
+        }
+
+        if (dialogCancelBtn) {
+            dialogCancelBtn.addEventListener('click', function () {
+                closeConfirmDialog(false);
+            });
+        }
+
+        if (dialogConfirmBtn) {
+            dialogConfirmBtn.addEventListener('click', function () {
+                closeConfirmDialog(true);
+            });
+        }
+
+        if (dialogRoot) {
+            dialogRoot.addEventListener('click', function (event) {
+                if (event.target === dialogRoot) {
+                    closeConfirmDialog(false);
+                }
+            });
+        }
+
+        document.addEventListener('keydown', function (event) {
+            if (event.key === 'Escape' && resolveDialog) {
+                closeConfirmDialog(false);
+            }
+        });
+
+        editLinks.forEach(function (link) {
+            link.addEventListener('click', function (event) {
+                event.preventDefault();
+                const targetUrl = link.getAttribute('href');
+                showConfirmDialog({
+                    title: 'Confirmar edición',
+                    message: mensajeEdicion,
+                    cancelLabel: 'Cancelar',
+                    confirmLabel: 'Editar reporte',
+                }).then(function (confirmarEdicion) {
+                    if (!confirmarEdicion) {
+                        return;
+                    }
+                    window.location.href = targetUrl;
+                });
+            });
+        });
+    });
+
     function filterByDate() {
         var inputDate = document.getElementById("dateInput").value;
         var rows = document.querySelectorAll(".table tbody tr");
