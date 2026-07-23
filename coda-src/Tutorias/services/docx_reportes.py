@@ -8,6 +8,11 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import RGBColor, Inches
 
+# Valor almacenado en Usuarios.constants.ESTADOS_ALUMNO para el estado "Activo".
+# Se mantiene local porque esta función sólo necesita aplicar la regla de inclusión
+# de la carta anual y no necesita modificar ni recorrer las opciones del formulario.
+ESTADO_ALUMNO_ACTIVO = 1
+
 
 def paragraph_replace_text(paragraph, regex, replace_str):
     while True:
@@ -89,15 +94,27 @@ def _replace_reporte_placeholders(documento, tutor, oficio, fecha_emision):
             if re.match(reg_tut_min, match):
                 paragraph_replace_text(p, reg_tut_min, tutor_data['nombre_tutor'])
 
+def _tutoria_es_reportable(tutoria):
+    """
+    Determina si una tutoría debe incluirse en la carta anual.
+
+    Una tutoría se incluye únicamente cuando:
+    - se registró asistencia; y
+    - el alumno estaba activo al momento de crear la tutoría.
+
+    Se utiliza estado_alumno_historico porque alumno.estado representa
+    el estado actual y puede haber cambiado después de la tutoría.
+    """
+    return (
+        tutoria.asistencia is True
+        and tutoria.estado_alumno_historico == ESTADO_ALUMNO_ACTIVO
+    )
 
 # Aquí se filtran tutorías (ej: asistencia, estado)
 def _build_report_rows(tutorias, mostrar_col_alumno, mostrar_col_fecha, mostrar_col_hora, mostrar_col_tema, mostrar_col_notas, tema_dict):
     rows = []
     for tutoria in tutorias:
-        if not tutoria.asistencia:  # deben haber asistido
-            continue
-        
-        if tutoria.alumno.estado != 1:
+        if not _tutoria_es_reportable(tutoria):  #revisa estado y asistencia del alumno para incluir la tutoría en el reporte, en vez de sólo validar que estado sea 1
             continue
 
         alumno = tutoria.alumno
