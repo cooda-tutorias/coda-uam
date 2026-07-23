@@ -1,4 +1,7 @@
-from django.test import TestCase
+from types import SimpleNamespace
+from datetime import datetime
+
+from django.test import TestCase, SimpleTestCase
 from django.urls import reverse
 from django.test import override_settings
 from django.core import mail
@@ -7,9 +10,10 @@ from django.utils import timezone
 from Usuarios.models import Tutor, Alumno
 from Tutorias.models import Tutoria, HistorialCambioTutoria
 from Tutorias.forms import FormSeguimiento
+from Tutorias.services.docx_reportes import _tutoria_es_reportable
 from Tutorias.constants import PENDIENTE, ACEPTADO, RECHAZADO
 from notifications.models import Notification
-from datetime import datetime
+
 
 class FormSeguimientoTests(TestCase):
     """Unit tests para FormSeguimiento"""
@@ -310,3 +314,82 @@ class NotificacionesTutoriaTests(TestCase):
         self.assertIn("Estado de la tutoría", last_history.cambios_realizados)
         self.assertIn("Aceptada", last_history.cambios_realizados)
         self.assertIn("Rechazada", last_history.cambios_realizados)
+
+
+class CartaAnualEstadoHistoricoTests(SimpleTestCase):
+    """
+    Pruebas de la regla de inclusión de tutorías en la carta anual.
+
+    La decisión debe depender del estado histórico guardado en la tutoría,
+    no del estado actual del alumno.
+    """
+
+    def test_incluye_tutoria_con_asistencia_y_estado_historico_activo(self):
+        tutoria = SimpleNamespace(
+            asistencia=True,
+            estado_alumno_historico=1,
+        )
+
+        self.assertTrue(_tutoria_es_reportable(tutoria))
+
+    def test_excluye_tutoria_con_estado_historico_no_reinscrito(self):
+        tutoria = SimpleNamespace(
+            asistencia=True,
+            estado_alumno_historico=2,
+        )
+
+        self.assertFalse(_tutoria_es_reportable(tutoria))
+
+    def test_excluye_tutoria_con_estado_historico_sin_carga_academica(self):
+        tutoria = SimpleNamespace(
+            asistencia=True,
+            estado_alumno_historico=10,
+        )
+
+        self.assertFalse(_tutoria_es_reportable(tutoria))
+
+    def test_excluye_tutoria_sin_asistencia(self):
+        tutoria = SimpleNamespace(
+            asistencia=False,
+            estado_alumno_historico=1,
+        )
+
+        self.assertFalse(_tutoria_es_reportable(tutoria))
+
+    def test_excluye_tutoria_con_asistencia_sin_registrar(self):
+        tutoria = SimpleNamespace(
+            asistencia=None,
+            estado_alumno_historico=1,
+        )
+
+        self.assertFalse(_tutoria_es_reportable(tutoria))
+
+    def test_excluye_tutoria_sin_estado_historico(self):
+        tutoria = SimpleNamespace(
+            asistencia=True,
+            estado_alumno_historico=None,
+        )
+
+        self.assertFalse(_tutoria_es_reportable(tutoria))
+
+    def test_incluye_si_historico_es_activo_aunque_estado_actual_no_lo_sea(self):
+        alumno = SimpleNamespace(estado=2)
+
+        tutoria = SimpleNamespace(
+            alumno=alumno,
+            asistencia=True,
+            estado_alumno_historico=1,
+        )
+
+        self.assertTrue(_tutoria_es_reportable(tutoria))
+
+    def test_excluye_si_historico_no_es_activo_aunque_estado_actual_si_lo_sea(self):
+        alumno = SimpleNamespace(estado=1)
+
+        tutoria = SimpleNamespace(
+            alumno=alumno,
+            asistencia=True,
+            estado_alumno_historico=2,
+        )
+
+        self.assertFalse(_tutoria_es_reportable(tutoria))

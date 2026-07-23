@@ -39,7 +39,7 @@ y el proyecto adhiere a [Semantic Versioning](https://semver.org/lang/es/).
 - Se corrigió el aviso de tardanza que permanecía visible después de completarse correctamente la generación y descarga del ZIP.
 - Se evitó el envío duplicado del formulario mientras una generación masiva se encuentra en proceso.
 - Se agregó manejo visual de errores cuando el servidor no devuelve un archivo ZIP válido.
-
+- Se corrigió la generación de la carta anual para considerar el estado histórico del alumno al momento de la tutoría, en lugar de su estado actual.
 
 ### Changed 
 - Refactor de la generación de cartas a `Tutorias/services/docx_reportes.py` para separar la lógica de documentos de `views.py`. 
