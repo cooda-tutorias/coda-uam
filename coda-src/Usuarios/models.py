@@ -88,7 +88,7 @@ class Usuario(AbstractUser):
         return role in self.rol  # Check if user has a specific role
 
 class Tutor(Usuario):
-    cubiculo = models.IntegerField()
+    cubiculo = models.CharField("Oficina", max_length=10, blank=True, null=True)
     horario = models.FileField(null=True, blank=True)
     coordinacion = models.CharField(max_length=30, choices=CARRERAS)
     es_coordinador = models.BooleanField(default=False)
@@ -105,7 +105,7 @@ class Tutor(Usuario):
         super().save(*args, **kwargs)
 
 class Coda(Usuario):
-    cubiculo = models.IntegerField()
+    cubiculo = models.CharField("Oficina", max_length=10, blank=True, null=True)
     horario = models.FileField(null=True, blank=True)
     es_coordinador = models.BooleanField(default=False)
     tema_tutorias = models.CharField(max_length=4, choices=TEMAS, default=OTRO)
@@ -120,7 +120,7 @@ class Coda(Usuario):
         super().save(*args, **kwargs)
 
 class Cordinador(Usuario):
-    cubiculo = models.IntegerField()
+    cubiculo = models.CharField("Oficina", max_length=10, blank=True, null=True)
     horario = models.FileField(null=True, blank=True)
     coordinacion = models.CharField(max_length=30, choices=CARRERAS)
     es_coordinador = models.BooleanField(default=True)
