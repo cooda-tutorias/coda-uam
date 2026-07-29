@@ -17,6 +17,7 @@ urlpatterns = [
     
     # URLS COORDINADORESs
     path("tutores-cord/", views.VerTutoresCoordListView.as_view(), name="Tutores-Cordinador"),
+    path('dashboard-coordinador/', views.CoordinadorDashboardView.as_view(), name='dashboard-coordinador'),
     path('tutorias-coordinador/', views.VerTutoriasCoordinadorListView.as_view(), name='Tutorias-Coordinacion'),
     path('tutorias-coordinador/<int:pk>', views.VerTutoriasCoordinadorPorTutorListView.as_view(), name='Tutorias-Cordinador'),
     path('tutorados-coordinador/<int:pk>', views.VerTutoradosCoordinadorListView.as_view(), name='Tutorados-Cordinador'),

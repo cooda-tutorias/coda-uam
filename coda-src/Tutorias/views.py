@@ -44,6 +44,7 @@ from .services.docx_reportes import generar_docx_reporte_tutorias_brindadas
 
 from django.views.generic import TemplateView, FormView
 from django.conf import settings
+from collections import Counter
 
 #Funcion para descargar pdf
 def carta_tutorados_pdf(request):
@@ -1174,6 +1175,77 @@ class HistorialTutoriasListView(BaseAccessMixin, ListView):
 class HistorialTutoriasGenerateView(BaseAccessMixin, ListView):
     model = Tutoria
     template_name = 'Tutorias/generarhistorialtutoria.html'
+
+class CoordinadorDashboardView(CordinadorViewMixin, TemplateView):
+    template_name = 'Tutorias/dashboard_coordinador.html'
+
+    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        context['header_footer'] = TEMPLATES[COORDINADOR]
+        coord = get_object_or_404(Cordinador, pk=self.request.user.pk)
+        tutores = Tutor.objects.filter(coordinacion=coord.coordinacion).order_by('last_name', 'first_name')
+
+        tutorias = Tutoria.objects.filter(tutor__in=tutores)
+
+        selected_tutor = self.request.GET.get('tutor', '')
+        selected_tema = self.request.GET.get('tema', '')
+
+        if selected_tutor:
+            tutorias = tutorias.filter(tutor_id=selected_tutor)
+
+        if selected_tema:
+            matching_ids = [tutoria.pk for tutoria in tutorias if selected_tema in (tutoria.tema or [])]
+            tutorias = Tutoria.objects.filter(pk__in=matching_ids)
+
+        tutor_metrics = []
+        for tutor in tutores:
+            tutor_tutorias = tutorias.filter(tutor=tutor)
+            if not selected_tutor or str(tutor.pk) == selected_tutor:
+                temas_por_tutor = Counter()
+                for tutoria in tutor_tutorias:
+                    for tema in tutoria.tema or []:
+                        temas_por_tutor[tema] += 1
+
+                tutor_metrics.append({
+                    'tutor': tutor,
+                    'tutoria_count': tutor_tutorias.count(),
+                    'alumno_count': tutor_tutorias.values('alumno').distinct().count(),
+                    'temas': [
+                        {'codigo': codigo, 'nombre': dict(TEMAS).get(codigo, codigo), 'count': count}
+                        for codigo, count in temas_por_tutor.most_common(3)
+                    ],
+                })
+
+        tutor_metrics = sorted(
+            tutor_metrics,
+            key=lambda item: (-item['alumno_count'], -item['tutoria_count'], item['tutor'].first_name)
+        )
+
+        tema_counter = Counter()
+        for tutoria in tutorias:
+            for tema in tutoria.tema or []:
+                tema_counter[tema] += 1
+
+        tema_metrics = [
+            {'codigo': codigo, 'nombre': dict(TEMAS).get(codigo, codigo), 'count': count}
+            for codigo, count in tema_counter.most_common(6)
+        ]
+
+        context.update({
+            'tutores': tutores,
+            'tutor_metrics': tutor_metrics,
+            'tema_metrics': tema_metrics,
+            'tutorias': tutorias.order_by('-fecha')[:15],
+            'selected_tutor': selected_tutor,
+            'selected_tema': selected_tema,
+            'suggestions': [
+                'Agregar series de tiempo para visualizar la evolución mensual de tutorías.',
+                'Incluir alertas cuando un tutor supere un umbral de alumnos atendidos o temas repetidos.',
+                'Comparar el desempeño por carrera y estado del alumno para priorizar intervenciones.',
+            ],
+        })
+        return context
+
 
 class VerTutoriasCoordinadorListView(CordinadorViewMixin, FormView):
     model = Tutoria

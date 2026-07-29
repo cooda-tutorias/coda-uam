@@ -4,7 +4,7 @@ from django.test import override_settings
 from django.core import mail
 from django.utils import timezone
 
-from Usuarios.models import Tutor, Alumno
+from Usuarios.models import Tutor, Alumno, Cordinador
 from Tutorias.models import Tutoria, HistorialCambioTutoria
 from Tutorias.forms import FormSeguimiento
 from Tutorias.constants import PENDIENTE, ACEPTADO, RECHAZADO
@@ -140,6 +140,123 @@ class FormSeguimientoTests(TestCase):
         form = FormSeguimiento(data=form_data, instance=self.tutoria)
         self.assertFalse(form.is_valid())
         self.assertIn('observaciones', form.errors)
+
+
+class CoordinatorDashboardTests(TestCase):
+    def setUp(self):
+        self.coordinador = Cordinador.objects.create(
+            matricula='9001',
+            email='coord@example.com',
+            password='x',
+            first_name='Coord',
+            last_name='Uno',
+            cubiculo=10,
+            coordinacion='COM',
+            sexo='M',
+        )
+
+        self.tutor_uno = Tutor.objects.create(
+            matricula='1001',
+            email='tutor1@example.com',
+            password='x',
+            first_name='Tutor',
+            last_name='Uno',
+            cubiculo=1,
+            coordinacion='COM',
+            sexo='M',
+        )
+
+        self.tutor_dos = Tutor.objects.create(
+            matricula='1002',
+            email='tutor2@example.com',
+            password='x',
+            first_name='Tutor',
+            last_name='Dos',
+            cubiculo=2,
+            coordinacion='COM',
+            sexo='M',
+        )
+
+        self.alumno_uno = Alumno.objects.create(
+            matricula='4001',
+            email='alumno1@example.com',
+            password='x',
+            first_name='Alumno',
+            last_name='Uno',
+            carrera='COM',
+            tutor_asignado=self.tutor_uno,
+            estado=1,
+        )
+
+        self.alumno_dos = Alumno.objects.create(
+            matricula='4002',
+            email='alumno2@example.com',
+            password='x',
+            first_name='Alumno',
+            last_name='Dos',
+            carrera='COM',
+            tutor_asignado=self.tutor_uno,
+            estado=2,
+        )
+
+        self.alumno_tres = Alumno.objects.create(
+            matricula='4003',
+            email='alumno3@example.com',
+            password='x',
+            first_name='Alumno',
+            last_name='Tres',
+            carrera='COM',
+            tutor_asignado=self.tutor_dos,
+            estado=3,
+        )
+
+        Tutoria.objects.create(
+            alumno=self.alumno_uno,
+            tutor=self.tutor_uno,
+            tema=['BEC'],
+            fecha=timezone.now(),
+            descripcion='Primera',
+            estado=PENDIENTE,
+        )
+        Tutoria.objects.create(
+            alumno=self.alumno_dos,
+            tutor=self.tutor_uno,
+            tema=['ING'],
+            fecha=timezone.now(),
+            descripcion='Segunda',
+            estado=ACEPTADO,
+        )
+        Tutoria.objects.create(
+            alumno=self.alumno_tres,
+            tutor=self.tutor_dos,
+            tema=['BEC'],
+            fecha=timezone.now(),
+            descripcion='Tercera',
+            estado=RECHAZADO,
+        )
+
+    def test_dashboard_muestra_metricas_por_tutor_y_filtro_por_tema(self):
+        self.client.force_login(self.coordinador)
+
+        response = self.client.get(reverse('dashboard-coordinador'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('tutor_metrics', response.context)
+        self.assertIn('tema_metrics', response.context)
+
+        tutor_metrics = response.context['tutor_metrics']
+        self.assertEqual(tutor_metrics[0]['tutoria_count'], 2)
+        self.assertEqual(tutor_metrics[0]['alumno_count'], 2)
+        self.assertEqual(tutor_metrics[0]['tutor'].pk, self.tutor_uno.pk)
+
+        tema_metrics = response.context['tema_metrics']
+        self.assertTrue(any(item['codigo'] == 'BEC' for item in tema_metrics))
+
+        filtered_response = self.client.get(reverse('dashboard-coordinador'), {'tutor': self.tutor_uno.pk, 'tema': 'ING'})
+        self.assertEqual(filtered_response.status_code, 200)
+        self.assertEqual(filtered_response.context['selected_tutor'], str(self.tutor_uno.pk))
+        self.assertEqual(filtered_response.context['selected_tema'], 'ING')
+        self.assertEqual(len(filtered_response.context['tutorias']), 1)
 
 
 class NotificacionesTutoriaTests(TestCase):

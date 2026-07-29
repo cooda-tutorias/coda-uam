@@ -7,14 +7,17 @@ class ContextConRolesMixin:
     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
         context = super().get_context_data(**kwargs)
 
-        # Get the selected role from the session
         selected_role = self.request.session.get("role")
 
-        # Debug: Print selected role and user roles
-        print(f"Debug: Selected Role = {selected_role}, User Roles = {self.request.user.get_roles()}")
-
-        # Determine the header_footer template based on the selected role
-        if selected_role == "alumno":
+        if self.request.user.has_role(COORDINADOR):
+            context["header_footer"] = TEMPLATES[COORDINADOR]
+        elif self.request.user.has_role(TUTOR):
+            context["header_footer"] = TEMPLATES[TUTOR]
+        elif self.request.user.has_role(ALUMNO):
+            context["header_footer"] = TEMPLATES[ALUMNO]
+        elif self.request.user.has_role(CODA):
+            context["header_footer"] = TEMPLATES[CODA]
+        elif selected_role == "alumno":
             context["header_footer"] = TEMPLATES[ALUMNO]
         elif selected_role == "tutor":
             context["header_footer"] = TEMPLATES[TUTOR]
@@ -23,11 +26,8 @@ class ContextConRolesMixin:
         elif selected_role == "coda":
             context["header_footer"] = TEMPLATES[CODA]
         else:
-            # Default template if no role is selected
-            context["header_footer"] = "Usuarios/HeaderAndFooterDefault.html"
+            context["header_footer"] = TEMPLATES[COORDINADOR]
 
-        # Debug: Print the final context
-        print(f"Debug: Context = {context}")
         return context
 
 class ContextNotificationsMixin:

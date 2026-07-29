@@ -1,0 +1,168 @@
+{% extends "Usuarios/HeaderAndFooterFachada.html"%}
+
+{% block title %}Dashboard de coordinación{% endblock %}
+
+{% block body %}
+<style>
+  .dashboard-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.04);
+    background: #fff;
+  }
+  .metric-pill {
+    display: inline-block;
+    background: #fff5e8;
+    color: #b45309;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+</style>
+
+<section class="py-4">
+  <div class="container-fluid px-4">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center mb-4">
+      <div>
+        <h2 class="mb-1">Dashboard de coordinación</h2>
+        <p class="text-muted mb-0">Resumen de tutorías por tutor, temas más recurrentes y filtros para priorizar seguimiento.</p>
+      </div>
+      <a href="{% url 'Tutorias-Coordinacion' %}" class="btn btn-outline-primary">Ver listado completo</a>
+    </div>
+
+    <form method="get" class="dashboard-card p-4 mb-4">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-5">
+          <label class="form-label" for="tutor">Filtrar por tutor</label>
+          <select id="tutor" name="tutor" class="form-select">
+            <option value="">Todos los tutores</option>
+            {% for tutor in tutores %}
+              <option value="{{ tutor.pk }}" {% if selected_tutor == tutor.pk|stringformat:'s' %}selected{% endif %}>{{ tutor.first_name }} {{ tutor.last_name }} {{ tutor.second_last_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-5">
+          <label class="form-label" for="tema">Filtrar por tema</label>
+          <select id="tema" name="tema" class="form-select">
+            <option value="">Todos los temas</option>
+            {% for item in tema_metrics %}
+              <option value="{{ item.codigo }}" {% if selected_tema == item.codigo %}selected{% endif %}>{{ item.nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-primary w-100">Aplicar</button>
+        </div>
+      </div>
+    </form>
+
+    <div class="row g-4 mb-4">
+      <div class="col-lg-4">
+        <div class="dashboard-card p-4 h-100">
+          <div class="text-muted mb-2">Tutorías registradas</div>
+          <h3 class="display-6 mb-1">{{ tutorias|length }}</h3>
+          <span class="metric-pill">Vista filtrada</span>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="dashboard-card p-4 h-100">
+          <div class="text-muted mb-2">Tutores en seguimiento</div>
+          <h3 class="display-6 mb-1">{{ tutor_metrics|length }}</h3>
+          <span class="metric-pill">Agrupado por tutor</span>
+        </div>
+      </div>
+      <div class="col-lg-4">
+        <div class="dashboard-card p-4 h-100">
+          <div class="text-muted mb-2">Temas más recurrentes</div>
+          <h3 class="display-6 mb-1">{{ tema_metrics|length }}</h3>
+          <span class="metric-pill">Top 6</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-4">
+      <div class="col-lg-7">
+        <div class="dashboard-card p-4">
+          <h4 class="mb-3">Resumen por tutor</h4>
+          <div class="table-responsive">
+            <table class="table table-hover align-middle">
+              <thead>
+                <tr>
+                  <th>Tutor</th>
+                  <th>Alumnos</th>
+                  <th>Tutorías</th>
+                  <th>Temas destacados</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in tutor_metrics %}
+                  <tr>
+                    <td>{{ row.tutor.first_name }} {{ row.tutor.last_name }} {{ row.tutor.second_last_name }}</td>
+                    <td>{{ row.alumno_count }}</td>
+                    <td>{{ row.tutoria_count }}</td>
+                    <td>
+                      {% for tema in row.temas %}
+                        <span class="metric-pill me-1">{{ tema.nombre }} ({{ tema.count }})</span>
+                      {% empty %}
+                        <span class="text-muted">Sin datos</span>
+                      {% endfor %}
+                    </td>
+                  </tr>
+                {% empty %}
+                  <tr><td colspan="4" class="text-muted">No hay tutorías para mostrar con los filtros seleccionados.</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-lg-5">
+        <div class="dashboard-card p-4 mb-4">
+          <h4 class="mb-3">Temas más solicitados</h4>
+          <ul class="list-group list-group-flush">
+            {% for item in tema_metrics %}
+              <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                <span>{{ item.nombre }}</span>
+                <span class="badge bg-primary rounded-pill">{{ item.count }}</span>
+              </li>
+            {% empty %}
+              <li class="list-group-item px-0 text-muted">No hay temas registrados.</li>
+            {% endfor %}
+          </ul>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="dashboard-card p-4 mt-4">
+      <h4 class="mb-3">Últimas tutorías registradas</h4>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle">
+          <thead>
+            <tr>
+              <th>Alumno</th>
+              <th>Tutor</th>
+              <th>Fecha</th>
+              <th>Tema</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for tutoria in tutorias %}
+              <tr>
+                <td>{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }}</td>
+                <td>{{ tutoria.tutor.first_name }} {{ tutoria.tutor.last_name }}</td>
+                <td>{{ tutoria.fecha|date:"d/m/Y H:i" }}</td>
+                <td>{{ tutoria.get_tema_display|join:", " }}</td>
+              </tr>
+            {% empty %}
+              <tr><td colspan="4" class="text-muted">No hay tutorías recientes para mostrar.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
