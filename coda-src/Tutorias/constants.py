@@ -14,6 +14,8 @@ TITULACION = "TIT"
 EGRESO = "EGRE"
 PERSONALES = "PER"
 SEGUIMIENTO = "SR"
+LOCKER = "LKR"
+RECUPERACION = "REC"
 OTRO = "OTRO"
 
 TEMAS = [
@@ -22,16 +24,18 @@ TEMAS = [
     (INGLES, "Inglés"),
     (COLEGIADO, "Órgano colegiado"),
     (REGLAMENTOS, "Reglamentos"),
-    (SERVICIO, "Servicio Social"),
+    (SERVICIO, "Servicio social"),
     (MOVILIDAD, "Movilidad"),
-    (PROYECTO, "Proyecto Terminal"),
-    (ESTANCIA, "Estancia de Verano"),
-    (TRAYECTORIA, "Trayectoria Curricular"),
-    (GRUPO, "Eleccion de grupo"),
+    (PROYECTO, "Proyecto terminal"),
+    (ESTANCIA, "Estancia de verano"),
+    (TRAYECTORIA, "Trayectoria curricular"),
+    (GRUPO, "Elección de grupo"),
     (TITULACION, "Titulación"),
     (EGRESO, "Egreso"),
     (PERSONALES, "Personales"),
     (SEGUIMIENTO, "Seguimiento de reunión"),
+    (RECUPERACION, "Recuperación especial"),
+    (LOCKER, "Solicitud de locker"),
     (OTRO, "Otro")
 ]
 

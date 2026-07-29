@@ -64,6 +64,20 @@ class Usuario(AbstractUser):
 
     objects = UserManager()
 
+    @property
+    def nombre_completo(self):
+        """
+        Regresa el nombre completo del usuario omitiendo apellidos vacíos o nulos
+        para evitar mostrar 'None' en la interfaz.
+        """
+        
+        # Creamos una lista con las partes del nombre
+        partes = [self.first_name, self.last_name, self.second_last_name]
+        
+        # 1. filter(None, partes) elimina los valores vacíos o Nulos
+        # 2. " ".join(...) los une con un espacio
+        return " ".join(filter(None, partes))
+
     def __str__(self) -> str:
         return str(self.matricula)
     
