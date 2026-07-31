@@ -1,0 +1,64 @@
+{% extends "Usuarios/perfil_base.html"%}
+
+
+{% block perfil %}
+{# Usa qr_base64 que la vista ya inyecta en el contexto #}
+{% if qr_base64 %}
+
+<div class="d-flex justify-content-center">
+<div class="card border-top border-bottom border-4 my-4"
+     style="border-color: #F08200 !important; border-radius: .5rem;">
+  <div class="card-body text-center">
+    <h5 class="mb-3">QR para tutorías en Sitio</h5>
+
+    <p class="text-muted text-center">
+        Imprime este QR para que tus tutorados lo escaneen para solicitar tutorías directamente en tu oficina.
+    </p>
+
+    <!-- Imagen incrustada (data URI) -->
+    <img
+      src="{{ qr_base64 }}"
+      alt="Código QR"
+      class="img-fluid shadow-2-strong"
+      style="width: 360px; height: 360px; object-fit: contain;"
+      onerror="this.style.display='none'; document.getElementById('qr-error').style.display='block';"
+    />
+
+    <!-- Mensaje de error si algo falla -->
+    <div id="qr-error" class="text-danger mt-2" style="display:none;">
+      No se pudo cargar el código QR.
+    </div>
+
+    <!-- Botones: descargar y mostrar URL -->
+    <div class="mt-3 d-flex justify-content-center gap-2">
+      <!-- Descargar (convierte base64 a archivo usando data URI directo en href) -->
+      <a href="{{ qr_base64 }}" download="qr_tutor.png" class="btn btn-outline-primary btn-sm">
+        Descargar QR
+      </a>
+
+      <!-- Mostrar URL en pequeño (opcional) -->
+      <button class="btn btn-outline-secondary btn-sm" type="button"
+              data-bs-toggle="collapse" data-bs-target="#qr-url" aria-expanded="false"
+              aria-controls="qr-url">
+        Ver URL
+      </button>
+    </div>
+
+    <div class="collapse mt-2" id="qr-url">
+      <small class="text-muted">{{ url_qr }}</small>
+    </div>
+  </div>
+</div>
+</div>
+
+{% else %}
+<!-- Si la vista no envió qr_base64 -->
+<div class="card border-top border-bottom border-4 my-4"
+     style="border-color: #F08200 !important; border-radius: .5rem;">
+  <div class="card-body text-center">
+    <p class="text-muted mb-0">No hay código QR disponible.</p>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

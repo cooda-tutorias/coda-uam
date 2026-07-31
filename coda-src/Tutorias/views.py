@@ -1,4 +1,6 @@
 import qrcode
+from django.contrib.auth.mixins import LoginRequiredMixin
+
 from collections import Counter
 from typing import Any, Dict
 from django.shortcuts import get_object_or_404, redirect
@@ -1602,6 +1604,78 @@ class QRCodeView(View):
         img.save(response, "PNG")
 
         return response
+
+
+# ALJ: Esta vista es para solicitar tutorías In Situ, es decir,
+# cuando el alumno escanea un QR directamente en la oficina del tutor.
+# Para ver cómo se genera el QR, revisar VerQRView de Usuarios/views.py
+# El QR está personalizado para cada tutor, de manera que solamente sus tutorados
+# pueden solicitarle tutorías In Situ.
+# TODO: agregar a los alumnos un campo de "tutor_sustituto" que normalmente será
+# el coordinador para que también esa persona pueda atenderlo.
+class TutoriaInSituCreateView(LoginRequiredMixin, View):
+
+    template_name = "Tutorias/tutoria_insitu_form.html"
+
+    def get(self, request, tutor_pk):
+
+        usuario = request.user
+
+        # 1) Validar que sea alumno
+        if not usuario.is_alumno:
+            return HttpResponseForbidden("Solo los alumnos pueden registrar tutorías in-situ.")
+
+        alumno = Alumno.objects.get(pk=request.user.pk)
+
+        # 2) Validar tutor
+        tutor = get_object_or_404(Tutor, pk=tutor_pk)
+
+        # 3) Validar que el alumno pertenece a ese tutor
+        if alumno.tutor_asignado.pk != tutor.pk:   # Ajusta nombre del campo
+            return HttpResponseForbidden(f"{tutor.nombre_completo} no es tu tutor asignado.")
+
+        # 4) Mostrar formulario
+        form = FormTutoriasInSitu()
+
+        return render(request, self.template_name, {
+            "form": form,
+            "tutor": tutor,
+        })
+
+    def post(self, request, tutor_pk):
+
+        usuario = request.user
+
+        if not usuario.is_alumno:
+            return HttpResponseForbidden("Solo los alumnos pueden registrar tutorías in-situ.")
+
+        alumno = Alumno.objects.get(pk=request.user.pk)
+
+        tutor = get_object_or_404(Tutor, pk=tutor_pk)
+
+        if alumno.tutor_asignado.pk != tutor.pk:  # Ajusta si tu campo se llama diferente
+            return HttpResponseForbidden(f"{tutor.nombre_completo} no es tu tutor asignado.")
+
+        form = FormTutoriasInSitu(request.POST)
+
+        if form.is_valid():
+            nueva = form.save(commit=False)
+            nueva.alumno = alumno
+            nueva.tutor = tutor
+            #nueva.modalidad = "INS"
+            nueva.estado = "ACE"  # aceptada directamente, para el tutor pasa directamente a historial tutorías.
+            nueva.fecha = timezone.now()
+            nueva.save()
+
+            # Agregar mensaje de confirmación
+            messages.success(request, "Tutoría In Situ registrada con éxito.")
+
+            return redirect("tutorias_alumno")
+
+        return render(request, self.template_name, {
+            "form": form,
+            "tutor": tutor
+        })
 
 
 class CrearTutoriaPorAlumnoView(TutorViewMixin, CreateView):

@@ -37,6 +37,124 @@ import pandas as pd
 from .models import Documento
 from .forms import DocumentoForm
 
+# Bibliotecas para generar códigos QR
+import qrcode
+import base64
+from io import BytesIO
+from django.views import View
+from django.http import Http404
+from PIL import Image, ImageDraw, ImageFont
+# Para las tutorias in-situ
+class VerQRView(BaseAccessMixin, View):
+
+    def get(self, request):
+        user = request.user
+
+        if not user.is_tutor:
+            raise Http404("Solo los tutores pueden ver su QR.")
+
+        # URL destino del QR
+        url_qr = request.build_absolute_uri(
+            reverse("tutoria_insitu", kwargs={"tutor_pk": user.pk}) ##reverse("tutoria_insitu", args=[tutor_pk])
+        )
+
+        # Generar QR
+        qr = qrcode.QRCode(box_size=20, border=4)
+        qr.add_data(url_qr)
+        qr.make(fit=True)
+        qr_img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+
+        qr_width, qr_height = qr_img.size
+
+        # —————— DISEÑO INSTITUCIONAL ——————
+
+        # Barra institucional
+        banner_height = 120
+        total_height = banner_height + qr_height + 50  # espacio extra abajo
+
+        final_img = Image.new("RGB", (qr_width, total_height), "white")
+        draw = ImageDraw.Draw(final_img)
+
+        # Barra superior
+        draw.rectangle([(0, 0), (qr_width, banner_height)], fill="#F08200")
+
+        # Cargar fuente Montserrat
+        font_path = os.path.join(
+            settings.BASE_DIR,
+            "Usuarios/static/fonts/Montserrat-Regular.ttf"
+        )
+
+        # ========================================
+        # Calcular ancho necesario para texto
+        # ========================================
+
+        # ========================================
+        # Texto en dos líneas
+        # ========================================
+
+        line1 = "Tutorías DCNI"
+        line2 = f"{user.first_name} {user.last_name}"
+
+        # Cargar fuente
+        try:
+            font = ImageFont.truetype(font_path, 52)
+        except:
+            font = ImageFont.load_default()
+
+        # Medir líneas
+        line1_w, line1_h = draw.textsize(line1, font=font)
+        line2_w, line2_h = draw.textsize(line2, font=font)
+
+        side_margin = 80
+
+        # Nuevo ancho: lo suficiente para el texto más largo
+        final_width = max(qr_width, line1_w + side_margin, line2_w + side_margin)
+
+        # Alturas
+        banner_height = line1_h + line2_h + 50
+        spacing_between_lines = 10  # espacio vertical entre línea 1 y línea 2
+
+        total_height = banner_height + qr_height + 50
+
+        # Crear imagen final
+        final_img = Image.new("RGB", (final_width, total_height), "white")
+        draw = ImageDraw.Draw(final_img)
+
+        # Barra superior
+        draw.rectangle([(0, 0), (final_width, banner_height)], fill="#F08200")
+
+        # Posiciones centradas
+        line1_x = (final_width - line1_w) // 2
+        line2_x = (final_width - line2_w) // 2
+
+        # Punto vertical de inicio
+        start_y = 20
+
+        # Dibujar texto centrado
+        draw.text((line1_x, start_y), line1, fill="white", font=font)
+        draw.text((line2_x, start_y + line1_h + spacing_between_lines), line2, fill="white", font=font)
+
+        # Centrar QR
+        qr_x = (final_width - qr_width) // 2
+        final_img.paste(qr_img, (qr_x, banner_height + 20))
+
+        # Exportar imagen como base64
+        buffer = BytesIO()
+        final_img.save(buffer, format="PNG")
+        buffer.seek(0)
+        img_base64 = base64.b64encode(buffer.getvalue()).decode()
+
+        return render(
+            request,
+            "Usuarios/ver_qr.html",
+            {
+                "qr_base64": f"data:image/png;base64,{img_base64}",
+                "url_qr": url_qr,
+                "header_footer": "Usuarios/navbar_tutor.html",
+            },
+        )
+
+
 # Test Views (Remove for production)
 def login_view_test(request):
     return render(request, 'Usuarios/login.html')

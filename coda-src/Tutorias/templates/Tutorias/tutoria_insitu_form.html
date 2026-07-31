@@ -1,0 +1,98 @@
+{% extends "Usuarios/base.html" %}
+{% load widget_tweaks %}
+{% load static %}
+
+{% block body %}
+
+<div class="container mt-5 d-flex justify-content-center">
+    <div class="card shadow p-4" style="max-width: 480px; width: 100%; border-radius: 12px;">
+
+        <h4 class="mb-3 text-center">Registrar Tutoría Presencial</h4>
+
+        <div class="mb-3 text-center">
+            <strong>Tutor:</strong> {{ tutor.nombre_completo }}
+        </div>
+
+        <form method="POST">
+            {% csrf_token %}
+
+            <!-- Tema(s): checkbox list -->
+            <div class="form-group mb-4 {% if form.tema.errors %}border border-danger rounded p-2{% endif %}">
+                <label class="mb-2 text-muted">Tema(s):</label>
+                <p class="text-muted small">Selecciona al menos un tema.</p>
+
+                <div class="row">
+                    {% for checkbox in form.tema %}
+                        <div class="col-6 mb-2">
+                            <div class="form-check">
+                                {{ checkbox.tag }}
+                                <label class="form-check-label" for="{{ checkbox.id_for_label }}">
+                                    {{ checkbox.choice_label }}
+                                </label>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                {% if form.tema.errors %}
+                    <div class="text-danger small mt-2">
+                        {{ form.tema.errors.as_text|linebreaksbr }}
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Campo "Otro" -->
+            <div id="otro-campo-container"
+                 class="form-group mb-4 {% if form.otro_tema.errors %}border border-danger rounded p-2{% endif %}"
+                 style="display: none;">
+                <label for="id_otro_tema" class="form-label">Especifica el tema:</label>
+                {% render_field form.otro_tema class="form-control" id="id_otro_tema" placeholder="Describe el tema..." %}
+
+                {% if form.otro_tema.errors %}
+                    <div class="text-danger small mt-2">
+                        {{ form.otro_tema.errors.as_text|linebreaksbr }}
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Descripción -->
+            <div class="mb-3">
+                <label class="form-label">Descripción</label>
+                {% render_field form.descripcion class="form-control" rows="3" %}
+            </div>
+
+            <button type="submit" class="btn btn-primary w-100 mt-2">
+                Registrar tutoría
+            </button>
+        </form>
+
+    </div>
+</div>
+
+<!-- Script: Mostrar/Ocultar el campo "Otro" -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+    const otroCampo = document.getElementById("otro-campo-container");
+    const otroInput = document.getElementById("id_otro_tema");
+
+    function verificarOtro() {
+        const otroMarcado = Array.from(checkboxes)
+            .some(cb => cb.value === "OTRO" && cb.checked);
+
+        otroCampo.style.display = otroMarcado ? "block" : "none";
+
+        if (otroMarcado) {
+            otroInput.setAttribute("required", "required");
+        } else {
+            otroInput.removeAttribute("required");
+            otroInput.value = "";
+        }
+    }
+
+    verificarOtro();
+    checkboxes.forEach(cb => cb.addEventListener("change", verificarOtro));
+});
+</script>
+
+{% endblock %}
