@@ -83,6 +83,9 @@
                             <div class="col-md-6 col-lg-6 d-flex align-items-center">
                                 <div class="card-body p-1 p-lg-5 my-5 text-black">
                                     <form method="post"> {% csrf_token %}
+                                        {% if request.GET.next %}
+                                            <input type="hidden" name="next" value="{{ request.GET.next }}">
+                                        {% endif %}
 
                                          <!-- Display Messages inside the Form -->
                                          {% if messages %}

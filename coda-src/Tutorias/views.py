@@ -28,6 +28,7 @@ from .forms import (
     FormReporte,
     FormCartasDeAsignacion,
     FormReporteDeTutorias,
+    FormTutoriasInSitu,
     ComunicacionMasivaForm,
     FormVerTutorias,
     FormReporteTutoriasMasivo,
@@ -1670,7 +1671,7 @@ class TutoriaInSituCreateView(LoginRequiredMixin, View):
             # Agregar mensaje de confirmación
             messages.success(request, "Tutoría In Situ registrada con éxito.")
 
-            return redirect("tutorias_alumno")
+            return redirect("Tutorias-alumno")
 
         return render(request, self.template_name, {
             "form": form,

@@ -81,10 +81,31 @@ class Usuario(AbstractUser):
     @property
     def is_tutor(self):
         """
-        Regresa verdadero si el usuario entre sus roles está el de TUTOR.
+        Regresa verdadero si el usuario tiene entre sus roles el de TUTOR.
         """        
         return TUTOR in self.rol
 
+    @property
+    def is_alumno(self):
+        """
+        Regresa verdadero si el usuario tiene entre sus roles el de ALUMNO.
+        """
+        return ALUMNO in self.rol
+
+    @property
+    def is_coda(self):
+        """
+        Regresa verdadero si el usuario tiene entre sus roles el de CODA.
+        """
+        return CODA in self.rol
+
+    @property
+    def is_coordinador(self):
+        """
+        Regresa verdadero si el usuario tiene entre sus roles el de COORDINADOR.
+        """
+        return COORDINADOR in self.rol
+    
 
     def __str__(self) -> str:
         return str(self.matricula)

@@ -44,7 +44,12 @@ from io import BytesIO
 from django.views import View
 from django.http import Http404
 from PIL import Image, ImageDraw, ImageFont
-# Para las tutorias in-situ
+
+
+# Esta es la vista que genera el código QR para los tutores, incluyendo 
+# el diseño institucional y la información del tutor.
+# El código QR sirve para solicitar tutorías in situ, y la 
+# URL codificada en el QR redirige a la vista de tutorías in situ.
 class VerQRView(BaseAccessMixin, View):
 
     def get(self, request):
@@ -66,7 +71,7 @@ class VerQRView(BaseAccessMixin, View):
 
         qr_width, qr_height = qr_img.size
 
-        # —————— DISEÑO INSTITUCIONAL ——————
+        #  DISEÑO INSTITUCIONAL 
 
         # Barra institucional
         banner_height = 120
@@ -274,6 +279,12 @@ class UsuarioLoginView(LoginView):
             login(self.request, user)
             self.request.session["role"] = selected_role
             self.request.session.modified = True  # Ensure session updates
+
+            # Revisa si una alumno escaneó el QR de su tutor y fue redirigido a login, 
+            # para redirigirlo a la URL para registrar la tutoría in situ después de iniciar sesión.
+            next_url = self.request.POST.get("next") or self.request.GET.get("next")
+            if next_url:
+                return redirect(next_url)
 
             # Redirect to the appropriate profile page
             return redirect(reverse_lazy(f"perfil-{selected_role}", kwargs={"pk": user.pk}))
