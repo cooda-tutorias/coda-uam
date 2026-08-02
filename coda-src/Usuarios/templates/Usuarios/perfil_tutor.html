@@ -2,9 +2,6 @@
 
 {% block title  %} Perfil Tutor {% endblock %}
 
-
-
-
 {% block perfil %}
 <div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
 <div class="row g-0">
@@ -24,40 +21,36 @@
   </div>
   <div class="col-md-8">
     <div class="card-body p-4 w-100">
+      {% if user_es_tutor %}
       <h5>Datos Personales</h5>
+      {% elif usuario.sexo == 'F' %}
+      <h5>Datos de la tutora</h5>
+      {% else %}
+      <h5>Datos del tutor</h5>
+      {% endif %}
       <hr class="mt-0 mb-4">
       <div class="row pt-1 w-100">
         <div class="col-6 mb-3 w-100">
           <h6>Correo institucional</h6>
           <p class="text-muted">{{ usuario.email }}</p>
         </div>
-        <div class="col-6 mb-3">
-          {% comment %} <h6>Correo personal</h6>
-          <p class="text-muted">{{ usuario.correo_personal }}</p> {% endcomment %}
+
+        <div class="mb-3">
+          <h6>Oficina</h6>
+          <p class="text-muted">{{ usuario.tutor.cubiculo }}</p>
         </div>
+
+        {% if user_es_tutor %}
         <div class="mb-3">
           <h6>Número económico</h6>
           <p class="text-muted">{{ usuario.tutor.matricula }}</p>
         </div>
+        {% endif %}
+
         <div class="mb-3">
-          <h6>Coordinación a la que pertenece el tutor</h6>
-          <p class="text-muted">{{ usuario.tutor.get_coordinacion_display }}</p>
+          <h6>Departamento</h6>
+          <p class="text-muted">{{ usuario.tutor.departamento_adscripcion }}</p>
         </div>
-      </div>
-      <hr class="mt-0 mb-4">
-      <div class="row pt-1">
-        <!-- <div class="col-6 mb-3">
-          <h6>Fecha de nacimiento</h6>
-          <p class="text-muted">30/09/2000</p>
-        </div> -->
-        <!-- <div class="col-6 mb-3">
-          <h6>Coordinación</h6>
-          <p class="text-muted">{{ tutor.coordinacion }}</p>
-        </div> -->
-        <!-- <div class="col-6 mb-3">
-          <h6>Trayectoria Academica</h6>
-          <p class="text-muted">Subir trayectoria</p>
-        </div> -->
       </div>
     </div>
   </div>
