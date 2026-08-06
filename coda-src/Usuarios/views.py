@@ -37,6 +37,86 @@ import pandas as pd
 from .models import Documento
 from .forms import DocumentoForm
 
+from .models import HorarioTutor
+from .forms import HorarioTutorForm
+from django.http import Http404
+from django.db import transaction
+
+class HorariosTutorView(BaseAccessMixin, View):
+    """Vista para manejar la creación y actualización de horarios de tutor."""
+
+    def get(self, request):
+        if not request.user.is_tutor:
+            raise Http404()
+
+        horarios = HorarioTutor.objects.filter(tutor=request.user)
+        form = HorarioTutorForm()
+
+        # Lista de hararios que se mostrarán
+        horas = [
+            f"{h:02d}:{m:02d}"
+            for h in range(8, 17)      # Desde las 08:00 hasta las 16:30
+            for m in (0, 30)           # Intervalos de 30 minutos
+        ]
+
+        return render(
+            request,
+            "Usuarios/horarios_tutor.html",
+            {
+                "form": form,
+                "horarios": horarios,
+                "horas": horas,
+                "dias_semana": HorarioTutor.DiaSemana.choices,
+                "header_footer": "Usuarios/navbar_tutor.html",
+            }
+        )
+
+    def post(self, request):
+        if not request.user.is_tutor:
+            raise Http404()
+
+        tutor = request.user
+
+        # Transacción atómica: si algo falla a la mitad, revierte el borrado
+        with transaction.atomic():
+
+            # 1. Eliminar todos los horarios anteriores
+            HorarioTutor.objects.filter(tutor=tutor).delete()
+
+            # 2. Reconstruirlos iterando sobre las claves de DiaSemana (0, 1, 2, 3, 4)
+            for dia_int, _ in HorarioTutor.DiaSemana.choices:
+                inicios = request.POST.getlist(f"inicio_{dia_int}[]")
+                fines = request.POST.getlist(f"fin_{dia_int}[]")
+
+                for inicio, fin in zip(inicios, fines):
+                    if inicio and fin:
+                        HorarioTutor.objects.create(
+                            tutor=tutor,
+                            dia_semana=dia_int,
+                            hora_inicio=inicio,
+                            hora_fin=fin,
+                        )
+
+        messages.success(request, "Tus horarios fueron actualizados con éxito.")
+
+        return redirect("tutor_horarios")
+
+
+class EliminarHorarioTutorView(BaseAccessMixin, View):
+    def post(self, request, pk):
+        horario = get_object_or_404(HorarioTutor, pk=pk, tutor=request.user)
+        horario.delete()
+        return redirect("tutor_horarios")
+
+
+class ListaHorariosTutorView(BaseAccessMixin, ListView):
+    model = HorarioTutor
+    template_name = "Usuarios/tutor_horarios.html"
+
+    def get_queryset(self):
+        return HorarioTutor.objects.filter(tutor=self.request.user)
+
+    
 # Test Views (Remove for production)
 def login_view_test(request):
     return render(request, 'Usuarios/login.html')

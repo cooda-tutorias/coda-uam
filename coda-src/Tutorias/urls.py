@@ -42,7 +42,12 @@ urlpatterns = [
 
     # Editar estado histórico del alumno
     path('tutoria/<int:pk>/editar-estado-historico/', views.EditarEstadoAlumnoHistoricoView.as_view(), name='editar-estado-historico'),
-    
+
+    # API URLS que se usan en el front-end para agendar tutorias cuando el alumno selecciona un slot de horario libre del tutor.
+    path("api/slots/", views.api_slots_tutor, name="api_slots_tutor"),
+    path('api/fechas-slot/<int:slot_id>/', views.api_fechas_slot, name='api_fechas_slot'),
+    path("api/slots-tutor/<int:tutor_id>/", views.api_slots_tutor, name="api_slots_tutor"),
+
     # URLS CODA 
     path('tutores-coda/', views.VerTutoresListView.as_view(), name='Tutores-Coda'),
     path('alumnos-coda/', views.VerAlumnosListView.as_view(), name='Alumnos-Coda'),

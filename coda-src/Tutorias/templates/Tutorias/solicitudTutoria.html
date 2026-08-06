@@ -1,73 +1,324 @@
 {% extends "Usuarios/HeaderAndFooterFachada.html"%}
+{% load widget_tweaks%}
+
 
 {% block title  %} Solicitar Tutoria {% endblock %}
 
 {% block body %}
-
-    <!--Formulario Solicitud tutoria-->
-    <section id="section" style="background-color: #eee;">
-        <div class="container py-5 h-100">
-            <div class="row d-flex justify-content-center align-items-center h-100">
-                <div class="col-lg-8 col-xl-6">
-                    <div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
-                    
-                    {% load widget_tweaks%}
+<!--Formulario Solicitud tutoria-->
+<section id="section" style="background-color: #eee;">
+    <div class="container py-5 h-100">
+        <div class="row d-flex justify-content-center align-items-center h-100">
+            <div class="col-lg-8 col-xl-6">
+                <div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
                     <form method="post">{% csrf_token %}
                         <div class="card-body py-4 px-4 text-body">
-                            <h3 class=" mb-4 text-primary text-title-bold">Solicitud de Tutoría</h3>
 
-                            <!-- Tema de la tutoria input -->
-                            <div class="form-group mb-4">
-                                <label class="mb-2 text-body-bold text-muted">Tema(s) de la tutoría.</label>
-                                <p class="text-muted">Selecciona al menos un tema para tratar en la tutoría</p>
+                            <!-- Mensaje contextual según rol -->
+                            {% include 'Tutorias/includes/alerta.html' %}
+
+                            <h3 class="mb-4 text-primary text-title-bold">
+                                {{ titulo_formulario|default:"Solicitud de tutoría" }}
+                            </h3>
+
+                            <!-- Bloque general de errores del formulario -->
+                            {% if request.method == "POST" and form.non_field_errors %}
+                            <div class="alert alert-danger mb-4">
+                                {{ form.non_field_errors }}
+                            </div>
+                            {% endif %}
+
+                            <!-- Tema(s) de la tutoría  -->
+                            <div
+                                class="form-group mb-4 {% if form.tema.errors %}border border-danger rounded p-2{% endif %}">
+                                <label class="mb-2 text-body-bold text-muted">Tema(s):</label>
+                                <p class="text-muted">Selecciona al menos un tema para tratar.</p>
                                 <div class="row">
                                     {% for checkbox in form.tema %}
                                     <div class="col-6 mb-2">
-                                    <label class="form-check-label">
-                                        {{ checkbox.tag }} {{ checkbox.choice_label }}
-                                    </label>
+                                        <label class="form-check-label">
+                                            {{ checkbox.tag }} {{ checkbox.choice_label }}
+                                        </label>
                                     </div>
                                     {% endfor %}
                                 </div>
 
-                                 <!-- Campo "Otro (especificar)" -->
-                                <div id="otro-campo-container" class="mt-3" style="display: none;">
-                                    <label for="otro" class="form-label">Especifica el tema:</label>
-                                    <input type="text" class="form-control" name="otro_tema" id="otro" placeholder="Describe el tema...">
+                                <!-- Error de selección de tema -->
+                                {% if request.method == "POST" and form.tema.errors %}
+                                <div class="text-danger small mt-2">
+                                    {{ form.tema.errors.as_text|linebreaksbr }}
                                 </div>
-
+                                {% endif %}
                             </div>
 
-                            <!-- Hora y Dia imput-->
-                            <div class="row mb-4">
-                                <!-- Dia de tutoria  imput-->
-                                <div class="col">
-                                    <div class="form-outline">
-                                        <!-- <input type="text" class="form-control" /> -->
-                                        {% render_field form.fecha class="form-select" id="fecha"%}
-                                        <label class="form-label" for="fecha">Fecha y Hora</label>
-                                    </div>
+                            <!-- Campo “Otro (especificar)” -->
+                            <div id="otro-campo-container"
+                                class="form-group mb-4 {% if form.otro_tema.errors %}border border-danger rounded p-2{% endif %}"
+                                style="display: none;">
+                                <label for="id_otro_tema" class="form-label">Especifica el tema:</label>
+                                {% render_field form.otro_tema class="form-control" id="id_otro_tema"
+                                placeholder="Describe el tema..." %}
+                                {% if request.method == "POST" and form.otro_tema.errors %}
+                                <div class="text-danger small mt-2">
+                                    {{ form.otro_tema.errors.as_text|linebreaksbr }}
                                 </div>
+                                {% endif %}
                             </div>
 
-                            <!-- Mensaje input -->
-                            <div class="form-group mb-4">
-                                <!-- <textarea class="form-control" rows="4"></textarea> -->
-                                {% render_field form.descripcion class="form-control" id="descripcion" rows="3"%}
-                                <label class="form-label" for="descripcion">Informacion sobre la Tutoria</label>
+                            <!-- Descripción -->
+                            <div
+                                class="form-group mb-4 {% if form.descripcion.errors %}border border-danger rounded p-2{% endif %}">
+                                {% render_field form.descripcion class="form-control" id="descripcion" rows="3" %}
+                                <label class="form-label" for="descripcion">{{ info_adicional|default:"Información adicional." }}</label>
+                                {% if form.descripcion.errors %}
+                                <div class="text-danger small mt-2">
+                                    {{ form.descripcion.errors.as_text|linebreaksbr }}
+                                </div>
+                                {% endif %}
                             </div>
 
-                            <!-- Submit button -->
-                            <button type="submit" value="Save" class="btn btn-primary btn-block mb-4 text-title">Solicitar Tutoria</button>
+
+                            <!-- Campos ocultos para guardar selección -->
+                            <input type="hidden" id="id_horario_tutor" name="horario_tutor">
+                            <input type="hidden" id="id_fecha_seleccionada" name="fecha_seleccionada">
+                            <input type="hidden" id="id_fecha_sugerida" name="fecha_sugerida">
+
+                            <!-- Botón que abre el modal -->
+                            {% comment %} <button type="button" id="btnAbrirModalCita" class="btn btn-outline-primary">
+                                Elegir fecha cita...
+                            </button> {% endcomment %}
+
+                            <!-- Botón que abre el modal -->
+                            <button type="button" id="btnAbrirModalCita" class="btn btn-outline-primary"
+                                data-bs-toggle="modal" data-bs-target="#modalAgendarCita">
+                                Elegir fecha cita...
+                            </button>
+
+                            <!-- AQUÍ INSERTA EL RESUMEN -->
+                            <div class="alert alert-info mt-3" id="resumenCita">
+                                No has seleccionado fecha aún.
+                            </div>
+
+                            <!-- Botón de envío -->
+                            <button type="submit" class="btn btn-primary btn-block mb-4 text-title">
+                                {{ texto_boton|default:"Enviar" }}
+                            </button>
                         </div>
                     </form>
-                    </div>
                 </div>
             </div>
         </div>
-    </section>
+    </div>
+</section>
 
-    <script>
+<!-- AQUÍ ES DONDE DEBE IR EL MODAL, JUSTO ANTES DE TERMINAR EL body -->
+{% include "Tutorias/_modal_agendar_cita.html" %}
+
+<!-- Script: mostrar/ocultar campo "Otro" -->
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+    const otroCampo = document.getElementById("otro-campo-container");
+    const otroInput = document.getElementById("id_otro_tema");
+
+    function verificarOtro() {
+      const otroMarcado = Array.from(checkboxes).some(cb => cb.value === "OTRO" && cb.checked);
+      otroCampo.style.display = otroMarcado ? "block" : "none";
+      if (otroMarcado) {
+        otroInput.setAttribute("required", "required");
+      } else {
+        otroInput.removeAttribute("required");
+        otroInput.value = "";
+      }
+    }
+
+    verificarOtro();
+    checkboxes.forEach(cb => cb.addEventListener("change", verificarOtro));
+  });
+</script>
+
+<!-- Script: manejar modal para seleccionar cita de horario disponible o sugerir fecha  -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const btnAbrirModal = document.getElementById("btnAbrirModalCita");
+    const selectSlot = document.getElementById("selectSlot");
+    const selectFecha = document.getElementById("selectFecha");
+    const campoSlotHidden = document.getElementById("id_horario_tutor");
+    const campoFechaHidden = document.getElementById("id_fecha_sugerida");
+    const resumenDiv = document.getElementById("resumenCita");
+
+    let modalCita = null; // no instanciamos aún
+
+    async function cargarYMostrarModal() {
+        // localizar elemento del modal
+        const modalEl = document.getElementById("modalAgendarCita");
+
+        if (!modalEl) {
+            console.error("No existe el elemento #modalAgendarCita en el DOM.");
+            return;
+        }
+
+        // Instanciación nativa de Bootstrap 5.3+
+        modalCita = bootstrap.Modal.getOrCreateInstance(modalEl, {
+            backdrop: 'static',
+            keyboard: false,
+            focus: true
+        });
+
+        // LIMPIAR selects (por si quedaron valores)
+        if (selectSlot) selectSlot.innerHTML = "";
+        if (selectFecha) selectFecha.innerHTML = "";
+
+        // Agregar opción inicial vacía
+        const opcionDefault = document.createElement("option");
+        opcionDefault.value = "";
+        opcionDefault.textContent = "— Selecciona un horario —";
+        if (selectSlot) selectSlot.appendChild(opcionDefault);
+
+
+        // Traer slots desde backend
+        try {
+            const tutorId = {{tutor.id}};
+            const resp = await fetch(`/api/slots-tutor/${tutorId}/`);
+            if (!resp.ok) throw new Error("fetch slots failed: " + resp.status);
+            const data = await resp.json();
+
+            // Asegurar bloques visibles segun respuesta
+            if (data.slots && data.slots.length > 0) {
+                document.getElementById("bloqueSlots").style.display = "block";
+                document.getElementById("bloqueSugerencia").style.display = "none";
+
+                data.slots.forEach(slot => {
+                    const option = document.createElement("option");
+                    option.value = slot.id;
+                    option.textContent = `${slot.dia_semana} ${slot.hora_inicio.substring(0,5)} - ${slot.hora_fin.substring(0,5)}`;
+                    if (selectSlot) selectSlot.appendChild(option);
+                });
+            } else {
+                document.getElementById("bloqueSlots").style.display = "none";
+                document.getElementById("bloqueSugerencia").style.display = "block";
+            }
+
+            // finalmente mostrar modal
+            modalCita.show();
+        } catch (err) {
+            console.error("Error cargando slots fecha:", err);
+            alert("No se pudieron cargar los horarios. Revisa la consola.");
+        }
+    }
+
+    // Reemplaza tu antiguo addEventListener por éste:
+    if (btnAbrirModal) {
+        btnAbrirModal.addEventListener("click", function (e) {
+            e.preventDefault();
+            cargarYMostrarModal();
+        });
+    } else {
+        console.warn("btnAbrirModalCita no existe en el DOM.");
+    }
+
+    // --- También protege el "change" y "aceptar" handlers ---
+    // (registra solo si existen los elementos; en tu plantilla deberían existir)
+    if (selectSlot) {
+        selectSlot.addEventListener("change", function () {
+            const slotId = this.value;
+            if (!slotId) {
+                selectFecha.innerHTML = "";
+                return;
+            }
+
+            fetch(`/api/fechas-slot/${slotId}/`)
+                .then(r => r.json())
+                .then(data => {
+                    selectFecha.innerHTML = "";
+                    data.fechas.forEach(f => {
+                        const option = document.createElement("option");
+                        option.value = f.fecha_iso || f.fecha;
+                        option.textContent = f.fecha_legible;
+                        selectFecha.appendChild(option);
+                    });
+                })
+                .catch(err => {
+                    console.error("Error cargando fechas del slot:", err);
+                });
+        });
+    }
+
+    // botón aceptar (dentro del modal)
+    const btnAceptar = document.getElementById("btnAceptarCita");
+    if (btnAceptar) {
+
+        console.log("btnAceptarCita encontrado, registrando listener...");
+
+        // ---- Formatear fecha a español: "24 de noviembre a las 23:42" ----
+        function formatearFechaEspanol(fechaIso) {
+            const fecha = new Date(fechaIso);
+
+            const opcionesFecha = { day: "numeric", month: "long" };
+            const fechaTexto = fecha.toLocaleDateString("es-ES", opcionesFecha);
+
+            const horas = fecha.getHours().toString().padStart(2, "0");
+            const minutos = fecha.getMinutes().toString().padStart(2, "0");
+
+            return `${fechaTexto} a las ${horas}:${minutos}`;
+        }
+
+
+        btnAceptar.addEventListener("click", function () {
+
+            console.log("btnAceptarCita clicked");
+
+            // Si bloqueSlots visible → slot + fecha seleccionada
+            if (document.getElementById("bloqueSlots").style.display === "block") {
+                const slotId = selectSlot?.value;
+                const fechaVal = selectFecha?.value;
+                const texto = selectFecha?.options[selectFecha.selectedIndex]?.text || fechaVal;
+
+                if (!slotId || !fechaVal) {
+                    alert("Debes seleccionar el día y la fecha.");
+                    return;
+                }
+
+                campoSlotHidden.value = slotId;
+                document.getElementById("id_fecha_seleccionada").value = fechaVal;
+                document.getElementById("id_fecha_sugerida").value = "";
+                campoFechaHidden.value = fechaVal;
+                resumenDiv.innerHTML = `<div class="alert alert-success">Cita agendada para: <strong>${texto}</strong>. </div>`;
+            } else {
+                // sugerencia
+                const fechaSug = document.getElementById("inputSugerencia")?.value;
+                if (!fechaSug) {
+                    alert("Debes elegir una fecha para sugerir.");
+                    return;
+                }
+
+                const fechaBonita = formatearFechaEspanol(fechaSug);
+
+                campoSlotHidden.value = "";
+                campoFechaHidden.value = fechaSug;
+                document.getElementById("id_fecha_seleccionada").value = "";
+                document.getElementById("id_fecha_sugerida").value = fechaSug;
+
+                resumenDiv.innerHTML = `<div class="alert alert-warning">Has sugerido la fecha: <strong>${fechaBonita}</strong>. Tu tutor deberá confirmar la cita.</div>`;
+            }
+
+            console.log("Cita seleccionada:", campoSlotHidden.value, campoFechaHidden.value);
+
+            if (modalCita) modalCita.hide();
+        });
+    }
+
+});
+</script>
+
+
+
+{% endblock %}
+
+
+{% comment %} 
+<!-- Cambié mucho la funcionalidad por eso reemplacé todo el código de abajo. -->    
+<script>
         document.addEventListener("DOMContentLoaded", function () {
             const checkboxes = document.querySelectorAll('input[type="checkbox"]');
             const otroCampo = document.getElementById("otro-campo-container");
@@ -109,6 +360,5 @@
             });
         });
 </script>
-
-
-{% endblock %}
+{% endblock %} 
+{% endcomment %}

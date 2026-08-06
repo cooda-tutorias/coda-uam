@@ -8,10 +8,12 @@
         <title> {% block title  %}  {% endblock %} </title>
         {% load static %}
         <link rel="icon" href="{% static 'Alumnos/img/icon.jpg' %}" sizes="32x32" type="image/png">
+ 
         <!-- Bootstrap CDN Bundle with Popper-->
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/js/bootstrap.bundle.min.js"
-        integrity="sha384-p34f1UUtsS3wqzfto5wAAmdvj+osOnFyQFpp4Ua3gs/ZVWx6oOypYoCJhGGScy+8"
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
         crossorigin="anonymous"></script>
+
         <!--Link CSS-->
         <link rel="stylesheet" href="{% static 'Alumnos/css/main.css' %}">
         <!-- Icons -->
@@ -112,9 +114,15 @@
                         <li>
                             <a href="{% url 'perfil' %}"  class="dropdown-item text-title h8" >Mi perfil</a>
                         </li>
-                        {% comment %} <li>
-                            <a class="dropdown-item" href="#">Configuraciones</a>
-                        </li> {% endcomment %}
+
+                        {% if user.is_tutor %}
+                        <li>
+                            <a class="dropdown-item" href="{% url 'tutor_horarios' %}">
+                                Mis horarios de tutoría
+                            </a>
+                        </li>
+                        {% endif %}
+
                         <li>
                             <a class="dropdown-item text-title h8" href="{% url 'logout' %}">Cerrar Sesión</a>
                         </li>
@@ -126,6 +134,18 @@
         <!-- Container wrapper -->
     </nav>
     <!-- Navbar -->
+
+    <!-- Mensajes de Django -->
+    {% if messages %}
+      <div class="container mt-3">
+        {% for message in messages %}
+          <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
 
 <!--  Inicia el body -->
 <!-- <div class="container py-5"> -->
