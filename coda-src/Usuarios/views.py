@@ -138,12 +138,30 @@ class PerfilAlumnoView(BaseAccessMixin, DetailView):
 
 
 class PerfilTutorView(BaseAccessMixin, DetailView):
+    """Muestra el perfil público o detallado de un tutor.
+
+    Permite a los alumnos y coordinadores visualizar los datos del tutor.
+    Agrega al contexto el flag `user_es_tutor` para mostrar u ocultar campos
+    sensibles (como el número económico) en la plantilla.
+    """
+    
     model = Usuario
     template_name = 'Usuarios/perfil_tutor.html'
 
     def get_queryset(self) -> QuerySet[Any]:
         return Usuario.objects.filter(rol__contains=["TUT"])  # Filter for Tutors
 
+    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+
+        # 1. Verificar si el usuario que está VISUALIZANDO la página (request.user)
+        #    tiene el rol de Tutor.
+        user_es_tutor = self.request.user.has_role("TUT")
+
+        # 2. Pasar el resultado booleano al contexto
+        context['user_es_tutor'] = user_es_tutor
+
+        return context
 
 class PerfilCodaView(BaseAccessMixin, DetailView):
     model = Usuario
@@ -160,6 +178,38 @@ class PerfilCordinadorView(BaseAccessMixin, DetailView):
     def get_queryset(self) -> QuerySet[Any]:
         return Usuario.objects.filter(rol__contains=["COR"])  # Filter for Coordinadores
 
+
+# Antonio LJ
+@login_required
+def redirect_perfil_tutor(request):
+    """
+    Obtiene el tutor del alumno autenticado y lo redirige a la vista PerfilTutorView.
+    """
+    try:
+        # 1. Obtener la instancia de Alumno asociada al usuario actual
+        # Asumimos que Alumno hereda de Usuario o tiene un campo relacionado con request.user
+        alumno = Alumno.objects.get(pk=request.user.pk)
+
+        # 2. Obtener la instancia del Tutor asignado
+        # Asumimos que el modelo Alumno tiene un campo llamado 'tutor_asignado'
+        tutor_pk = alumno.tutor_asignado.pk # Asumiendo que Tutor está relacionado con User
+
+        # Si el tutor está relacionado directamente con el modelo Tutor y este a su vez
+        # con el modelo Usuario, se debe obtener la PK del Usuario del Tutor
+        # Si el Tutor hereda de Usuario, simplemente usamos:
+        # tutor_pk = alumno.tutor_asignado.pk
+
+        tutor_pk = alumno.tutor_asignado.pk # Asumiendo que Tutor hereda de Usuario
+
+    except Alumno.DoesNotExist:
+        messages.error(request, "El usuario actual no es un alumno o no está registrado como tal.")
+        return redirect('perfil-alumno') # Redireccionar a una página segura
+    except AttributeError: # Si 'tutor_asignado' es None
+        messages.warning(request, "Aún no tienes un tutor asignado.")
+        return redirect('perfil-alumno') # Redireccionar a una página segura
+
+    # 3. Redirigir a la vista del perfil del tutor, usando su PK
+    return redirect('perfil-tutor', pk=tutor_pk)
 
 ### Role-Based Profile Redirection
 @login_required

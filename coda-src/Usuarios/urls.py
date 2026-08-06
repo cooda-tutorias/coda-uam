@@ -11,6 +11,7 @@ urlpatterns = [
     path('logout/', auth_views.logout_then_login, name='logout'),
     #path('perfil-test/', views.perfil_view_test, name='perfil-test'),
     path('perfil-alumno/<int:pk>/', views.PerfilAlumnoView.as_view(), name='perfil-alumno'),
+    path('mi-tutor/', views.redirect_perfil_tutor, name='perfil-tutor-alumno'),
     path('perfil-tutor/<int:pk>/', views.PerfilTutorView.as_view(), name='perfil-tutor'),
     path('perfil-coordinador/<int:pk>/', views.PerfilCordinadorView.as_view(), name='perfil-coordinador'),
     path('perfil-coda/<int:pk>/', views.PerfilCodaView.as_view(), name='perfil-coda'),

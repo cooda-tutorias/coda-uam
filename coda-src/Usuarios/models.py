@@ -5,7 +5,7 @@ from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.contrib.postgres.fields import ArrayField
 from .constants import ROLES, CARRERAS
 from Tutorias.constants import TEMAS, OTRO
-from .constants import CODA, TUTOR, COORDINADOR, ALUMNO, SEXOS, ESTADOS_ALUMNO
+from .constants import CODA, TUTOR, COORDINADOR, ALUMNO, SEXOS, ESTADOS_ALUMNO, COORDINACION_A_DEPARTAMENTO
 
 class UserManager(BaseUserManager):
     """Define a model manager for User model with no username field."""
@@ -133,6 +133,11 @@ class Tutor(Usuario):
             self.rol.append(TUTOR)
         super().save(*args, **kwargs)
 
+    @property
+    def departamento_adscripcion(self) -> str:
+        """Devuelve el nombre del departamento según la clave de coordinación."""
+        return COORDINACION_A_DEPARTAMENTO.get(self.coordinacion, "Sin Departamento")
+    
 class Coda(Usuario):
     cubiculo = models.CharField("Oficina", max_length=10, blank=True, null=True)
     horario = models.FileField(null=True, blank=True)

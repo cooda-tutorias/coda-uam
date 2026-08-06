@@ -25,6 +25,19 @@ CARRERAS = [
         (BMOLECULAR, "Biología Molecular")
     ]
 
+# Departamentos de la DCNI
+DMAS = "Matemáticas Aplicadas y Sistemas"
+DCNI = "Ciencias Naturales"
+DCPT = "Procesos y Tecnologías"
+
+# MAPEO: COORDINACIÓN -> DEPARTAMENTO 
+COORDINACION_A_DEPARTAMENTO = {
+    MATEMATICAS: DMAS,
+    COMPUTACION: DMAS,
+    BMOLECULAR: DCNI,
+    IBIOLOGICA: DCPT,
+}
+
 TEMPLATES = {
     # ALUMNO: 'Usuarios/HeaderFooterAlumno.html',
     # TUTOR: 'Usuarios/HeaderFooterTutor.html',
