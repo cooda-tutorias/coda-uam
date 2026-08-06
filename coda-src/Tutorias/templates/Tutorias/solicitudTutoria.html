@@ -11,7 +11,6 @@
         <div class="row d-flex justify-content-center align-items-center h-100">
             <div class="col-lg-8 col-xl-6">
                 <div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
-
                     <form method="post">{% csrf_token %}
                         <div class="card-body py-4 px-4 text-body">
 
@@ -70,8 +69,7 @@
                             <div
                                 class="form-group mb-4 {% if form.descripcion.errors %}border border-danger rounded p-2{% endif %}">
                                 {% render_field form.descripcion class="form-control" id="descripcion" rows="3" %}
-                                <label class="form-label" for="descripcion">{{ info_adicional|default:"Información
-                                    adicional." }}</label>
+                                <label class="form-label" for="descripcion">{{ info_adicional|default:"Información adicional." }}</label>
                                 {% if form.descripcion.errors %}
                                 <div class="text-danger small mt-2">
                                     {{ form.descripcion.errors.as_text|linebreaksbr }}
