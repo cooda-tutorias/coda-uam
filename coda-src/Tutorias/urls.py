@@ -57,6 +57,11 @@ urlpatterns = [
     path('generar-txt/<int:pk>', views.generar_archivo_txt, name='generar_txt'),
     #path('debug-tutorias/', views.DebugTutoriasView.as_view(), name='debug-tutorias'),
     path('qr-code/', views.QRCodeView.as_view(), name='qr-code'),
+
+    # Esto lo agregó Antonio LJ para las tutoría in-situ con QR
+    path("tutorias/in-situ/<int:tutor_pk>/", views.TutoriaInSituCreateView.as_view(), name="tutoria_insitu"),
+
+
     # Desactivamos la tutoria por tutor mientras se arregla la coordinacion de horarios
     #path('creartutoria/<int:pk_alumno>/', views.CrearTutoriaPorAlumnoView.as_view(),name='crear-tutoria-por-alumno'),
 ]
