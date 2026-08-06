@@ -35,6 +35,9 @@ urlpatterns = [
     path('ajustes/', views.ajustes.as_view(), name='ajustes'),
     path('cargar_plantilla/', views.CargarPlantilla.as_view(), name='cargar_plantilla'),
     path('eliminar-documento/<int:pk>/', views.eliminar_documento, name='eliminar_documento'),
-    path('ver_plantilla/<int:documento_id>/', views.VerPlantilla.as_view(), name='ver_plantilla')
-    # ... (other existing URL patterns)
+    path('ver_plantilla/<int:documento_id>/', views.VerPlantilla.as_view(), name='ver_plantilla'),
+
+    # Agregado por Antonio LJ los horarios de atención de un tutor.
+    path("mis-horarios/", views.HorariosTutorView.as_view(), name="tutor_horarios"),
+    path("mis-horarios/eliminar/<int:pk>/", views.EliminarHorarioTutorView.as_view(), name="tutor_horario_eliminar"),
 ]

@@ -1,3 +1,7 @@
+from django import forms
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_GET
+
 import qrcode
 from collections import Counter
 from typing import Any, Dict
@@ -35,7 +39,7 @@ from .signals import tutoria_notification_requested
 from .constants import PENDIENTE, ACEPTADO, RECHAZADO, DURACION_ASESORIA, CANCELADO, ESTADO # de nuevo, no estoy seguro
 from Usuarios.constants import TUTOR, ALUMNO, COORDINADOR, TEMPLATES, ESTADOS_ALUMNO
 from Usuarios.views import BaseAccessMixin, CodaViewMixin, TutorViewMixin, AlumnoViewMixin, CordinadorViewMixin
-from Usuarios.models import Tutor, Alumno, Cordinador, Coda
+from Usuarios.models import Tutor, Alumno, Cordinador, Coda, HorarioTutor
 from Usuarios.models import Documento
 from django.http import FileResponse
 from django.utils import timezone
@@ -53,6 +57,10 @@ from .services.docx_reportes import generar_docx_reporte_tutorias_brindadas
 
 from django.views.generic import TemplateView, FormView
 from django.conf import settings
+from django.http import (
+    FileResponse, Http404, HttpRequest, HttpResponse, HttpResponseForbidden,
+    JsonResponse,
+)
 
 #Funcion para descargar pdf
 def carta_tutorados_pdf(request):
@@ -499,26 +507,211 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
     
     
 # Solicitud Tutorias
+# API para devolver los slots de un tutor
+@login_required
+@require_GET
+def api_slots_tutor(request, tutor_id):
+    slots = HorarioTutor.objects.filter(tutor_id=tutor_id, activo=True)
+    print(slots)  # en consola del servidor
+
+    data = {
+        "slots": [
+            {
+                "id": slot.id,
+                "dia_semana": slot.get_dia_semana_display(),
+                "hora_inicio": slot.hora_inicio.strftime("%H:%M:%S"),
+                "hora_fin": slot.hora_fin.strftime("%H:%M:%S"),
+                "nombre": f"{slot.get_dia_semana_display()} {slot.hora_inicio.strftime('%H:%M')}–{slot.hora_fin.strftime('%H:%M')}"
+            }
+            for slot in slots
+        ]
+    }
+    return JsonResponse(data)
+
+
+
+# API para devolver las fechas futuras disponibles de un slot
+@login_required
+@require_GET
+def api_fechas_slot(request, slot_id):
+    try:
+        slot = HorarioTutor.objects.get(id=slot_id, activo=True)
+    except HorarioTutor.DoesNotExist:
+        return JsonResponse({"fechas": []})
+
+    hoy = timezone.localdate()
+    fechas = []
+
+    dias_semana = [
+        "Lunes", "Martes", "Miércoles", "Jueves", "Viernes",
+        "Sábado", "Domingo"
+    ]
+    meses = [
+        "enero", "febrero", "marzo", "abril", "mayo", "junio",
+        "julio", "agosto", "septiembre", "octubre", "noviembre",
+        "diciembre"
+    ]
+
+    for i in range(28):
+        dia = hoy + timedelta(days=i)
+
+        if dia.weekday() == slot.dia_semana:
+            fecha_legible = f"{dias_semana[dia.weekday()]}, {dia.day} de {meses[dia.month - 1]}"
+
+            fechas.append({
+                "fecha_iso": dia.isoformat(),
+                "fecha_legible": fecha_legible
+            })
+
+    return JsonResponse({"fechas": fechas})
+
+    
+# Vista para que el ALUMNO solicite tutorias, ya sea:
+# a) eligiendo uno de los horarios predefinidos por su tutor, o si no ha definido,
+# a) sugiriendo una fecha a su tutor para la cita que debe ser aceptado o rechazado.
+
+# El método form_valid se encarga de notificar al tutor por estos medios:
+# a) notificación del sistema web.
+# b) correo con la información de la cita.
+# c) notificación web push si la tiene habilitada en su navegador.
+
 class TutoriaCreateView(AlumnoViewMixin, CreateView):
-
+    model = Tutoria
     form_class = FormTutorias
-
     template_name = 'Tutorias/solicitudTutoria.html'
-
     success_url = reverse_lazy('Tutorias-alumno')
 
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+
+        context = super().get_context_data(**kwargs)
+
+        alumno = getattr(self.request.user, "alumno", None)
+        tutor = getattr(alumno, "tutor_asignado", None)
+
+        context["tutor"] = tutor
+
+        # Defaults (por si no hay rol)
+        titulo = "Solicitar tutoría"
+        texto_boton = "Solicitar tutoría"
+        info_adicional = "Información adicional sobre la tutoría."
+        alerta_texto = "Estás solicitando una tutoría con tu tutor asignado."
+        alerta_tipo = "info"
+
+        # Colocar todas las variantes de clave que usamos en plantillas anteriores
+        context["titulo_formulario"] = titulo
+        context["titulo_form"] = titulo              # compatibilidad
+        context["texto_boton"] = texto_boton
+        context["boton_texto"] = texto_boton         # compatibilidad
+        context["info_adicional"] = info_adicional
+        context["alerta_texto"] = alerta_texto
+        context["alerta_tipo"] = alerta_tipo
+
+        # Si ya se eligió fecha mediante el modal
+        fecha_cita = self.request.session.get("fecha_cita", None)
+        context["fecha_cita"] = fecha_cita
+
+        return context
+
+    
     def form_valid(self, form: FormTutorias) -> HttpResponse:
         alumno = get_object_or_404(Alumno, pk=self.request.user)
+        tutor = alumno.tutor_asignado
+
+        # ====================================================
+        # 1) Validar que el alumno tenga un tutor asignado y asignar los objetos a la tutoría
+        # ====================================================
+        if not tutor:
+            form.add_error(None, "No tienes un tutor asignado.")
+            return self.form_invalid(form)
+
         form.instance.alumno = alumno
-        form.instance.tutor = alumno.tutor_asignado
+        form.instance.tutor = tutor
 
         # Snapshot del estado del alumno al momento de crear la tutoría
         if not form.instance.estado_alumno_historico:
             form.instance.estado_alumno_historico = alumno.estado
 
-        # rol = self.request.user.has_role("ALU")
-        if self.request.user.has_role("ALU"):
-            recipient = Tutor.objects.get(pk=alumno.tutor_asignado)
+
+        # ====================================================
+        # 2) Leer valores ocultos enviados por el modal
+        # ====================================================
+        request = self.request
+        horario_id = request.POST.get("horario_tutor")
+        fecha_slot = request.POST.get("fecha_seleccionada")  # fecha ISO YYYY-MM-DD
+        fecha_final = request.POST.get("fecha_sugerida")
+
+        if not horario_id and not fecha_final:
+            form.add_error(None, "Debes elegir un horario o sugerir una fecha.")
+            return self.form_invalid(form)
+
+        # ====================================================
+        # 3) Guardar temas correctamente (el modelo requiere lista)
+        # ====================================================
+        form.instance.tema = form.cleaned_data["tema"]  # es lista, y es válido para ArrayField
+
+
+        # ====================================================
+        # 4) Asignación de fecha
+        # ====================================================
+
+        # Caso donde el alumno elige un horario de los disponibles del tutor (Agenda cita).
+        if horario_id:
+            alumno_sugirio = False
+
+            slot = HorarioTutor.objects.filter(pk=horario_id, tutor=tutor).first()
+            if not slot:
+                form.add_error(None, "El horario seleccionado ya no está disponible.")
+                return self.form_invalid(form)
+
+            if not fecha_slot:
+                form.add_error(None, "Debes elegir una fecha para el horario.")
+                return self.form_invalid(form)
+
+            # Cuando se elige un horario del tutor:
+            #   fecha_slot solo tiene fecha sin horario y
+            #   slo.hora_inicio tiene la hora
+            try:
+                fecha_dt = datetime.fromisoformat(fecha_slot)
+            except(ValueError, TypeError):
+                form.add_error(None, "La fecha recibida no tiene un formato válido.")
+                return self.form_invalid(form)
+
+            # Combinar fecha del día + hora_inicio del slot porque así es el
+            # tipo de fecha en el modelo Tutoria.
+            fecha_final_dt = datetime.combine(fecha_dt, slot.hora_inicio)
+
+            form.instance.fecha = fecha_final_dt
+
+            # Como eligió un horarios disponible del tutor, se considera ya ACEPTADA la cita.
+            form.instance.estado = "ACE"
+            messages.success(request, "Tu solicitud ha sido agendada con éxito. No faltes a la cita en el día y horario que elegiste 📅.")
+        else:
+            # Caso donde el tutor no tenía horarios registrados y
+            # el alumno sugirió una fecha para la cita (Solicita cita).
+            alumno_sugirio = True
+
+            # fecha_final ya tiene el formato '2025-11-24T10:00'
+            try:
+                form.instance.fecha = datetime.fromisoformat(fecha_final)
+
+                # Como el alumno sugirió una fecha, queda PENDIENTE hasta que el
+                # tutor acepte la tutoría en esa fecha.
+                form.instance.estado = "PEN"
+                messages.warning(request, "Tu solicitud de tutoría ha sido enviada. Espera la respuesta de tu tutor ⏳.")
+            except(ValueError, TypeError):
+                form.add_error(None, "No enviaste una fecha válida.")
+                return self.form_invalid(form)
+
+        # Mensaje corto para saber si es tutoría agendada o solicitada.
+        resumen_notificacion="Nueva solicitud de tutoría"
+        if not alumno_sugirio:
+            resumen_notificacion="Nueva tutoría agendada"
 
         # Eliminar corchetes de la lista
         tutoria_notification_requested.send(
@@ -526,8 +719,8 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
             event="solicitud_creada",
             tutoria=form.instance,
             actor=alumno,
-            recipient=recipient,
-            verb='Nueva solicitud de tutoria',
+            recipient=tutor,
+            verb=resumen_notificacion,
             description=f'{", ".join(form.instance.get_tema_display())}',
         )
         
@@ -539,9 +732,8 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
             #recipient_list=[recipient.email],
             #fail_silently=False
     
-        
-
         return super().form_valid(form)
+    
 
     def get_initial(self) -> dict[str, Any]:
         return super().get_initial()
