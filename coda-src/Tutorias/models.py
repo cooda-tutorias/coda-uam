@@ -1,4 +1,6 @@
 from django.db import models
+from django.utils.http import urlencode
+from datetime import timedelta
 from django.contrib.postgres.fields import ArrayField
 from Usuarios.models import Alumno, Tutor
 from Usuarios.constants import ESTADOS_ALUMNO
@@ -54,6 +56,26 @@ class Tutoria(models.Model):
         choices_dict = dict(ESTADOS_ALUMNO)
         return choices_dict.get(self.estado_alumno_historico, "Sin registro")
 
+    @property
+    def google_calendar_url(self):
+        # 1. Configurar fechas
+        start_time = self.fecha
+        end_time = start_time + timedelta(hours=1) # Asumimos 1 hora de duración
+
+        # 2. Formato que pide Google: YYYYMMDDTHHMMSSZ (o sin Z para hora local)
+        fmt = "%Y%m%dT%H%M%S"
+
+        # 3. Construir parámetros
+        temas_texto = ",".join(self.get_tema_display())
+        params = {
+            'action': 'TEMPLATE',
+            'text': f"Tutoría con {self.alumno.nombre_completo}",
+            'details': f"Temas: {temas_texto}.",
+            'dates': f"{start_time.strftime(fmt)}/{end_time.strftime(fmt)}",
+            'ctz': 'America/Mexico_City' # Fuerza la zona horaria de CDMX
+        }   
+
+        return f"https://calendar.google.com/calendar/render?{urlencode(params)}"
 
 class HistorialCambioTutoria(models.Model):
     tutoria = models.ForeignKey(Tutoria, on_delete=models.CASCADE, related_name='historial_cambios')

@@ -10,7 +10,7 @@ from django.views.generic.detail import DetailView
 from django.views.generic.list import ListView
 from django.views.generic.edit import CreateView, UpdateView
 from django.views.generic import View, FormView
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.utils.text import slugify
 from django.core.exceptions import PermissionDenied
 from django.core.mail import send_mail, EmailMessage
@@ -39,6 +39,7 @@ from Usuarios.models import Tutor, Alumno, Cordinador, Coda
 from Usuarios.models import Documento
 from django.http import FileResponse
 from django.utils import timezone
+from django.utils.safestring import mark_safe
 from reportlab.pdfgen import canvas
 from io import BytesIO
 from reportlab.lib import colors
@@ -53,6 +54,46 @@ from .services.docx_reportes import generar_docx_reporte_tutorias_brindadas
 
 from django.views.generic import TemplateView, FormView
 from django.conf import settings
+
+from icalendar import Calendar, Event
+
+# Esta función se usa para crear el archivo .ics con información de la 
+# fecha de la tutoria para que se pueda agregar el evento a 
+# Calendarios de Apple o Outlook.
+# Para Google Calendar se usa otro procedimiento.
+def descargar_ics_tutoria(request, tutoria_id):
+    # 1. Obtener la tutoria
+    tutoria = get_object_or_404(Tutoria, pk=tutoria_id)
+    
+    # 2. Crear el objeto calendario
+    cal = Calendar()
+    cal.add('prodid', '-//UAM Cuajimalpa//Sistema Tutorias//MX')
+    cal.add('version', '2.0')
+    
+    # 3. Crear el evento
+    event = Event()
+    event.add('summary', f"Tutoría con {tutoria.alumno.nombre_completo}")
+    
+    # Manejar los tiempos
+    start_time = tutoria.fecha
+    end_time = start_time + timedelta(hours=1)
+    
+    event.add('dtstart', start_time)
+    event.add('dtend', end_time)
+    
+    # Descripción y ubicación (Opcional)
+    # Como tu tema es una lista, usamos tu lógica de join si es necesario
+    temas_str = ", ".join(tutoria.get_tema_display())
+    event.add('description', f"Tema(s): {temas_str}")
+    
+    # 4. Agregar evento al calendario
+    cal.add_component(event)
+    
+    # 5. Dejar listo el archivo para descarga
+    response = HttpResponse(cal.to_ical(), content_type="text/calendar")
+    response['Content-Disposition'] = f'attachment; filename="cita_{tutoria.id}.ics"'
+
+    return response
 
 #Funcion para descargar pdf
 def carta_tutorados_pdf(request):
@@ -1300,24 +1341,35 @@ class TutoriasDetailView(BaseAccessMixin, DetailView):
         return queryset
     
 class HistorialTutoriasListView(BaseAccessMixin, ListView):
-     
+    """
+    Vista para mostrar el historial de tutorías de un usuario, ya sea para un tutor o un alumno. 
+    La vista filtra las tutorías según el rol del usuario y la fecha de realización.
+    """ 
     model = Tutoria
     template_name='Tutorias/historialtutoria.html'
+    context_object_name = "tutorias"
 
     def get_queryset(self) -> QuerySet[Any]:
-        
-        if Tutor.objects.filter(pk=self.request.user.pk).exists():
-            # Tutorias correspondientes al tutor
-            queryset = super().get_queryset().filter(tutor=self.request.user.pk)
-        else: 
-            # Tutorias correspondientes al alumno
-            queryset = super().get_queryset().filter(alumno=self.request.user)
-        
-        if self.request.user.is_superuser == 1: 
-            # Muestra todas las tutorias para el primer usuario creado (generalmente el primer superuser)
-            queryset = super().get_queryset().all()
-        
-        return queryset
+        ahora = timezone.now()
+        user = self.request.user
+
+        # Tutor: solamente tutorías ya realizadas
+        if user.has_role("TUT"):
+            return Tutoria.objects.filter(
+                tutor=user,
+                fecha__lt=ahora
+            ).order_by("-fecha")
+
+
+        # Alumno: sus tutorías
+        if user.has_role("ALU"):
+            return Tutoria.objects.filter(
+                alumno=user
+            ).order_by("-fecha")
+
+        # Cualquier otro rol: no mostrar tutorías
+        return Tutoria.objects.none()
+ 
 
 class HistorialTutoriasGenerateView(BaseAccessMixin, ListView):
     model = Tutoria
@@ -1453,7 +1505,14 @@ class VerTutoradosCoordinadorListView(CordinadorViewMixin, ListView):
         context["tutor"] = tutor
         return context
 
+
 class VerTutoriasTutorListView(TutorViewMixin, FormView):
+    """
+    Vista para mostrar solamente las tutorías pendientes de aprobación para un tutor.
+    Permite filtrar las tutorías por estado del alumno.
+    Adicionalmente, verifica si el tutor tiene horarios de atención definidos para
+    motivar al tutor a configurarlos si no los tiene, mostrando un mensaje de advertencia.
+    """
      
     model = Tutoria
     template_name='Tutorias/verTutorias_tutor.html'
@@ -1462,7 +1521,11 @@ class VerTutoriasTutorListView(TutorViewMixin, FormView):
     def form_valid(self, form):
         estado = form.cleaned_data.get("estado")
 
-        tutorias = Tutoria.objects.filter(tutor=self.request.user)
+        # Obtiene las tutorías del tutor actual que requieren aprobación y están pendientes
+        tutorias = Tutoria.objects.filter(
+            tutor=self.request.user,
+            estado="PEN"
+        ).order_by("fecha")
 
         if estado:
             tutorias = tutorias.filter(alumno__estado=estado)
@@ -1472,16 +1535,57 @@ class VerTutoriasTutorListView(TutorViewMixin, FormView):
 
     def get(self, request, *args, **kwargs):
         form = self.get_form()
-        tutorias = Tutoria.objects.filter(tutor=request.user)
-        return self.render_to_response(self.get_context_data(form=form, object_list=tutorias))
+
+        tutorias = Tutoria.objects.filter(
+            tutor=request.user,
+            estado="PEN"
+        ).order_by("fecha")
+
+        return self.render_to_response(
+            self.get_context_data(
+                form=form, 
+                object_list=tutorias
+            )
+        )
     
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
         tutorados = Alumno.objects.filter(tutor_asignado=self.request.user)
-        context["tutorados"] = [alumno for alumno in tutorados]
-        return context
+        context["tutorados"] = tutorados
 
+        return context 
 
+class TutorProximasListView(TutorViewMixin, ListView):
+    """
+    Vista para mostrar las tutorías próximas de un tutor.
+    Filtra las tutorías que están aceptadas, cuya fecha es mayor o igual a la fecha actual.
+    """
+    model = Tutoria
+    template_name = "Tutorias/tutorias_proximas.html"
+    context_object_name = "tutorias_proximas"
+
+    def get_queryset(self):
+        user = self.request.user
+
+        # Obtener el tutor real (objeto Tutor)
+        try:
+            tutor = user.tutor
+        except Tutor.DoesNotExist:
+            return Tutoria.objects.none()
+
+        hoy = timezone.localdate()
+
+        # Tutorías próximas:
+        # estado = ACE (Aceptadas)
+        # fecha >= hoy
+        return (
+            Tutoria.objects.filter(
+                tutor=tutor,
+                estado="ACE",
+                fecha__date__gte=hoy
+            ).order_by("fecha")
+        )
+    
 class VerTutoriasAlumnoListView(AlumnoViewMixin, ListView):
      
     model = Tutoria

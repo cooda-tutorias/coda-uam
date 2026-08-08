@@ -10,7 +10,7 @@
       <div class="col-lg-8 col-xl-10">
         <div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
           <div class="card-body p-4">
-            <h3 class=" mb-4 text-primary text-title-bold">Lista de Tutorias</h3>
+            <h3 class=" mb-4 text-primary text-title-bold">Lista de tutorías solicitadas</h3>
 
             <!--Inicio de Filtro-->
             <!-- <div class="filter-bar my-4 text-body">
@@ -56,8 +56,7 @@
                     <th>Hora</th>
                     <th>Tema</th>
                     <th class="w-25">Descripción</th>
-                    <th>Acciones</th>
-                    <th>Estado</th>
+                    <th>Acción</th>
                   </tr>
                 </thead>
                 <tbody id="data" class="text-body">
@@ -70,11 +69,15 @@
                     <td>{{ tutoria.alumno.get_estado_display }}</td>
                     <td>{{ tutoria.fecha|date }}</td>
                     <td>{{ tutoria.fecha|date:"P" }}</td>
-                    <td>{{ tutoria.get_tema_display|join:", " }}</td>
+                    <td>
+                        {{ tutoria.get_tema_display|join:", " }} 
+                        <a href="{% url 'Tutorias-update' pk=tutoria.pk %}" 
+                           class="text-secondary ms-2" title="Editar tutoría">
+                          <i class="bi bi-pencil-square hover-primary"></i>
+                        </a>
+                    </td>                    
                     <td class="w-25">{{ tutoria.descripcion|default:"-" }}</td>
-                    <td class="text-body-bold">
-                      <a href="{% url 'Tutorias-update' pk=tutoria.pk %}">Editar</a>
-                    </td>
+
                     <td>
                       {% if tutoria.get_estado_display == 'Aceptada' and not tutoria.asistencia %}
                         <span class="badge bg-success">Aceptada</span>
