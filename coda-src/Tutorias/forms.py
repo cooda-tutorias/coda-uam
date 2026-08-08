@@ -45,6 +45,73 @@ class FormTutorias(forms.ModelForm):
             if not otro_tema or not otro_tema.strip():
                 self.add_error('otro_tema', 'Este campo es obligatorio si seleccionas "Otro".')
 
+# Formato para la tutorias in-situ
+# forms.py
+class FormTutoriasInSitu(forms.ModelForm):
+    # class Meta:
+    #     model = Tutoria
+    #     fields = ["tema", "descripcion"]   # agrega otros si los necesitas
+    #     widgets = {
+    #         "tema": forms.Select(attrs={"class": "form-control"}),
+    #         "descripcion": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+    #     }
+
+    def __init__(self, *args, **kwargs):
+        # Extrae el usuario del contexto (no todos los formularios lo enviarán)
+        self.user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+
+        # Si existe instancia con fecha, formatea para HTML5
+        if self.instance and self.instance.fecha:
+            self.initial['fecha'] = self.instance.fecha.strftime('%Y-%m-%dT%H:%M')
+
+        # Personaliza comportamiento según el rol
+        if self.user:
+            if self.user.has_role("ALU"):
+                # Si es alumno, el campo tutor no se edita
+                if "tutor" in self.fields:
+                    self.fields["tutor"].widget = forms.HiddenInput()
+
+            elif self.user.has_role("TUT"):
+                # Si es tutor, el campo alumno no se edita
+                if "alumno" in self.fields:
+                    self.fields["alumno"].widget = forms.HiddenInput()
+
+        # Añade estilos base a los widgets
+        for field_name, field in self.fields.items():
+            css_class = field.widget.attrs.get("class", "")
+            field.widget.attrs["class"] = f"{css_class} form-control".strip()
+
+    alumno = forms.CharField(disabled=True, required=False)
+    tutor = forms.CharField(disabled=True, required=False)
+    tema= forms.MultipleChoiceField(
+        choices=TEMAS,
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "form-check-input"}),
+        label="Temas de la tutoría",
+        required=True
+    )
+    otro_tema = forms.CharField(required=False, label='Especificar tema')
+    #fecha = forms.DateTimeField(widget=forms.DateTimeInput(attrs={'type': 'datetime-local'}), required=True)
+    descripcion = forms.CharField(widget=forms.Textarea, max_length=255, required=True)
+    estado = forms.ChoiceField(choices=ESTADO, required=False)
+
+    class Meta:
+        model = Tutoria
+        fields = ['tema', 'descripcion']
+
+    def clean(self):
+        cleaned_data = super().clean()
+        temas = cleaned_data.get('tema')
+        otro_tema = cleaned_data.get('otro_tema')
+
+        # Validar que haya seleccionado al menos un tema
+        if not temas:
+            self.add_error('tema', 'Debes seleccionar al menos un tema para la tutoría.')
+
+        if temas and 'OTRO' in temas:
+            if not otro_tema or not otro_tema.strip():
+                self.add_error('otro_tema', 'Este campo es obligatorio si seleccionas "Otro".')
+
 
 class FormEditarEstadoAlumnoHistorico(forms.Form):
     """Formulario para editar solo el estado histórico del alumno en una tutoría"""

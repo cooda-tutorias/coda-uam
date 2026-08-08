@@ -2,10 +2,13 @@ from django.test import TestCase
 from django.db import models
 from Usuarios.models import Tutor, Cordinador, Coda  
 from django.contrib.auth import get_user_model
+from django.urls import reverse
 
 # Importar el modelo de Usuario
 Usuario = get_user_model()
 
+# Clase para probar que el campo "cubiculo" es un CharField en los 
+# modelos Tutor, Cordinador y Coda
 class CubiculoTestCase(TestCase):
 
     def test_campo_cubiculo_es_charfield(self):
@@ -51,3 +54,15 @@ class UsuarioNombreCompletoTest(TestCase):
 
         #2. Reforzamos que el apellido materno es None para este usuario.
         self.assertNotIn("None", usuario.nombre_completo)
+
+
+# Clase para probar que la página de login preserva la URL de redirección
+# cuando un alumno escanea el QR de un código de tutoría in situ y es 
+# redirigido a la página de login.
+class LoginRedirectTest(TestCase):
+    def test_login_page_preserves_next_url(self):
+        response = self.client.get(reverse("login"), {"next": "/tutorias/in-situ/7/"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="next"')
+        self.assertContains(response, 'value="/tutorias/in-situ/7/"')

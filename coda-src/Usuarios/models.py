@@ -78,6 +78,35 @@ class Usuario(AbstractUser):
         # 2. " ".join(...) los une con un espacio
         return " ".join(filter(None, partes))
 
+    @property
+    def is_tutor(self):
+        """
+        Regresa verdadero si el usuario tiene entre sus roles el de TUTOR.
+        """        
+        return TUTOR in self.rol
+
+    @property
+    def is_alumno(self):
+        """
+        Regresa verdadero si el usuario tiene entre sus roles el de ALUMNO.
+        """
+        return ALUMNO in self.rol
+
+    @property
+    def is_coda(self):
+        """
+        Regresa verdadero si el usuario tiene entre sus roles el de CODA.
+        """
+        return CODA in self.rol
+
+    @property
+    def is_coordinador(self):
+        """
+        Regresa verdadero si el usuario tiene entre sus roles el de COORDINADOR.
+        """
+        return COORDINADOR in self.rol
+    
+
     def __str__(self) -> str:
         return str(self.matricula)
     
