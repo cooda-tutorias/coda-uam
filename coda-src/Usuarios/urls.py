@@ -38,7 +38,8 @@ urlpatterns = [
     path('eliminar-documento/<int:pk>/', views.eliminar_documento, name='eliminar_documento'),
     path('ver_plantilla/<int:documento_id>/', views.VerPlantilla.as_view(), name='ver_plantilla'),
 
-    # Agregado por Antonio LJ los horarios de atención de un tutor.
+    # Agregado por Antonio LJ para tutorías in-situ.
+    path("mi-qr/", views.VerQRView.as_view(), name="ver_qr_tutor"),
     path("mis-horarios/", views.HorariosTutorView.as_view(), name="tutor_horarios"),
     path("mis-horarios/eliminar/<int:pk>/", views.EliminarHorarioTutorView.as_view(), name="tutor_horario_eliminar"),
 ]
