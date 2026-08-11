@@ -5,6 +5,12 @@
 {% block title  %} Solicitar Tutoria {% endblock %}
 
 {% block body %}
+<!-- Estilos y Scripts de Flatpickr (CDN) -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/material_blue.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script src="https://npmcdn.com/flatpickr/dist/l10n/es.js"></script>
+
 <!--Formulario Solicitud tutoria-->
 <section id="section" style="background-color: #eee;">
     <div class="container py-5 h-100">
@@ -84,15 +90,17 @@
                             <input type="hidden" id="id_fecha_sugerida" name="fecha_sugerida">
 
                             <!-- Botón que abre el modal -->
-                            {% comment %} <button type="button" id="btnAbrirModalCita" class="btn btn-outline-primary">
+                            <button type="button" id="btnAbrirModalCita" class="btn btn-outline-primary">
                                 Elegir fecha cita...
-                            </button> {% endcomment %}
+                            </button>
 
+                            {% comment %} 
                             <!-- Botón que abre el modal -->
                             <button type="button" id="btnAbrirModalCita" class="btn btn-outline-primary"
                                 data-bs-toggle="modal" data-bs-target="#modalAgendarCita">
                                 Elegir fecha cita...
                             </button>
+                             {% endcomment %}
 
                             <!-- AQUÍ INSERTA EL RESUMEN -->
                             <div class="alert alert-info mt-3" id="resumenCita">
@@ -111,8 +119,8 @@
     </div>
 </section>
 
-<!-- AQUÍ ES DONDE DEBE IR EL MODAL, JUSTO ANTES DE TERMINAR EL body -->
-{% include "Tutorias/_modal_agendar_cita.html" %}
+<!-- MODAL INCLUIDO -->
+ {% include "Tutorias/_modal_agendar_cita.html" %}
 
 <!-- Script: mostrar/ocultar campo "Otro" -->
 <script>
@@ -137,6 +145,301 @@
   });
 </script>
 
+<!-- Script 2: Manejo de Flatpickr + Modal de citas de 30 min -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const btnAbrirModal = document.getElementById("btnAbrirModalCita");
+    const campoSlotHidden = document.getElementById("id_horario_tutor");
+    const campoFechaSeleccionadaHidden = document.getElementById("id_fecha_seleccionada");
+    const campoFechaSugeridaHidden = document.getElementById("id_fecha_sugerida");
+    const resumenDiv = document.getElementById("resumenCita");
+
+    let flatpickrInstance = null;
+    let modalCita = null;
+    let slotSeleccionadoVal = "";
+    let fechaSeleccionadaVal = "";
+    let textoResumenSeleccionado = "";
+
+    const tutorId = {{ tutor.id|default:"null" }};
+
+    function formatearFechaEspanol(fechaStr, horaInicio, horaFin) {
+        const partes = fechaStr.split("-");
+        const fecha = new Date(partes[0], partes[1] - 1, partes[2]);
+        const opciones = { weekday: 'long', day: 'numeric', month: 'long' };
+        const fechaTexto = fecha.toLocaleDateString("es-ES", opciones);
+        return `${fechaTexto} de ${horaInicio} a ${horaFin} hrs`;
+    }
+
+    async function abrirModalConFlatpickr() {
+        const modalEl = document.getElementById("modalAgendarCita");
+        if (!modalEl) return;
+
+        modalCita = bootstrap.Modal.getOrCreateInstance(modalEl, {
+            backdrop: 'static',
+            keyboard: false
+        });
+
+        const btnAceptar = document.getElementById("btnAceptarCita");
+        if (btnAceptar) btnAceptar.disabled = true;
+
+        try {
+            const resp = await fetch(`/api/slots-tutor/${tutorId}/`);
+            if (!resp.ok) throw new Error("Error consultando disponibilidades.");
+            const data = await resp.json();
+
+            const bloqueSlots = document.getElementById("bloqueSlots");
+            const bloqueSugerencia = document.getElementById("bloqueSugerencia");
+
+            if (data.slots && data.slots.length > 0) {
+                bloqueSlots.style.display = "block";
+                bloqueSugerencia.style.display = "none";
+
+                // Extraer arreglo de días numéricos de atención (0=Lunes, 1=Martes... 6=Domingo)
+                const diasActivos = data.slots.map(s => s.dia_semana_num); 
+
+                // Destruir instancia previa de Flatpickr si ya existía para evitar duplicados
+                if (flatpickrInstance) {
+                    flatpickrInstance.destroy();
+                }
+
+                flatpickrInstance = flatpickr("#calendarioContainer", {
+                    inline: true,
+                    locale: "es",
+                    minDate: "today",
+                    dateFormat: "Y-m-d",
+                    enable: [
+                        function(date) {
+                            let dayIndex = date.getDay() - 1; 
+                            if (dayIndex === -1) dayIndex = 6; // Ajuste para Domingo en sintaxis de Python
+                            return diasActivos.includes(dayIndex);
+                        }
+                    ],
+                    onChange: function(selectedDates, dateStr) {
+                        if (btnAceptar) btnAceptar.disabled = true;
+                        cargarFranjas30Min(dateStr);
+                    }
+                });
+            } else {
+                bloqueSlots.style.display = "none";
+                bloqueSugerencia.style.display = "block";
+                if (btnAceptar) btnAceptar.disabled = false;
+
+                // ========================================================
+                // CALCULAR PRÓXIMO DÍA HÁBIL A LAS 10:00 AM
+                // ========================================================
+                const inputSugerencia = document.getElementById("inputSugerencia");
+                if (inputSugerencia) {
+                    let fechaSugerida = new Date();
+                    fechaSugerida.setDate(fechaSugerida.getDate() + 1); // Comenzar sumando 1 día (mañana)
+
+                    // Si cae en Sábado (6) o Domingo (0), avanzar hasta el Lunes
+                    while (fechaSugerida.getDay() === 0 || fechaSugerida.getDay() === 6) {
+                        fechaSugerida.setDate(fechaSugerida.getDate() + 1);
+                    }
+
+                    // Formatear al estándar YYYY-MM-DDTHH:mm requerido por <input type="datetime-local">
+                    const year = fechaSugerida.getFullYear();
+                    const month = String(fechaSugerida.getMonth() + 1).padStart(2, '0');
+                    const day = String(fechaSugerida.getDate()).padStart(2, '0');
+
+                    inputSugerencia.value = `${year}-${month}-${day}T10:00`;
+                }
+            }
+
+            modalCita.show();
+        } catch (err) {
+            console.error("Error al abrir modal:", err);
+            alert("No se pudieron verificar los horarios del tutor.");
+        }
+    }
+
+    function cargarFranjas30Min(fechaStr) {
+        const contenedor = document.getElementById("contenedorFranjas");
+        const btnAceptar = document.getElementById("btnAceptarCita");
+        contenedor.innerHTML = `<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Cargando horarios...</div>`;
+
+        fetch(`/api/franjas-disponibles/${tutorId}/?fecha=${fechaStr}`)
+            .then(r => r.json())
+            .then(data => {
+                contenedor.innerHTML = "";
+                if (!data.franjas || data.franjas.length === 0) {
+                    contenedor.innerHTML = `<p class="text-muted small">No hay franjas libres en este día.</p>`;
+                    return;
+                }
+
+                data.franjas.forEach(f => {
+                    const btn = document.createElement("button");
+                    btn.type = "button";
+                    btn.className = "btn btn-horario-slot btn-sm mb-2 text-start w-100";
+                    btn.innerText = `${f.hora_inicio} - ${f.hora_fin}`;
+
+                    btn.addEventListener("click", function () {
+                        // 1. Quitar el estado activo (naranja) de todos los botones
+                        document.querySelectorAll("#contenedorFranjas .btn").forEach(b => {
+                            b.classList.remove("slot-seleccionado");
+                        });
+
+                        // 2. Marcar solo el botón actual como activo (pasa a naranja)
+                        btn.classList.add("slot-seleccionado");
+
+                        slotSeleccionadoVal = f.slot_id;
+                        fechaSeleccionadaVal = fechaStr;
+                        textoResumenSeleccionado = formatearFechaEspanol(fechaStr, f.hora_inicio, f.hora_fin);
+
+                        if (btnAceptar) btnAceptar.disabled = false;
+                    });
+
+                    contenedor.appendChild(btn);
+                });
+            })
+            .catch(err => {
+                contenedor.innerHTML = `<p class="text-danger small">Error al cargar disponibilidades.</p>`;
+            });
+    }
+
+    if (btnAbrirModal) {
+        btnAbrirModal.addEventListener("click", function (e) {
+            e.preventDefault();
+            abrirModalConFlatpickr();
+        });
+    }
+
+    function formatearFechaSugerida(fechaIsoStr) {
+        if (!fechaIsoStr) return "";
+        
+        // Separar fecha ('YYYY-MM-DD') y hora ('HH:mm')
+        const [fechaParte, horaParte] = fechaIsoStr.split("T");
+        if (!fechaParte || !horaParte) return fechaIsoStr;
+
+        const [yyyy, mm, dd] = fechaParte.split("-");
+        const [horas, minutos] = horaParte.split(":");
+
+        // Convertir de formato 24 hrs a 12 hrs AM/PM
+        let h = parseInt(horas, 10);
+        const ampm = h >= 12 ? "PM" : "AM";
+        h = h % 12;
+        h = h ? h : 12; // Si la hora es 00, se muestra como 12
+        const hFormateada = String(h).padStart(2, '0');
+
+        return `${dd}/${mm}/${yyyy} a las ${hFormateada}:${minutos} ${ampm}`;
+    }
+
+    const btnAceptarModal = document.getElementById("btnAceptarCita");
+    if (btnAceptarModal) {
+        btnAceptarModal.addEventListener("click", function () {
+            const bloqueSlots = document.getElementById("bloqueSlots");
+
+            if (bloqueSlots.style.display === "block") {
+                if (!slotSeleccionadoVal || !fechaSeleccionadaVal) {
+                    alert("Debes seleccionar un horario del calendario.");
+                    return;
+                }
+
+                campoSlotHidden.value = slotSeleccionadoVal;
+                campoFechaSeleccionadaHidden.value = fechaSeleccionadaVal;
+                campoFechaSugeridaHidden.value = "";
+
+                resumenDiv.innerHTML = `<div class="alert alert-success mb-0">
+                    Elegiste agendar para: <strong>${textoResumenSeleccionado}</strong>.
+                </div>`;
+            } else {
+                const fechaSug = document.getElementById("inputSugerencia")?.value;
+                if (!fechaSug) {
+                    alert("Debes elegir una fecha para sugerir.");
+                    return;
+                }
+                campoSlotHidden.value = "";
+                campoFechaSeleccionadaHidden.value = "";
+                campoFechaSugeridaHidden.value = fechaSug;
+
+                // Formatear solo para la presentación visual
+                const fechaFormateada = formatearFechaSugerida(fechaSug);
+
+                resumenDiv.innerHTML = `<div class="alert alert-warning mb-0">
+                    Has sugerido la fecha: <strong>${fechaFormateada}</strong>. Tu tutor deberá confirmarla.
+                </div>`;
+            }
+
+            if (modalCita) modalCita.hide();
+        });
+    }
+});
+</script>
+
+<style>
+/* =========================================================
+   1. ENCABEZADO DEL CALENDARIO (Flatpickr)
+   ========================================================= */
+/* Fondo del encabezado (Mes y días de la semana) */
+.flatpickr-calendar .flatpickr-months,
+.flatpickr-calendar .flatpickr-weekdays,
+.flatpickr-calendar .flatpickr-month,
+span.flatpickr-weekday {
+    background-color: #857F7A !important; /* Naranja institucional del sitio */
+    color: #ffffff !important;
+}
+
+/* 1. Título del mes visible en el encabezado (cerrado) */
+.flatpickr-current-month .flatpickr-monthDropdown-months {
+    background-color: transparent !important;
+    color: #ffffff !important;
+}
+
+/* 2. Lista de opciones del desplegable (<option>) al hacer clic */
+.flatpickr-current-month .flatpickr-monthDropdown-months option,
+.flatpickr-monthDropdown-month {
+    background-color: #ffffff !important;
+    color: #3D3028 !important; /* Texto café oscuro visible sobre fondo blanco */
+}
+
+/* Evita que vuelva a cambiar de fondo al pasar el cursor por encima */
+.flatpickr-current-month .flatpickr-monthDropdown-months:hover {
+    background-color: transparent !important;
+}
+
+/* Flechas de navegación (Anterior / Siguiente mes) */
+.flatpickr-calendar .flatpickr-months .flatpickr-prev-month,
+.flatpickr-calendar .flatpickr-months .flatpickr-next-month {
+    fill: #ffffff !important;
+    color: #ffffff !important;
+}
+
+/* Día seleccionado en el calendario */
+.flatpickr-day.selected, 
+.flatpickr-day.selected:hover {
+    background: #F08200 !important;
+    border-color: #F08200 !important;
+    color: #ffffff !important;
+}
+
+/* =========================================================
+   2. LISTA DE FRANJAS HORARIAS (Estilo Café Oscuro)
+   ========================================================= */
+/* Botón desmarcado (Estado normal: Café oscuro) */
+.btn-horario-slot {
+    color: #3D3028 !important;
+    border: 1.5px solid #3D3028 !important;
+    background-color: #ffffff !important;
+    font-weight: 600;
+    transition: all 0.2s ease-in-out;
+}
+
+/* Hover sobre botón desmarcado */
+.btn-horario-slot:hover {
+    background-color: #3D3028 !important;
+    color: #ffffff !important;
+}
+
+/* Botón marcado/seleccionado (Cambia a Naranja activo) */
+.btn-horario-slot.slot-seleccionado {
+    background-color: #F08200 !important;
+    border-color: #F08200 !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 6px rgba(240, 130, 0, 0.35);
+}
+</style>
+
+{% comment %} 
 <!-- Script: manejar modal para seleccionar cita de horario disponible o sugerir fecha  -->
 <script>
 document.addEventListener("DOMContentLoaded", function () {
@@ -310,8 +613,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 });
 </script>
-
-
+{% endcomment %}
 
 {% endblock %}
 

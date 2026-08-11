@@ -65,6 +65,7 @@ from django.http import (
     JsonResponse,
 )
 
+
 #Funcion para descargar pdf
 def carta_tutorados_pdf(request):
     print(request)
@@ -521,6 +522,7 @@ def api_slots_tutor(request, tutor_id):
         "slots": [
             {
                 "id": slot.id,
+                "dia_semana_num": slot.dia_semana,  # Tiene los días así (0=Lunes..6=Domingo)
                 "dia_semana": slot.get_dia_semana_display(),
                 "hora_inicio": slot.hora_inicio.strftime("%H:%M:%S"),
                 "hora_fin": slot.hora_fin.strftime("%H:%M:%S"),
@@ -568,6 +570,54 @@ def api_fechas_slot(request, slot_id):
 
     return JsonResponse({"fechas": fechas})
 
+
+
+def obtener_franjas_disponibles_api(request, tutor_id):
+    """
+    Retorna las franjas disponibles de 30 minutos para una fecha dada (?fecha=YYYY-MM-DD).
+    """
+    fecha_str = request.GET.get('fecha')
+    if not fecha_str:
+        return JsonResponse({'error': 'Parámetro fecha requerido'}, status=400)
+    
+    fecha_dt = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+    dia_semana_py = fecha_dt.weekday() # 0=Lunes, 1=Martes...
+
+    # Mapeo según cómo tengas guardado el día de la semana en HorarioTutor
+    horarios_tutor = HorarioTutor.objects.filter(
+        tutor_id=tutor_id,
+        dia_semana=dia_semana_py,
+        activo=True
+    )
+
+    # Tutorías agendadas en ese día para evitar colisiones
+    tutorias_existentes = Tutoria.objects.filter(
+        tutor_id=tutor_id,
+        fecha__date=fecha_dt,
+        estado__in=['PENDIENTE', 'ACEPTADA']
+    )
+    horas_ocupadas = [t.fecha.strftime("%H:%M") for t in tutorias_existentes if t.fecha]
+
+    franjas = []
+    duracion = timedelta(minutes=30)
+
+    for h in horarios_tutor:
+        actual = datetime.combine(fecha_dt, h.hora_inicio)
+        limite = datetime.combine(fecha_dt, h.hora_fin)
+
+        while actual + duracion <= limite:
+            hora_inicio_str = actual.strftime("%H:%M")
+            if hora_inicio_str not in horas_ocupadas:
+                franjas.append({
+                    'slot_id': h.id,
+                    'hora_inicio': hora_inicio_str,
+                    'hora_fin': (actual + duracion).strftime("%H:%M"),
+                    'datetime_iso': actual.isoformat()
+                })
+            actual += duracion
+
+    return JsonResponse({'franjas': franjas})
+
     
 # Vista para que el ALUMNO solicite tutorias, ya sea:
 # a) eligiendo uno de los horarios predefinidos por su tutor, o si no ha definido,
@@ -599,14 +649,28 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
 
         context["tutor"] = tutor
 
-        # Defaults (por si no hay rol)
-        titulo = "Solicitar tutoría"
-        texto_boton = "Solicitar tutoría"
+        # Validar si el tutor tiene horarios de atención activos registrados
+        tiene_horarios = False
+        if tutor:
+            tiene_horarios = HorarioTutor.objects.filter(tutor=tutor, activo=True).exists()
+
+        if tiene_horarios:
+            titulo = "Agendar tutoría"
+            texto_boton = "Agendar tutoría"
+            alerta_texto = "Estás por agendar una tutoría dentro de los horarios definidos por tu tutor."
+            alerta_tipo = "success"
+            subtitulo_modal = "Tu tutor(a) definió horarios de atención. Selecciona un día y un horario disponible."
+        else:
+            titulo = "Solicitar tutoría"
+            texto_boton = "Solicitar tutoría"
+            alerta_texto = "Estás por solicitar una tutoría. Debes sugerir una fecha y hora."
+            alerta_tipo = "warning"
+            subtitulo_modal = "Tu tutor(a) aún no registra horarios de atención para tutorías. Pero puedes sugerirle una fecha para visitarlo."
+
         info_adicional = "Información adicional sobre la tutoría."
-        alerta_texto = "Estás solicitando una tutoría con tu tutor asignado."
-        alerta_tipo = "info"
 
         # Colocar todas las variantes de clave que usamos en plantillas anteriores
+        context["tiene_horarios"] = tiene_horarios
         context["titulo_formulario"] = titulo
         context["titulo_form"] = titulo              # compatibilidad
         context["texto_boton"] = texto_boton
@@ -614,6 +678,7 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
         context["info_adicional"] = info_adicional
         context["alerta_texto"] = alerta_texto
         context["alerta_tipo"] = alerta_tipo
+        context["subtitulo_modal"] = subtitulo_modal
 
         # Si ya se eligió fecha mediante el modal
         fecha_cita = self.request.session.get("fecha_cita", None)

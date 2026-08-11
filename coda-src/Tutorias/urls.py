@@ -47,6 +47,7 @@ urlpatterns = [
     path("api/slots/", views.api_slots_tutor, name="api_slots_tutor"),
     path('api/fechas-slot/<int:slot_id>/', views.api_fechas_slot, name='api_fechas_slot'),
     path("api/slots-tutor/<int:tutor_id>/", views.api_slots_tutor, name="api_slots_tutor"),
+    path('api/franjas-disponibles/<int:tutor_id>/', views.obtener_franjas_disponibles_api, name='api-franjas-disponibles'),
 
     # URLS CODA 
     path('tutores-coda/', views.VerTutoresListView.as_view(), name='Tutores-Coda'),
