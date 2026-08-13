@@ -17,6 +17,7 @@ from django.core.mail import send_mail, EmailMessage
 from django.contrib import messages
 from datetime import datetime, timedelta
 import pandas as pd
+from urllib3 import request
 from .constants import TEMAS
 
 from .models import Tutoria, HistorialCambioTutoria, Asesoria
@@ -32,7 +33,14 @@ from .forms import (
 )
 from .signals import tutoria_notification_requested
 # from .forms import FormSeguimiento # de nuevo, no estoy seguro, FormReporte
-from .constants import PENDIENTE, ACEPTADO, RECHAZADO, DURACION_ASESORIA, CANCELADO, ESTADO # de nuevo, no estoy seguro
+
+# De esta manera se incluyen todas la constantes.
+# TODO: Usar el estándar PEP8 para importar constantes:
+# from . import constants
+# Pero se tendría que cambiar el código que usa las constantes, por ejemplo:
+# constants.TEMAS o constants.PENDIENTE, etc. Esto es más limpio y evita conflictos de nombres.
+from .constants import *
+
 from Usuarios.constants import TUTOR, ALUMNO, COORDINADOR, TEMPLATES, ESTADOS_ALUMNO
 from Usuarios.views import BaseAccessMixin, CodaViewMixin, TutorViewMixin, AlumnoViewMixin, CordinadorViewMixin
 from Usuarios.models import Tutor, Alumno, Cordinador, Coda
@@ -56,6 +64,89 @@ from django.views.generic import TemplateView, FormView
 from django.conf import settings
 
 from icalendar import Calendar, Event
+
+from django.contrib.auth.decorators import login_required
+
+# Función para convertir una fecha en formato string a un objeto datetime con zona horaria.
+def convertir_fecha_local(valor):
+    fecha_sin_zona = datetime.strptime(
+        valor,
+        "%Y-%m-%dT%H:%M",
+    )
+
+    return timezone.make_aware(
+        fecha_sin_zona,
+        timezone.get_current_timezone(),
+    )
+
+# Función para que el tutor pueda proponer fechas alternativas para la tutoría. 
+# Se llama desde la vista de detalle de la tutoría.
+@login_required
+def proponer_fechas_tutoria(request, pk):
+    tutoria = get_object_or_404(Tutoria, pk=pk)
+    
+    if request.method == 'POST':
+        propuesta_1_raw = request.POST.get('propuesta_1')
+        propuesta_2_raw = request.POST.get('propuesta_2')
+
+        # Verificar que efectivamente haya al menos una propuesta de fecha.
+        if propuesta_1_raw:
+            try:
+                propuesta_1 = convertir_fecha_local(propuesta_1_raw)
+                propuesta_2 = convertir_fecha_local(propuesta_2_raw) if propuesta_2_raw else None
+            except ValueError:
+                messages.error(
+                    request,
+                    "Alguna de las fechas proporcionadas no es válida.",
+                )
+                return redirect("Tutorias-tutor")    
+                                   
+            # Si hay dos propuestas, se envían al alumno para que elija. Si solo hay una, se acepta directamente.
+            if propuesta_2_raw:
+                # CASO A: Dos fechas -> El alumno debe elegir en su vista
+                tutoria.fecha_propuesta_1 = propuesta_1
+                tutoria.fecha_propuesta_2 = propuesta_2
+                tutoria.estado = PROPUESTA
+                messages.success(request, "Se han enviado las alternativas de horario al alumno.")
+            else:
+                # CASO B: Una sola fecha -> Se reasigna la fecha y se ACEPTA directamente
+                tutoria.fecha = propuesta_1
+                tutoria.fecha_propuesta_1 = None
+                tutoria.fecha_propuesta_2 = None
+                tutoria.estado = ACEPTADO
+                messages.success(request, "Se ha actualizado y aceptado la tutoría con la nueva fecha.")
+            
+            tutoria.save()
+        else:
+            messages.error(request, "Debes ingresar al menos la Opción 1.")
+
+    return redirect('Tutorias-tutor')
+
+# Función para que el alumno pueda seleccionar una de las fechas propuestas por el tutor.
+@login_required
+def seleccionar_propuesta_tutoria(request, pk):
+    tutoria = get_object_or_404(Tutoria, pk=pk)
+    
+    if request.method == 'POST':
+        opcion_elegida = request.POST.get('opcion_elegida') # '1' o '2'
+
+        if opcion_elegida == '1' and tutoria.fecha_propuesta_1:
+            tutoria.fecha = tutoria.fecha_propuesta_1
+        elif opcion_elegida == '2' and tutoria.fecha_propuesta_2:
+            tutoria.fecha = tutoria.fecha_propuesta_2
+        else:
+            messages.error(request, "Selección inválida.")
+            return redirect('Tutorias-alumno')
+
+        # Se confirma el horario y se resetean las propuestas
+        tutoria.estado = ACEPTADO
+        tutoria.fecha_propuesta_1 = None
+        tutoria.fecha_propuesta_2 = None
+        tutoria.save()
+
+        messages.success(request, "Tu solicitud ha sido agendada con éxito. No faltes a la cita en el día y horario que elegiste 📅.")
+
+    return redirect('Tutorias-alumno')
 
 # Esta función se usa para crear el archivo .ics con información de la 
 # fecha de la tutoria para que se pueda agregar el evento a 
@@ -349,14 +440,18 @@ class AceptarTutoriaView(View):
 
         tutoria.estado = ACEPTADO
         tutoria.save(update_fields=["estado"])
+
+        messages.success(request, f"Haz aceptado la solicitud de tutoría de {tutoria.alumno.nombre_completo}.")
+
         tutoria_notification_requested.send(
             sender=self.__class__,
             event="aceptada",
             tutoria=tutoria,
             actor=request.user,
         )
-        return redirect('Tutorias-tutor')  
+        return redirect('Tutorias-proximas')  
 
+  
 class RechazarTutoriaView(View):
     def post(self, request, pk):
         tutoria = get_object_or_404(Tutoria, pk=pk)
@@ -366,14 +461,35 @@ class RechazarTutoriaView(View):
         if tutoria.estado == RECHAZADO:
             return redirect('Tutorias-tutor')
 
+        motivo = request.POST.get("motivo_rechazo", "").strip()
+        if motivo == "otro":
+            motivo = request.POST.get("motivo_rechazo_otro", "", ).strip()
+
+        if not motivo:
+            messages.error(
+                request,
+                "Debes seleccionar o escribir una razón para el rechazo.",
+            )
+            return redirect("Tutorias-tutor")
+        
         tutoria.estado = RECHAZADO
-        tutoria.save(update_fields=["estado"])
+        tutoria.motivo_rechazo = motivo
+        tutoria.save(update_fields=["estado", "motivo_rechazo"])
         tutoria_notification_requested.send(
             sender=self.__class__,
             event="rechazada",
             tutoria=tutoria,
             actor=request.user,
         )
+
+        messages.info(
+            request,
+            (
+                "El rechazo se registró correctamente y el alumno será notificado. "
+                "No es necesario realizar ninguna acción adicional."
+            ),
+        )
+
         return redirect('Tutorias-tutor')
 
 class CancelarTutoriaView(View):
@@ -1524,7 +1640,7 @@ class VerTutoriasTutorListView(TutorViewMixin, FormView):
         # Obtiene las tutorías del tutor actual que requieren aprobación y están pendientes
         tutorias = Tutoria.objects.filter(
             tutor=self.request.user,
-            estado="PEN"
+            estado__in=[PENDIENTE, PROPUESTA],
         ).order_by("fecha")
 
         if estado:
@@ -1538,7 +1654,7 @@ class VerTutoriasTutorListView(TutorViewMixin, FormView):
 
         tutorias = Tutoria.objects.filter(
             tutor=request.user,
-            estado="PEN"
+            estado__in=[PENDIENTE, PROPUESTA],
         ).order_by("fecha")
 
         return self.render_to_response(
@@ -1552,6 +1668,14 @@ class VerTutoriasTutorListView(TutorViewMixin, FormView):
         context = super().get_context_data(**kwargs)
         tutorados = Alumno.objects.filter(tutor_asignado=self.request.user)
         context["tutorados"] = tutorados
+
+        context.update({
+            "estado_propuesta": PROPUESTA,
+            "estado_pendiente": PENDIENTE,
+            "estado_aceptado": ACEPTADO,
+            "estado_rechazado": RECHAZADO,
+            "estado_cancelado": CANCELADO,
+        })
 
         return context 
 

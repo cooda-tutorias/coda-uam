@@ -1,9 +1,8 @@
 {% extends "Usuarios/HeaderAndFooterFachada.html" %}
 
-{% block title  %}  Tutorias Alumnos {% endblock %}
+{% block title %} Tutorias Alumnos {% endblock %}
 
 {% block body %}
-
 
 <!-- <body> -->
     <!--Ver Tutorias-->
@@ -13,7 +12,7 @@
                 <div class="col-lg-8 col-xl-10">
                     <div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
                         <div class="card-body p-4">
-                            <h3 class=" mb-4 text-primary text-title-bold">Tutorías Solicitadas</h3>
+                            <h3 class="mb-4 text-primary text-title-bold">Tutorías Solicitadas</h3>
                             
                             <!--Inicio de table-->
                             <div class="row justify-content-center align-items-center">
@@ -35,15 +34,15 @@
                                             </thead>
                                             <tbody>
                                                 {% for tutoria in object_list %}
-                                                <tr class="text-body">
-                                                    <td>{{ tutoria.pk }} </td>
-                                                    <td>{{ tutoria.alumno.matricula }} </td>
-                                                    <td>{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }} </td>
+                                                <tr class="text-body text-center">
+                                                    <td>{{ tutoria.pk }}</td>
+                                                    <td>{{ tutoria.alumno.matricula }}</td>
+                                                    <td>{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}</td>
                                                     <td>{{ tutoria.fecha|date }}</td>
                                                     <td>{{ tutoria.fecha|date:"P" }}</td>
                                                     <!--Se agregó |join:", " para quitar notación de lista-->
-                                                    <td>{{ tutoria.get_tema_display |join:", " }} </td>
-                                                    <td>{{ tutoria.tutor.first_name }} {{ tutoria.tutor.last_name }} {{ tutoria.tutor.second_last_name }} </td>
+                                                    <td>{{ tutoria.get_tema_display|join:", " }}</td>
+                                                    <td>{{ tutoria.tutor.first_name }} {{ tutoria.tutor.last_name }} {{ tutoria.tutor.second_last_name }}</td>
                                                     <td class="text-center text-body-bold">
                                                         <a href="{% url 'Tutorias-update' pk=tutoria.pk %}">Editar</a>
                                                     </td>
@@ -52,6 +51,13 @@
                                                         <span class="badge bg-success">Aceptada</span>
                                                         {% elif tutoria.estado == 'REJ' %}
                                                         <span class="badge badge-warning text-dark">Rechazada</span>
+                                                        {% elif tutoria.estado == 'PRO' %}
+                                                            <button type="button" 
+                                                                    class="btn btn-sm btn-primary text-white text-capitalize shadow-0" 
+                                                                    data-mdb-toggle="modal" 
+                                                                    data-mdb-target="#modalSeleccionar-{{ tutoria.pk }}">
+                                                                Elegir Horario
+                                                            </button>
                                                         {% elif tutoria.get_estado_display == 'Cancelada' %}
                                                         <span class="badge badge-danger text-dark">Cancelada</span>
                                                         {% else %}
@@ -73,57 +79,59 @@
         </div>
     </section>
 
-    <!-- No borras por si lo que hiso felipe la caga
-        <section style="background-color: #eee;">
-            <div class="container">
-                <h3 class=" mb-5 text-primary">Tutorias Solicitadas</h3>
-                <div class="row justify-content-center align-items-center">
-                <div class="col-lg-10">
-                    <table class="table table-striped">
-                        <thead>
-                            <tr>
-                                <th>Nombre</th>
-                                <th>Fecha</th>
-                                <th>Hora</th>
-                                <th>Tema</th>
-                                <th>Tutor</th>
-                                <th>Estado de Aceptación</th>
-                                <th>Acciones</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for tutoria in object_list %}
-                            <tr>
-                                <td>{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }}</td>
-                                <td>{{ tutoria.fecha|date }}</td>
-                                <td>{{ tutoria.fecha|date:"P" }}</td>
-                                <td>{{ tutoria.get_tema_display }} </td>
-                                <td>{{ tutoria.tutor.first_name }} {{ tutoria.tutor.last_name }}</td>
-                                <td>
-                                    {% if tutoria.estado == 'Aceptado' %}
-                                    <span class="badge bg-success">Aceptada</span>
-                                    <span class="badge bg-success">Aceptado</span>
-                                    {% elif tutoria.estado == 'Rechazado' %}
-                                    <span class="badge badge-warning text-dark">Rechazada</span>
-                                    {% else %}
-                                    <span class="badge badge-warning text-dark">Pendiente</span>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    <a href="{% url 'Tutorias-update' tutoria.pk %}" class="btn btn-primary btn-sm">Editar</a>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+    <!-- Modales de Selección de Horario para el Alumno -->
+    {% for tutoria in object_list %}
+        {% if tutoria.estado == 'PRO' %}
+        <div class="modal fade" id="modalSeleccionar-{{ tutoria.pk }}" tabindex="-1" aria-labelledby="modalLabel-{{ tutoria.pk }}" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    
+                    <form method="post" action="{% url 'seleccionar_propuesta_tutoria' pk=tutoria.pk %}">
+                        {% csrf_token %}
+                        
+                        <div class="modal-header bg-light">
+                            <h5 class="modal-title text-primary" id="modalLabel-{{ tutoria.pk }}">
+                                Horario sugerido por el Tutor
+                            </h5>
+                            <button type="button" class="btn-close" data-mdb-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        
+                        <div class="modal-body text-start">
+                            <p class="text-muted small mb-3">
+                                Tu tutor(a) <strong>{{ tutoria.tutor.first_name }} {{ tutoria.tutor.last_name }}</strong> ha propuesto alternativas de horario. Selecciona la que mejor te convenga:
+                            </p>
+
+                            <!-- Opción 1 -->
+                            <div class="form-check p-3 mb-2 border rounded">
+                                <input class="form-check-input ms-0 me-2" type="radio" name="opcion_elegida" id="opcion1-{{ tutoria.pk }}" value="1" checked>
+                                <label class="form-check-label fw-bold text-dark" for="opcion1-{{ tutoria.pk }}">
+                                    Opción 1: {{ tutoria.fecha_propuesta_1|date:"d/m/Y - h:i A" }}
+                                </label>
+                            </div>
+
+                            <!-- Opción 2 (Se muestra solo si existe) -->
+                            {% if tutoria.fecha_propuesta_2 %}
+                            <div class="form-check p-3 mb-2 border rounded">
+                                <input class="form-check-input ms-0 me-2" type="radio" name="opcion_elegida" id="opcion2-{{ tutoria.pk }}" value="2">
+                                <label class="form-check-label fw-bold text-dark" for="opcion2-{{ tutoria.pk }}">
+                                    Opción 2: {{ tutoria.fecha_propuesta_2|date:"d/m/Y - h:i A" }}
+                                </label>
+                            </div>
+                            {% endif %}
+                        </div>
+                        
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary btn-sm" data-mdb-dismiss="modal">Cancelar</button>
+                            <button type="submit" class="btn btn-primary btn-sm">Confirmar Horario</button>
+                        </div>
+                        
+                    </form>
+
                 </div>
             </div>
         </div>
-    </section>
--->
-    
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
+        {% endif %}
+    {% endfor %}
 <!-- </body> -->
 
 {% endblock %}

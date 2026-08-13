@@ -26,11 +26,13 @@ urlpatterns = [
     # URLS ALUMNOS
     path('tutorias-alumno/', views.VerTutoriasAlumnoListView.as_view(), name='Tutorias-alumno'),
     path('tutoria-rapida/', views.QuickCreateTutoriaView.as_view(), name='tutoria-rapida'),
+    path('tutoria/<int:pk>/seleccionar/', views.seleccionar_propuesta_tutoria, name='seleccionar_propuesta_tutoria'),
 
     # URLS TUTORES
     path('tutoria/<int:pk>/aceptar/', views.AceptarTutoriaView.as_view(), name='aceptar_tutoria'),
     path('tutoria/<int:pk>/rechazar/', views.RechazarTutoriaView.as_view(), name='rechazar_tutoria'),
     path('tutoria/<int:pk>/cancelar/', views.CancelarTutoriaView.as_view(), name='cancelar-tutoria'),
+    path('tutoria/<int:pk>/proponer/', views.proponer_fechas_tutoria, name='proponer_fechas_tutoria'),
 
     # Las tres URL de las lista de tutorías.
     path('tutorias-tutor/', views.VerTutoriasTutorListView.as_view(),name='Tutorias-tutor'),

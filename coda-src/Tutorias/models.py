@@ -9,15 +9,27 @@ from .constants import TEMAS, SERVICIO, PENDIENTE, ESTADO, DURACION_ASESORIA
 # Create your models here.
 class Tutoria(models.Model):
 
-
     alumno = models.ForeignKey(Alumno, on_delete=models.CASCADE)
     tutor = models.ForeignKey(Tutor, on_delete=models.CASCADE)
     # tema = models.CharField(SERVICIO, max_length=4, choices=TEMAS, default=SERVICIO)
     # Se cambia el campo para que sea una lista
     tema = ArrayField(models.CharField(SERVICIO, max_length=4, choices=TEMAS, default=SERVICIO))
     fecha = models.DateTimeField()
+
+    # Propuestas alternativas cuando el tutor acepta la tutoría, pero propone otras fechas.
+    fecha_propuesta_1 = models.DateTimeField(null=True, blank=True)
+    fecha_propuesta_2 = models.DateTimeField(null=True, blank=True)
+
     descripcion = models.CharField(max_length=255, blank=True, null=True)
     estado = models.CharField(PENDIENTE, max_length=4, choices=ESTADO, default=PENDIENTE)
+
+    # Campo para registrar el motivo de rechazo de la tutoría.
+    motivo_rechazo = models.CharField(
+        max_length=500,
+        blank=True,
+        null=True,
+    )
+
     # campos para el seguimiento de tutoría
     asistencia = models.BooleanField(default=False, blank=True, null=True)
     duracion = models.IntegerField(DURACION_ASESORIA,default=0, blank=True, null=True)

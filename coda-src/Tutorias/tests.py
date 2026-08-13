@@ -12,7 +12,7 @@ from Usuarios.models import Tutor, Alumno
 from Tutorias.models import Tutoria, HistorialCambioTutoria
 from Tutorias.forms import FormSeguimiento
 from Tutorias.services.docx_reportes import _tutoria_es_reportable
-from Tutorias.constants import BECAS, PENDIENTE, ACEPTADO, RECHAZADO
+from Tutorias.constants import BECAS, PENDIENTE, ACEPTADO, RECHAZADO, PROPUESTA
 from notifications.models import Notification
 
 
@@ -208,21 +208,47 @@ class ListaTutoriasSolicitadasTest(TestCase):
         # 4. URL de la vista
         self.url = reverse('Tutorias-tutor')
 
-    def test_lista_solicitadas_solo_filtra_estado_pendiente_en_estados_mixtos(self):
-        """Verifica que teniendo estados variados solo traiga las pendientes."""
-        tutoria_pen = Tutoria.objects.create(tutor=self.tutor, alumno=self.alumno, tema=['BEC'], fecha=timezone.now(), estado='PEN')
-        tutoria_ace = Tutoria.objects.create(tutor=self.tutor, alumno=self.alumno, tema=['BEC'], fecha=timezone.now(), estado='ACE')
-        tutoria_rec = Tutoria.objects.create(tutor=self.tutor, alumno=self.alumno, tema=['BEC'], fecha=timezone.now(), estado='REC')
+    def test_lista_solicitadas_vacia_si_no_hay_pendientes_ni_propuestas(self):
+        """Muestra las tutorías pendientes y las que esperan elección del alumno."""
+        tutoria_pen = Tutoria.objects.create(
+            tutor=self.tutor,
+            alumno=self.alumno,
+            tema=["BEC"],
+            fecha=timezone.now(),
+            estado=PENDIENTE,
+        )
+        tutoria_pro = Tutoria.objects.create(
+            tutor=self.tutor,
+            alumno=self.alumno,
+            tema=["BEC"],
+            fecha=timezone.now(),
+            estado=PROPUESTA,
+        )
+        tutoria_ace = Tutoria.objects.create(
+            tutor=self.tutor,
+            alumno=self.alumno,
+            tema=["BEC"],
+            fecha=timezone.now(),
+            estado=ACEPTADO,
+        )
+        tutoria_rej = Tutoria.objects.create(
+            tutor=self.tutor,
+            alumno=self.alumno,
+            tema=["BEC"],
+            fecha=timezone.now(),
+            estado=RECHAZADO,
+        )
 
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, 200)
-        solicitadas = response.context['object_list']
+        solicitadas = response.context["object_list"]
 
-        self.assertEqual(len(solicitadas), 1)
+        self.assertEqual(len(solicitadas), 2)
         self.assertIn(tutoria_pen, solicitadas)
+        self.assertIn(tutoria_pro, solicitadas)
         self.assertNotIn(tutoria_ace, solicitadas)
-        self.assertNotIn(tutoria_rec, solicitadas)
+        self.assertNotIn(tutoria_rej, solicitadas)
 
     def test_lista_solicitadas_vacia_si_no_hay_pendientes(self):
         """Verifica que si hay tutorías pero ninguna es PEN, la lista regrese vacía."""
@@ -265,6 +291,239 @@ class ListaTutoriasSolicitadasTest(TestCase):
         solicitadas = response.context['object_list']
         self.assertIn(mi_tutoria, solicitadas)
         self.assertNotIn(otra_tutoria, solicitadas)
+
+
+class PropuestasFechaTutoriaTests(TestCase):
+    """Pruebas del flujo de fechas alternativas propuestas por el tutor."""
+
+    def setUp(self):
+        self.tutor = Tutor.objects.create_user(
+            first_name='Antonio',
+            last_name='López',
+            email='tutor.propuestas@cua.uam.mx',
+            matricula='123457',
+            password='password123',
+            es_tutor=True,
+        )
+        self.alumno = Alumno.objects.create_user(
+            first_name='Estudiante',
+            last_name='Gómez',
+            email='alumno.propuestas@cua.uam.mx',
+            matricula='654322',
+            password='password123',
+            tutor_asignado=self.tutor,
+        )
+        self.tutoria = Tutoria.objects.create(
+            tutor=self.tutor,
+            alumno=self.alumno,
+            tema=['BEC'],
+            fecha=timezone.make_aware(datetime(2030, 1, 10, 10, 0)),
+            estado=PENDIENTE,
+        )
+
+    def test_una_fecha_propuesta_acepta_directamente_la_tutoria(self):
+        self.client.force_login(self.tutor)
+
+        response = self.client.post(
+            reverse('proponer_fechas_tutoria', args=[self.tutoria.pk]),
+            {
+                'propuesta_1': '2030-01-15T11:30',
+                'propuesta_2': '',
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse('Tutorias-tutor'),
+            fetch_redirect_response=False,
+        )
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, ACEPTADO)
+        self.assertEqual(
+            self.tutoria.fecha,
+            timezone.make_aware(datetime(2030, 1, 15, 11, 30)),
+        )
+        self.assertIsNone(self.tutoria.fecha_propuesta_1)
+        self.assertIsNone(self.tutoria.fecha_propuesta_2)
+
+    def test_dos_fechas_dejan_la_tutoria_en_propuesta_hasta_que_el_alumno_elija(self):
+        self.client.force_login(self.tutor)
+
+        response = self.client.post(
+            reverse('proponer_fechas_tutoria', args=[self.tutoria.pk]),
+            {
+                'propuesta_1': '2030-01-15T11:30',
+                'propuesta_2': '2030-01-16T12:00',
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse('Tutorias-tutor'),
+            fetch_redirect_response=False,
+        )
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, PROPUESTA)
+        self.assertEqual(
+            self.tutoria.fecha_propuesta_1,
+            timezone.make_aware(datetime(2030, 1, 15, 11, 30)),
+        )
+        self.assertEqual(
+            self.tutoria.fecha_propuesta_2,
+            timezone.make_aware(datetime(2030, 1, 16, 12, 0)),
+        )
+
+        self.client.force_login(self.alumno)
+        response = self.client.post(
+            reverse('seleccionar_propuesta_tutoria', args=[self.tutoria.pk]),
+            {'opcion_elegida': '2'},
+        )
+
+        self.assertRedirects(
+            response,
+            reverse('Tutorias-alumno'),
+            fetch_redirect_response=False,
+        )
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, ACEPTADO)
+        self.assertEqual(
+            self.tutoria.fecha,
+            timezone.make_aware(datetime(2030, 1, 16, 12, 0)),
+        )
+        self.assertIsNone(self.tutoria.fecha_propuesta_1)
+        self.assertIsNone(self.tutoria.fecha_propuesta_2)
+
+
+class MotivosRechazoTutoriaTests(TestCase):
+    """Pruebas del registro del motivo al rechazar una tutoría."""
+
+    def setUp(self):
+        self.tutor = Tutor.objects.create_user(
+            first_name='Antonio',
+            last_name='López',
+            email='tutor.rechazo@cua.uam.mx',
+            matricula='123458',
+            password='password123',
+            es_tutor=True,
+        )
+        self.otro_tutor = Tutor.objects.create_user(
+            first_name='Otro',
+            last_name='Tutor',
+            email='otro.tutor.rechazo@cua.uam.mx',
+            matricula='123459',
+            password='password123',
+            es_tutor=True,
+        )
+        self.alumno = Alumno.objects.create_user(
+            first_name='Estudiante',
+            last_name='Gómez',
+            email='alumno.rechazo@cua.uam.mx',
+            matricula='654323',
+            password='password123',
+            tutor_asignado=self.tutor,
+        )
+        self.tutoria = Tutoria.objects.create(
+            tutor=self.tutor,
+            alumno=self.alumno,
+            tema=['BEC'],
+            fecha=timezone.make_aware(datetime(2030, 1, 10, 10, 0)),
+            estado=PENDIENTE,
+        )
+        self.url = reverse('rechazar_tutoria', args=[self.tutoria.pk])
+
+    def test_rechazo_con_motivo_predefinido(self):
+        self.client.force_login(self.tutor)
+        motivo = (
+            'El tema solicitado se encuentra fuera de mi ámbito de '
+            'atención o conocimiento.'
+        )
+
+        response = self.client.post(
+            self.url,
+            {'motivo_rechazo': motivo},
+        )
+
+        self.assertRedirects(
+            response,
+            reverse('Tutorias-tutor'),
+            fetch_redirect_response=False,
+        )
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, RECHAZADO)
+        self.assertEqual(self.tutoria.motivo_rechazo, motivo)
+
+    def test_rechazo_con_otro_motivo_guarda_el_texto_escrito(self):
+        self.client.force_login(self.tutor)
+        motivo_personalizado = (
+            'La solicitud requiere una revisión previa por parte de la '
+            'coordinación.'
+        )
+
+        response = self.client.post(
+            self.url,
+            {
+                'motivo_rechazo': 'otro',
+                'motivo_rechazo_otro': motivo_personalizado,
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse('Tutorias-tutor'),
+            fetch_redirect_response=False,
+        )
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, RECHAZADO)
+        self.assertEqual(self.tutoria.motivo_rechazo, motivo_personalizado)
+        self.assertNotEqual(self.tutoria.motivo_rechazo, 'otro')
+
+    def test_rechazo_sin_motivo_no_modifica_la_tutoria(self):
+        self.client.force_login(self.tutor)
+
+        response = self.client.post(self.url, {})
+
+        self.assertRedirects(
+            response,
+            reverse('Tutorias-tutor'),
+            fetch_redirect_response=False,
+        )
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, PENDIENTE)
+        self.assertFalse(self.tutoria.motivo_rechazo)
+        mensajes = list(response.wsgi_request._messages)
+        self.assertEqual(len(mensajes), 1)
+        self.assertIn(
+            'Debes seleccionar o escribir una razón',
+            str(mensajes[0]),
+        )
+
+    def test_rechazo_con_opcion_otro_vacia_no_modifica_la_tutoria(self):
+        self.client.force_login(self.tutor)
+
+        self.client.post(
+            self.url,
+            {
+                'motivo_rechazo': 'otro',
+                'motivo_rechazo_otro': '   ',
+            },
+        )
+
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, PENDIENTE)
+        self.assertFalse(self.tutoria.motivo_rechazo)
+
+    def test_otro_tutor_no_puede_rechazar_la_tutoria(self):
+        self.client.force_login(self.otro_tutor)
+
+        response = self.client.post(
+            self.url,
+            {'motivo_rechazo': 'Motivo no autorizado'},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, PENDIENTE)
+        self.assertFalse(self.tutoria.motivo_rechazo)
 
 
 class FormSeguimientoTests(TestCase):

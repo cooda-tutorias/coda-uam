@@ -347,7 +347,7 @@ class FormVerTutorias(forms.Form):
     estado = forms.TypedChoiceField(
         choices=[('', 'Todos los estados')] + ESTADOS_ALUMNO[1:],
         required=False,
-        label="Estado del Alumno",
+        label="Estado del alumno",
         coerce=int,
         empty_value='',
     )

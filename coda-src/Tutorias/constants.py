@@ -43,12 +43,14 @@ ACEPTADO = 'ACE'
 RECHAZADO = 'REJ'
 PENDIENTE = 'PEN'
 CANCELADO = 'CAN'
+PROPUESTA = 'PRO'
 
 ESTADO = [
     (ACEPTADO, 'Aceptada'),
     (RECHAZADO, 'Rechazada'),
     (PENDIENTE, 'Pendiente'),
-    (CANCELADO, 'Cancelada')
+    (CANCELADO, 'Cancelada'),
+    (PROPUESTA, 'Propuesta'),
 ]
 
 DURACION_ASESORIA = [

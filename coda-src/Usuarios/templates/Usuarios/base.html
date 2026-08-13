@@ -62,6 +62,8 @@
                 {% notifications_unread as unread_count %}
 
                 <div class="dropdown">
+                    <!-- TODO: Acá abajo hay definidos dos id diferentes, hay que dejar uno, tal vez el 2o es el bueno. -->
+
                     <a class="fs-6 dropdown-toggle hidden-arrow" href="#" id="navbarDropdownMenuLink"
                         id="navbarDropdownMenuNotification" role="button" data-mdb-toggle="dropdown" aria-expanded="false">
                         <i class="far fa-bell text-primary h5 m-3"></i>
@@ -135,6 +137,18 @@
 <!--  Inicia el body -->
 <!-- <div class="container py-5"> -->
 
+<!-- Mensajes globales de Django -->
+{% if messages %}
+  <div class="container mt-3">
+    {% for message in messages %}
+      <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" data-mdb-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+
 {% block body %}
 {% endblock %}
 
@@ -182,8 +196,9 @@
     <!-- Copyright -->
 </footer>
 <!-- Fin Footer -->
-<!--Scrip MDB -->
-<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
+
+    <!--Scrip MDB -->
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
 
     <!-- Para la paginacion y la estructuracion de las tablas -->
     <!-- DataTables CSS -->
