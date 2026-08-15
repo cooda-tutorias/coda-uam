@@ -1,0 +1,30 @@
+/*
+ * Personalizaciones visuales del proyecto.
+ * Este archivo debe cargarse después de main.css para sobrescribir el tema base.
+ */
+
+:root {
+  --bs-success: #15ab92;
+  --bs-success-rgb: 25, 135, 84;
+  --bs-warning: #ffc107;
+  --bs-danger: #ff6961;
+}
+
+.bg-success {
+  background-color: var(--bs-success) !important;
+  color: #fff !important;
+}
+
+.bg-warning {
+  background-color: var(--bs-warning) !important;
+  color: #212529 !important;
+}
+
+.bg-danger {
+  background-color: var(--bs-danger) !important;
+  color: #fff !important;
+}
+
+.badge.bg-warning {
+  color: #212529 !important;
+}

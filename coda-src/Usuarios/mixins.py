@@ -24,7 +24,7 @@ class ContextConRolesMixin:
             context["header_footer"] = TEMPLATES[CODA]
         else:
             # Default template if no role is selected
-            context["header_footer"] = "Usuarios/HeaderAndFooterDefault.html"
+            context["header_footer"] = "Usuarios/HeaderAndFooterFachada.html"
 
         # Debug: Print the final context
         print(f"Debug: Context = {context}")

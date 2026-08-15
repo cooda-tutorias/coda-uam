@@ -1,0 +1,516 @@
+{% extends "Usuarios/HeaderAndFooterFachada.html" %}
+{% block title %}Panel de Tutorías{% endblock %}
+{% block body %}
+  <style>
+    .tutorias-nav-tabs {
+        gap: .25rem;
+        border-bottom: 1px solid #d9dee3;
+    }
+
+    .tutorias-nav-tabs .nav-link {
+        margin-bottom: -1px;
+        padding: 1rem 1.5rem;
+        color: #4f4f4f;
+        font-size: 1rem;
+        font-weight: 500;
+        text-transform: none;
+        background-color: transparent;
+        border: 1px solid transparent;
+        border-top: 4px solid transparent;
+        border-radius: .35rem .35rem 0 0;
+        transition: color .15s ease-in-out, background-color .15s ease-in-out;
+    }
+
+    .tutorias-nav-tabs .nav-link:hover:not(.active) {
+        color: #F08200;
+        background-color: #fcfaf7;
+    }
+
+    .tutorias-nav-tabs .nav-link.active {
+        color: #F08200;
+        background-color: #fff;
+        border-color: #F08200 #d9dee3 #fff;
+        box-shadow: 0 -1px 2px rgba(0, 0, 0, .04);
+    }
+
+    @media (max-width: 575.98px) {
+        .tutorias-nav-tabs .nav-link {
+            padding: .75rem;
+            font-size: .9rem;
+        }
+    }
+
+/* Limita el contenedor a un máximo de 2 renglones con puntos suspensivos */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word; /* Para evitar que palabras muy largas rompan la celda */
+}    
+
+.tooltip-cafe {
+  --bs-tooltip-bg: #4b2f10;
+  --bs-tooltip-color: #ffffff;
+  --mdb-tooltip-bg: #4A2E11;
+  --mdb-tooltip-color: #ffffff;
+}
+
+
+.action-group {
+  overflow: hidden;
+  border: 1px solid #d6d6d6;
+  border-radius: 0.5rem;
+  background-color: #fff;
+}
+
+.action-neutral {
+  display: inline-flex;
+  width: 36px;
+  height: 34px;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  color: #555;
+  background-color: #fff;
+  border: 0;
+  border-right: 1px solid #e2e2e2;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.action-group > :last-child {
+  border-right: 0;
+}
+
+.action-accept:hover,
+.action-accept:focus {
+  color: #fff;
+  background-color: var(--bs-green);
+}
+
+.action-reschedule:hover,
+.action-reschedule:focus {
+  color: #fff;
+  background-color: var(--bs-primary);
+}
+
+.action-reject:hover,
+.action-reject:focus {
+  color: #fff;
+  background-color: var(--bs-red);
+}
+
+.action-edit:hover,
+.action-edit:focus {
+  color: #fff;
+  background-color: #79bdc8;
+}
+  </style>
+  <section id="section" style="background-color: #eee;">
+    <div class="container py-5 min-vh-100">
+      <div class="row justify-content-center">
+        <div class="col-lg-10 col-xl-11">
+          <div class="card border-top border-bottom border-4"
+               style="border-color: #F08200 !important">
+            <div class="card-body p-4">
+              <h3 class="mb-4 text-primary text-title-bold">Panel de Tutorías</h3>
+              <!-- 1. ENCABEZADO DE PESTAÑAS -->
+              <ul class="nav nav-tabs tutorias-nav-tabs mb-4"
+                  id="tutorias-tabs"
+                  role="tablist">
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link active"
+                          id="solicitadas-tab"
+                          data-mdb-toggle="tab"
+                          data-mdb-target="#solicitadas"
+                          type="button"
+                          role="tab"
+                          aria-controls="solicitadas"
+                          aria-selected="true">
+                    <i class="bi bi-send me-2"></i>Solicitadas
+                    {% if tutorias_solicitadas %}
+                      <span class="badge rounded-pill bg-success ms-2">{{ tutorias_solicitadas|length }}</span>
+                    {% endif %}
+                  </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link"
+                          id="agendadas-tab"
+                          data-mdb-toggle="tab"
+                          data-mdb-target="#agendadas"
+                          type="button"
+                          role="tab"
+                          aria-controls="agendadas"
+                          aria-selected="false">
+                    <i class="bi bi-calendar-check me-2"></i>Agendadas
+                    {% if tutorias_agendadas %}
+                      <span class="badge rounded-pill bg-success ms-2">{{ tutorias_agendadas|length }}</span>
+                    {% endif %}
+                  </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link"
+                          id="historial-tab"
+                          data-mdb-toggle="tab"
+                          data-mdb-target="#historial"
+                          type="button"
+                          role="tab"
+                          aria-controls="historial"
+                          aria-selected="false">
+                    <i class="bi bi-archive me-2"></i>Historial
+                  </button>
+                </li>
+              </ul>
+              <!-- 2. CONTENIDO DE LAS PESTAÑAS -->
+              <div class="tab-content" id="tutorias-tabs-content">
+                <!-- PESTAÑA 1: SOLICITADAS -->
+                <div class="tab-pane fade show active"
+                     id="solicitadas"
+                     role="tabpanel"
+                     aria-labelledby="solicitadas-tab">
+                  <div class="table-responsive">
+                    <table class="table table-striped table-hover align-middle">
+                      <thead>
+                        <tr class="text-title text-center">
+                          <th>Tutor</th>
+                          <th>Fecha sugerida</th>
+                          <th>Tema</th>
+                          <th>Descripción</th>
+                          <th>Estado</th>
+                          <th>Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for tutoria in tutorias_solicitadas %}
+                          <tr class="text-body text-center">
+                            <td>{{ tutoria.tutor.nombre_completo }}</td>
+                            <td class="text-nowrap">
+                              <span class="d-block fw-semibold">{{ tutoria.fecha|date:"j M Y" }}</span>
+                              <small class="text-muted">
+                                <i class="bi bi-clock me-1"></i>
+                                {{ tutoria.fecha|date:"P" }}
+                              </small>
+                            </td>
+                            <td>{{ tutoria.get_tema_display|join:", " }}</td>
+                            <!-- Corta la descripción a 2 líneas y el texto completo lo muestra en el tooltip -->
+                            <td style="max-width: 200px;">
+                              <span class="tooltip-dinamico"
+                                    data-descripcion="{{ tutoria.descripcion|escape }}"
+                                    data-mdb-placement="top"
+                                    data-mdb-custom-class="tooltip-cafe">
+                                <div class="line-clamp-2 text-wrap">{{ tutoria.descripcion|default:"-" }}</div>
+                              </span>
+                            </td>
+                            <!-- Celda que muestra el estado de la tutoría con un badge -->
+                            <td>
+                              <span class="badge rounded-pill {{ tutoria.estado_badge_class }}">{{ tutoria.get_estado_display }}</span>
+                            </td>
+                            <!-- Celda que muestra los botones de acciones para el usuario -->
+                            <td>
+                              <!-- CASO 1: PROPUESTA (El tutor propuso horarios) -->
+                              {% if tutoria.estado_efectivo == 'PRO' %}
+                                <button type="button"
+                                        class="btn btn-sm btn-primary text-white text-capitalize shadow-0"
+                                        data-mdb-toggle="modal"
+                                        data-mdb-target="#modalSeleccionar-{{ tutoria.pk }}">Elegir horario</button>
+                              {% else %}
+                                <!-- CASO 2 y 3: PENDIENTE O VENCIDA -->
+                                <div class="btn-group btn-group-sm action-group"
+                                     role="group"
+                                     aria-label="Acciones de tutoría">
+                                  {% if tutoria.estado_efectivo == 'PEN' %}
+                                    <!-- 1. EDITAR (Abre modal) -->
+                                    <a href="{% url 'Tutorias-update' pk=tutoria.pk %}"
+                                       class="btn action-neutral action-edit"
+                                       title="Editar tema y descripción"
+                                       aria-label="Editar tema y descripción">
+                                      <i class="bi bi-pencil-square" aria-hidden="true"></i>
+                                    </a>
+                                    <!-- 2. REAGENDAR (Abre Modal, temporalmente) -->
+                                    <button type="button"
+                                            class="btn action-neutral action-reschedule"
+                                            title="Cambiar fecha sugerida">
+                                      <i class="bi bi-calendar-event"></i>
+                                    </button>
+                                  {% endif %}
+                                  <!-- 3. CANCELAR (Se muestra SIEMPRE que no sea PRO, es decir PEN o VEN) -->
+                                  <button type="button"
+                                          class="btn action-neutral action-reject"
+                                          title="Cancelar solicitud">
+                                    <i class="bi bi-x-lg"></i>
+                                  </button>
+                                </div>
+                              {% endif %}
+                            </td>
+                          </tr>
+                        {% empty %}
+                          <tr>
+                            <td colspan="6" class="py-4 text-center text-muted">No tienes solicitudes pendientes.</td>
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <!-- PESTAÑA 2: AGENDADAS -->
+                <div class="tab-pane fade"
+                     id="agendadas"
+                     role="tabpanel"
+                     aria-labelledby="agendadas-tab">
+                  <div class="table-responsive">
+                    <table class="table table-striped table-hover align-middle">
+                      <thead>
+                        <tr class="text-title text-center">
+                          <th>Tutor</th>
+                          <th>Fecha agendada</th>
+                          <th>Tema</th>
+                          <th>Descripción</th>
+                          <th>Estado</th>
+                          <th>Acción</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for tutoria in tutorias_agendadas %}
+                          <tr class="text-body text-center">
+                            <td>{{ tutoria.tutor.nombre_completo }}</td>
+                            <td class="text-nowrap">
+                              <span class="d-block fw-semibold">{{ tutoria.fecha|date:"j M Y" }}</span>
+                              <small class="text-muted">
+                                <i class="bi bi-clock me-1"></i>
+                                {{ tutoria.fecha|date:"P" }}
+                              </small>
+                            </td>
+                            <td>{{ tutoria.get_tema_display|join:", " }}</td>
+                            <!-- Corta la descripción a 2 líneas y el texto completo lo muestra en el tooltip -->
+                            <td style="max-width: 200px;">
+                              <span class="tooltip-dinamico"
+                                    data-descripcion="{{ tutoria.descripcion|escape }}"
+                                    data-mdb-placement="top"
+                                    data-mdb-custom-class="tooltip-cafe">
+                                <div class="line-clamp-2 text-wrap">{{ tutoria.descripcion|default:"-" }}</div>
+                              </span>
+                            </td>
+                            <td><span class="badge rounded-pill bg-success">{{ tutoria.get_estado_display }}</span></td>
+                            <td>
+                              <div class="btn-group btn-group-sm action-group"
+                                   role="group"
+                                   aria-label="Acciones de tutoría">
+                                <!-- 1. EDITAR (Abre modal) -->
+                                <a href="{% url 'Tutorias-update' pk=tutoria.pk %}"
+                                   class="btn action-neutral action-edit"
+                                   title="Editar tema y descripción"
+                                   aria-label="Editar tema y descripción">
+                                  <i class="bi bi-pencil-square" aria-hidden="true"></i>
+                                </a>
+                                <!-- 2. REAGENDAR (Abre Modal, temporalmente) -->
+                                <button type="button"
+                                        class="btn action-neutral action-reschedule"
+                                        title="Cambiar fecha sugerida">
+                                  <i class="bi bi-calendar-event"></i>
+                                </button>
+                                <!-- 3. CANCELAR (solamente muestra ventana de confirmación ) -->
+                                <button type="button"
+                                        class="btn action-neutral action-reject"
+                                        title="Cancelar solicitud">
+                                  <i class="bi bi-x-lg"></i>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        {% empty %}
+                          <tr>
+                            <td colspan="6" class="py-4 text-center text-muted">Aún no hay tutorías en tu historial.</td>
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <!-- PESTAÑA 3: HISTORIAL -->
+                <div class="tab-pane fade"
+                     id="historial"
+                     role="tabpanel"
+                     aria-labelledby="historial-tab">
+                  <div class="table-responsive">
+                    <table class="table table-striped table-hover align-middle datatable">
+                      <thead>
+                        <tr class="text-title text-center">
+                          <th>Tutor</th>
+                          <th>Fecha tutoría</th>
+                          <th>Tema</th>
+                          <th>Descripción</th>
+                          <th>Estado</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for tutoria in tutorias_historial %}
+                          <tr class="text-body text-center">
+                            <td>{{ tutoria.tutor.nombre_completo }}</td>
+                            <td class="text-nowrap">
+                              <span class="d-block fw-semibold">{{ tutoria.fecha|date:"j M Y" }}</span>
+                              <small class="text-muted">
+                                <i class="bi bi-clock me-1"></i>
+                                {{ tutoria.fecha|date:"P" }}
+                              </small>
+                            </td>
+                            <td>{{ tutoria.get_tema_display|join:", " }}</td>
+                            <!-- Corta la descripción a 2 líneas y el texto completo lo muestra en el tooltip -->
+                            <td style="max-width: 200px;">
+                              <span class="tooltip-dinamico"
+                                    data-descripcion="{{ tutoria.descripcion|escape }}"
+                                    data-mdb-placement="top"
+                                    data-mdb-custom-class="tooltip-cafe">
+                                <div class="line-clamp-2 text-wrap">{{ tutoria.descripcion|default:"-" }}</div>
+                              </span>
+                            </td>
+                            <!-- Celda que muestra el estado de la tutoría con un badge -->
+                            <td>
+                              <span class="badge rounded-pill {{ tutoria.estado_badge_class }}">{{ tutoria.get_estado_display }}</span>
+                            </td>
+                          </tr>
+                        {% empty %}
+                          <tr>
+                            <td colspan="5" class="py-4 text-center text-muted">Aún no hay tutorías en tu historial.</td>
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  {% for tutoria in tutorias_solicitadas %}
+    {% if tutoria.estado_efectivo == 'PRO' %}
+      <div class="modal fade"
+           id="modalSeleccionar-{{ tutoria.pk }}"
+           tabindex="-1"
+           aria-labelledby="modalLabel-{{ tutoria.pk }}"
+           aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <form method="post"
+                  action="{% url 'seleccionar_propuesta_tutoria' pk=tutoria.pk %}">
+              {% csrf_token %}
+              <div class="modal-header bg-light">
+                <h5 class="modal-title text-primary" id="modalLabel-{{ tutoria.pk }}">Horario sugerido por el tutor</h5>
+                <button type="button"
+                        class="btn-close"
+                        data-mdb-dismiss="modal"
+                        aria-label="Cerrar"></button>
+              </div>
+              <div class="modal-body text-start">
+                <p class="text-muted small mb-3">
+                  Tu tutor(a) <strong>{{ tutoria.tutor.nombre_completo }}</strong> propuso estos horarios. Elige el que mejor te convenga:
+                </p>
+                {% if tutoria.fecha_propuesta_1 %}
+                  <div class="form-check p-3 mb-2 border rounded">
+                    <input class="form-check-input ms-0 me-2"
+                           type="radio"
+                           name="opcion_elegida"
+                           id="opcion1-{{ tutoria.pk }}"
+                           value="1"
+                           required>
+                    <label class="form-check-label fw-bold text-dark"
+                           for="opcion1-{{ tutoria.pk }}">
+                      Opción 1: {{ tutoria.fecha_propuesta_1|date:"d M Y, h:i a" }}
+                    </label>
+                  </div>
+                {% endif %}
+                {% if tutoria.fecha_propuesta_2 %}
+                  <div class="form-check p-3 mb-2 border rounded">
+                    <input class="form-check-input ms-0 me-2"
+                           type="radio"
+                           name="opcion_elegida"
+                           id="opcion2-{{ tutoria.pk }}"
+                           value="2"
+                           required>
+                    <label class="form-check-label fw-bold text-dark"
+                           for="opcion2-{{ tutoria.pk }}">
+                      Opción 2: {{ tutoria.fecha_propuesta_2|date:"d M Y, h:i a" }}
+                    </label>
+                  </div>
+                {% endif %}
+              </div>
+              <div class="modal-footer">
+                <button type="button"
+                        class="btn btn-secondary btn-sm"
+                        data-mdb-dismiss="modal">Cerrar</button>
+                <button type="submit" class="btn btn-primary btn-sm">Confirmar horario</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  {% endfor %}
+  <script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Inicializa todos los tooltips de la página
+  const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-mdb-toggle="tooltip"]'));
+  tooltipTriggerList.map(function (tooltipTriggerEl) {
+    return new mdb.Tooltip(tooltipTriggerEl);
+  });
+});
+  </script>
+  <script>
+document.addEventListener('DOMContentLoaded', function () {
+
+  function inicializarTooltips(contenedor) {
+    if (!contenedor) {
+      return;
+    }
+
+    const elementos = contenedor.querySelectorAll('.tooltip-dinamico');
+
+    elementos.forEach(function (span) {
+      const contenedorTexto = span.querySelector('.line-clamp-2');
+
+      if (!contenedorTexto) {
+        return;
+      }
+
+      const estaCortado =
+        contenedorTexto.scrollHeight > contenedorTexto.clientHeight;
+
+      const yaInicializado =
+        span.getAttribute('data-tooltip-inicializado') === 'true';
+
+      if (estaCortado && !yaInicializado) {
+        span.setAttribute('title', span.getAttribute('data-descripcion'));
+        span.setAttribute('data-mdb-toggle', 'tooltip');
+        span.setAttribute('data-mdb-placement', 'top');
+        span.setAttribute('data-mdb-custom-class', 'tooltip-cafe');
+
+        new mdb.Tooltip(span);
+
+        span.setAttribute('data-tooltip-inicializado', 'true');
+      }
+    });
+  }
+
+  // Inicializa los tooltips de la pestaña visible al cargar la página.
+  const pestañaActiva = document.querySelector('.tab-pane.active');
+  inicializarTooltips(pestañaActiva);
+
+  // Inicializa los tooltips de las demás pestañas cuando se muestran.
+  const botonesPestaña =
+    document.querySelectorAll('[data-mdb-toggle="tab"]');
+
+  botonesPestaña.forEach(function (boton) {
+    boton.addEventListener('shown.mdb.tab', function (event) {
+      const selectorPanel = event.target.getAttribute('data-mdb-target');
+      const panelVisible = document.querySelector(selectorPanel);
+
+      inicializarTooltips(panelVisible);
+    });
+  });
+
+});
+  </script>
+{% endblock %}

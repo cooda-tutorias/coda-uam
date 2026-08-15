@@ -39,11 +39,17 @@ TEMAS = [
     (OTRO, "Otro")
 ]
 
+# Estados que sí se guardan en la base de datos
 ACEPTADO = 'ACE'
 RECHAZADO = 'REJ'
 PENDIENTE = 'PEN'
 CANCELADO = 'CAN'
 PROPUESTA = 'PRO'
+
+# Nuevos estados dinámicos (determinados en tiempo de ejecución)
+VENCIDA = 'VEN'
+REPORTADA = 'REP'
+REALIZADA = 'REA'
 
 ESTADO = [
     (ACEPTADO, 'Aceptada'),
@@ -51,6 +57,10 @@ ESTADO = [
     (PENDIENTE, 'Pendiente'),
     (CANCELADO, 'Cancelada'),
     (PROPUESTA, 'Propuesta'),
+    # Estados determinados dinámicamente
+    (VENCIDA, 'Vencida'),
+    (REPORTADA, 'Registrada'),
+    (REALIZADA, 'Realizada'),    
 ]
 
 DURACION_ASESORIA = [

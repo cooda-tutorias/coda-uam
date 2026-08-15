@@ -4,7 +4,14 @@ from datetime import timedelta
 from django.contrib.postgres.fields import ArrayField
 from Usuarios.models import Alumno, Tutor
 from Usuarios.constants import ESTADOS_ALUMNO
-from .constants import TEMAS, SERVICIO, PENDIENTE, ESTADO, DURACION_ASESORIA
+from .constants import TEMAS, SERVICIO, ESTADO, DURACION_ASESORIA
+from django.utils import timezone
+
+# Incluir todos los estados de una tutoría.
+from .constants import (
+    PENDIENTE, PROPUESTA, VENCIDA, ACEPTADO,
+    REALIZADA, REPORTADA, RECHAZADO, CANCELADO
+)
 
 # Create your models here.
 class Tutoria(models.Model):
@@ -49,6 +56,54 @@ class Tutoria(models.Model):
     
     class Meta:
         ordering = ["-fecha"]
+
+    @property
+    def estado_efectivo(self):
+        """ 
+        Regresa el estado efectivo de la tutoría al momento de la consulta, 
+        considerando la fecha y la asistencia.
+        """
+        ahora = timezone.now()
+        
+        # 1. Solicitud o propuesta que venció sin ser aceptada
+        if self.estado in [PENDIENTE, PROPUESTA] and self.fecha < ahora:
+            return VENCIDA
+
+        # 2. Tutoría aceptada que ya pasó la fecha
+        if self.estado == ACEPTADO and self.fecha < ahora:
+            if self.asistencia is not None:
+                return REPORTADA
+            return REALIZADA    
+                
+        # 3. En cualquier otro caso, regresa el estado normal grabado en BD
+        return self.estado
+
+
+    def _get_FIELD_display(self, field):
+        """
+        Intercepta la generación automática de labels de Django 
+        para soportar estados dinámicos sin romper la convención del framework.
+        """
+        if field.name == 'estado':
+            # Si el estado efectivo está en nuestro diccionario global, devolvemos su texto
+            return dict(ESTADO).get(self.estado_efectivo)
+        
+        return super()._get_FIELD_display(field)
+
+    @property
+    def estado_badge_class(self):
+        """Devuelve la clase CSS correspondiente al estado efectivo actual."""
+        mapa_clases = {
+            'PEN': 'bg-pendiente',
+            'PRO': 'bg-propuesta',
+            'ACE': 'bg-aceptada',
+            'REJ': 'bg-rechazada',
+            'CAN': 'bg-cancelada',
+            'VEN': 'bg-vencida',
+            'REP': 'bg-reportada',
+            'REA': 'bg-realizada',
+        }
+        return mapa_clases.get(self.estado_efectivo, 'bg-secondary')
 
     #Sobreescribir método get_foo_display de django
     def get_tema_display(self):

@@ -66,6 +66,7 @@ from django.conf import settings
 from icalendar import Calendar, Event
 
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
 
 # Función para convertir una fecha en formato string a un objeto datetime con zona horaria.
 def convertir_fecha_local(valor):
@@ -1637,7 +1638,7 @@ class VerTutoriasTutorListView(TutorViewMixin, FormView):
     def form_valid(self, form):
         estado = form.cleaned_data.get("estado")
 
-        # Obtiene las tutorías del tutor actual que requieren aprobación y están pendientes
+        # Obtiene las tutorías del tutor actual que requieren aprobación o están pendientes
         tutorias = Tutoria.objects.filter(
             tutor=self.request.user,
             estado__in=[PENDIENTE, PROPUESTA],
@@ -1710,22 +1711,48 @@ class TutorProximasListView(TutorViewMixin, ListView):
             ).order_by("fecha")
         )
     
-class VerTutoriasAlumnoListView(AlumnoViewMixin, ListView):
-     
+class VerTutoriasAlumnoListView(LoginRequiredMixin, ListView):
+    """Organiza las tutorías del alumno por su estado efectivo."""
+
     model = Tutoria
-    template_name='Tutorias/verTutorias_alumno.html'
+    template_name = 'Tutorias/panel_tutorias_alumno.html'
+    context_object_name = 'tutorias'
 
     def get_queryset(self) -> QuerySet[Any]:
+        return (
+            super()
+            .get_queryset()
+            .filter(alumno_id=self.request.user.pk)
+            .select_related('tutor')
+        )
+
+    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        tutorias = list(context['tutorias'])
+
+        # HeaderAndFooterFachada.html extiende esta plantilla dinámicamente.
+        # Esta vista usa LoginRequiredMixin directamente, por lo que debe
+        # proporcionar el valor que antes agregaba AlumnoViewMixin.
+        context['header_footer'] = TEMPLATES[ALUMNO]
+
+        context['tutorias_solicitadas'] = [
+            t
+            for t in tutorias
+            if t.estado_efectivo in [PENDIENTE, PROPUESTA, VENCIDA]
+        ]
+        context['tutorias_agendadas'] = [
+            t
+            for t in tutorias
+            if t.estado_efectivo == ACEPTADO
+        ]
+        context['tutorias_historial'] = [
+            t
+            for t in tutorias
+            if t.estado_efectivo in [REALIZADA, REPORTADA, RECHAZADO, CANCELADO]
+        ]
         
-        # Tutorias correspondientes al alumno
-        
-        queryset = super().get_queryset().filter(alumno=self.request.user)
-        #if self.request.user.is_superuser == 1: 
-            # Muestra todas las tutorias para el primer usuario creado (generalmente el primer superuser)
-            #queryset = super().get_queryset().all()
-        
-        return queryset
-    
+        return context
+
 
 # TODO Eliminar para prod
 # class DebugTutoriasView(LoginRequiredMixin, ListView):

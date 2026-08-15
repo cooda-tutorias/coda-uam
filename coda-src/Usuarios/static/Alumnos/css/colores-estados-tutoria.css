@@ -1,0 +1,51 @@
+/* ===================================================
+   PALETA UNIFICADA DE BADGES DE ESTADO
+   =================================================== */
+
+/* PENDIENTE: Amarillo/Ámbar suave */
+.bg-pendiente {
+  background-color: #FEF3C7 !important;
+  color: #92400E !important;
+}
+
+/* PROPUESTA: Azul celeste claro */
+.bg-propuesta {
+  background-color: #E0F2FE !important;
+  color: #0369A1 !important;
+}
+
+/* ACEPTADA: Verde confiable / Esmeralda */
+.bg-aceptada {
+  background-color: #D1FAE5 !important;
+  color: #065F46 !important;
+}
+
+/* RECHAZADA: Rojo vino / Terracota */
+.bg-rechazada {
+  background-color: #FEE2E2 !important;
+  color: #991B1B !important;
+}
+
+/* CANCELADA: Gris ceniza / Neutro */
+.bg-cancelada{
+  background-color: #727272 !important;
+  color: #f1f3f5 !important;
+}
+
+/* VENCIDA: Café suave / Beige */
+.bg-vencida {
+  background-color: #e8dbd4 !important;
+  color: #4E342E !important;
+}
+
+/* REPORTADA: Verde brillante */
+.bg-reportada {
+  background-color: #10B981 !important;
+  color: #FFFFFF !important;
+}
+
+/* REALIZADA / FINALIZADA: Azul marino / Oscuro */
+.bg-realizada {
+  background-color: #14a2c9 !important;
+  color: #FFFFFF !important;
+}
