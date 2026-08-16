@@ -162,6 +162,7 @@
                   </button>
                 </li>
               </ul>
+
               <!-- 2. CONTENIDO DE LAS PESTAÑAS -->
               <div class="tab-content" id="tutorias-tabs-content">
                 <!-- PESTAÑA 1: SOLICITADAS -->
@@ -175,10 +176,10 @@
                         <tr class="text-title text-center">
                           <th>Tutor</th>
                           <th>Fecha sugerida</th>
-                          <th>Tema</th>
+                          <th>Tema(s)</th>
                           <th>Descripción</th>
                           <th>Estado</th>
-                          <th>Acción</th>
+                          <th>Acciones</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -208,7 +209,7 @@
                             </td>
                             <!-- Celda que muestra los botones de acciones para el usuario -->
                             <td>
-                              <!-- CASO 1: PROPUESTA (El tutor propuso horarios) -->
+                              <!-- CASO 1: PROPUESTA (El tutor propuso 2 horarios) -->
                               {% if tutoria.estado_efectivo == 'PRO' %}
                                 <button type="button"
                                         class="btn btn-sm btn-primary text-white text-capitalize shadow-0"
@@ -220,14 +221,15 @@
                                      role="group"
                                      aria-label="Acciones de tutoría">
                                   {% if tutoria.estado_efectivo == 'PEN' %}
-                                    <!-- 1. EDITAR (Abre modal) -->
-                                    <a href="{% url 'Tutorias-update' pk=tutoria.pk %}"
-                                       class="btn action-neutral action-edit"
-                                       title="Editar tema y descripción"
-                                       aria-label="Editar tema y descripción">
+                                    <!-- 1. EDITAR (Abre un modal) -->
+                                    <button type="button"
+                                            class="btn action-neutral action-edit js-abrir-editar-tutoria"
+                                            data-url="{% url 'Tutorias-update-modal' pk=tutoria.pk %}"
+                                            aria-label="Editar tema y descripción"
+                                            title="Editar tema y descripción">
                                       <i class="bi bi-pencil-square" aria-hidden="true"></i>
-                                    </a>
-                                    <!-- 2. REAGENDAR (Abre Modal, temporalmente) -->
+                                    </button>
+                                    <!-- 2. REAGENDAR (Abre un modal, FALTA) -->
                                     <button type="button"
                                             class="btn action-neutral action-reschedule"
                                             title="Cambiar fecha sugerida">
@@ -264,10 +266,10 @@
                         <tr class="text-title text-center">
                           <th>Tutor</th>
                           <th>Fecha agendada</th>
-                          <th>Tema</th>
+                          <th>Tema(s)</th>
                           <th>Descripción</th>
                           <th>Estado</th>
-                          <th>Acción</th>
+                          <th>Acciones</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -297,12 +299,13 @@
                                    role="group"
                                    aria-label="Acciones de tutoría">
                                 <!-- 1. EDITAR (Abre modal) -->
-                                <a href="{% url 'Tutorias-update' pk=tutoria.pk %}"
-                                   class="btn action-neutral action-edit"
-                                   title="Editar tema y descripción"
-                                   aria-label="Editar tema y descripción">
+                                <button type="button"
+                                        class="btn action-neutral action-edit js-abrir-editar-tutoria"
+                                        data-url="{% url 'Tutorias-update-modal' pk=tutoria.pk %}"
+                                        aria-label="Editar tema y descripción"
+                                        title="Editar tema y descripción">
                                   <i class="bi bi-pencil-square" aria-hidden="true"></i>
-                                </a>
+                                </button>
                                 <!-- 2. REAGENDAR (Abre Modal, temporalmente) -->
                                 <button type="button"
                                         class="btn action-neutral action-reschedule"
@@ -338,7 +341,7 @@
                         <tr class="text-title text-center">
                           <th>Tutor</th>
                           <th>Fecha tutoría</th>
-                          <th>Tema</th>
+                          <th>Tema(s)</th>
                           <th>Descripción</th>
                           <th>Estado</th>
                         </tr>
@@ -449,8 +452,176 @@
       </div>
     {% endif %}
   {% endfor %}
+
+  <div id="contenedor-modal-editar-tutoria"></div>
+
+  <script>
+document.addEventListener("DOMContentLoaded", function () {
+  const contenedor = document.getElementById(
+    "contenedor-modal-editar-tutoria"
+  );
+
+  let modalActual = null;
+
+  function abrirModalDesdeHtml(html) {
+    contenedor.innerHTML = html;
+
+    const elementoModal = contenedor.querySelector(
+      "#modalEditarTutoria"
+    );
+
+    modalActual = new mdb.Modal(elementoModal);
+    modalActual.show();
+  }
+
+  // Se utiliza delegación de eventos para todos los botones Editar.
+  document.addEventListener("click", async function (event) {
+    const boton = event.target.closest(
+      ".js-abrir-editar-tutoria"
+    );
+
+    if (!boton) {
+      return;
+    }
+
+    boton.disabled = true;
+
+    try {
+      const respuesta = await fetch(boton.dataset.url, {
+        headers: {
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      });
+
+      if (!respuesta.ok) {
+        throw new Error("No fue posible cargar el formulario.");
+      }
+
+      const html = await respuesta.text();
+      abrirModalDesdeHtml(html);
+
+    } catch (error) {
+      console.error(error);
+      alert("No fue posible abrir la edición de la tutoría.");
+
+    } finally {
+      boton.disabled = false;
+    }
+  });
+
+  // Procesa el formulario cargado dinámicamente.
+  contenedor.addEventListener("submit", async function (event) {
+    const formulario = event.target.closest(
+      ".js-form-editar-tutoria"
+    );
+
+    if (!formulario) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const botonGuardar = formulario.querySelector(
+      'button[type="submit"]'
+    );
+
+    botonGuardar.disabled = true;
+
+    try {
+      const respuesta = await fetch(formulario.action, {
+        method: "POST",
+        body: new FormData(formulario),
+        headers: {
+          "X-Requested-With": "XMLHttpRequest",
+        },
+      });
+
+      if (respuesta.ok) {
+        const resultado = await respuesta.json();
+
+        if (resultado.ok) {
+          modalActual.hide();
+
+          const pestañaActiva = document.querySelector(
+            '#tutorias-tabs .nav-link.active'
+          );
+
+          if (pestañaActiva) {
+            sessionStorage.setItem(
+            'pestañaTutoriasActiva',
+            pestañaActiva.getAttribute('data-mdb-target')
+            );
+          }
+
+          window.location.reload();
+          return;
+        }      
+      }
+
+      if (respuesta.status === 422) {
+        const html = await respuesta.text();
+
+        /*
+         * Conserva abierto el modal y reemplaza su contenido
+         * con el formulario que contiene los errores.
+         */
+        const documentoTemporal =
+          new DOMParser().parseFromString(html, "text/html");
+
+        const contenidoNuevo =
+          documentoTemporal.querySelector(".modal-content");
+
+        const contenidoActual =
+          contenedor.querySelector(".modal-content");
+
+        if (contenidoNuevo && contenidoActual) {
+          contenidoActual.replaceWith(contenidoNuevo);
+        }
+
+        return;
+      }
+
+      throw new Error("No fue posible guardar la tutoría.");
+
+    } catch (error) {
+      console.error(error);
+      alert("Ocurrió un error al guardar los cambios.");
+
+    } finally {
+      const botonActual = contenedor.querySelector(
+        'button[type="submit"]'
+      );
+
+      if (botonActual) {
+        botonActual.disabled = false;
+      }
+    }
+  });
+});
+  </script>
+
   <script>
 document.addEventListener('DOMContentLoaded', function() {
+  // Para que después de hacer la edición de temas o descripción
+  // se regrese la pestaña actual.
+  const selectorPestañaGuardada = sessionStorage.getItem(
+    'pestañaTutoriasActiva'
+  );
+
+  if (selectorPestañaGuardada) {
+    const botonPestaña = document.querySelector(
+      `[data-mdb-target="${selectorPestañaGuardada}"]`
+    );
+
+    if (botonPestaña) {
+      const instanciaPestaña = new mdb.Tab(botonPestaña);
+      instanciaPestaña.show();
+    }
+
+    sessionStorage.removeItem('pestañaTutoriasActiva');
+  }
+
+
   // Inicializa todos los tooltips de la página
   const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-mdb-toggle="tooltip"]'));
   tooltipTriggerList.map(function (tooltipTriggerEl) {

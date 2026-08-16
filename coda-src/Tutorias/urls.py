@@ -9,6 +9,8 @@ urlpatterns = [
     #path('', views.index, name='index'),
     path('tutorias/<int:pk>/', views.TutoriasDetailView.as_view(), name='Tutorias-detail'),
     path('editar-tutoria/<int:pk>', views.TutoriaUpdateView.as_view(), name='Tutorias-update'),
+    path('editar-tutoria-modal/<int:pk>/', views.TutoriaModalUpdateView.as_view(), name='Tutorias-update-modal'),
+
     path('crear-tutoria/', views.TutoriaCreateView.as_view(), name='Tutorias-create'),
     path('crear-reporte-2/<int:pk>', views.Reporte2CreateView.as_view(), name='Reporte2-create'),
     path('crear-reporte/<int:pk>', views.ReporteCreateView.as_view(), name='Reporte-create'),

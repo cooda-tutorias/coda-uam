@@ -10,6 +10,34 @@ def str_to_bool(value):
         return value
     return str(value).strip().lower() == 'true'
 
+
+class FormEditarTutoriaModal(forms.ModelForm):
+    """
+    Formulario para editar los temas y la descripción de la tutoría.
+    """
+    tema = forms.MultipleChoiceField(
+        choices=TEMAS,
+        widget=forms.CheckboxSelectMultiple,
+        label="Temas de la tutoría",
+        required=True,
+    )
+
+    descripcion = forms.CharField(
+        label="Descripción",
+        max_length=255,
+        required=True,
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": 4,
+            }
+        ),
+    )
+
+    class Meta:
+        model = Tutoria
+        fields = ["tema", "descripcion"]
+
 class FormTutorias(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):

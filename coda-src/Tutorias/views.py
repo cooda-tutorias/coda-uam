@@ -5,7 +5,7 @@ from django.shortcuts import get_object_or_404, redirect
 from django.db.models.query import QuerySet
 from django.forms.models import BaseModelForm
 from django.shortcuts import render, redirect
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.views.generic.detail import DetailView
 from django.views.generic.list import ListView
 from django.views.generic.edit import CreateView, UpdateView
@@ -23,6 +23,7 @@ from .constants import TEMAS
 from .models import Tutoria, HistorialCambioTutoria, Asesoria
 from .forms import (
     FormTutorias,
+    FormEditarTutoriaModal,
     FormSeguimiento,
     FormReporte,
     FormCartasDeAsignacion,
@@ -499,7 +500,8 @@ class CancelarTutoriaView(View):
         tutoria.estado = CANCELADO
         tutoria.save()
         return redirect('Tutorias-tutor')
-    
+   
+
 class TutoriaUpdateView(BaseAccessMixin, UpdateView):
     model = Tutoria
     form_class = FormTutorias  # ← Usa tu formulario personalizado
@@ -655,6 +657,30 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
 
         return render(request, 'tutoria/editar_tutoria.html', {'form': form})
     
+
+class TutoriaModalUpdateView(TutoriaUpdateView):
+    """
+    Vista para editar los temas y la descripción de una tutoría usando una ventana modal.
+    """
+    form_class = FormEditarTutoriaModal
+    template_name = "Tutorias/includes/_modal_editar_tutoria.html"
+
+    def form_valid(self, form):
+        # Reutiliza guardado, historial y notificaciones de la vista original.
+        super().form_valid(form)
+
+        return JsonResponse({
+            "ok": True,
+            "message": "La tutoría se actualizó correctamente.",
+        })
+
+    def form_invalid(self, form):
+        response = self.render_to_response(
+            self.get_context_data(form=form)
+        )
+        response.status_code = 422
+        return response
+
     
 # Solicitud Tutorias
 class TutoriaCreateView(AlumnoViewMixin, CreateView):

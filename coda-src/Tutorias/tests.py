@@ -12,7 +12,17 @@ from Usuarios.models import Tutor, Alumno
 from Tutorias.models import Tutoria, HistorialCambioTutoria
 from Tutorias.forms import FormSeguimiento
 from Tutorias.services.docx_reportes import _tutoria_es_reportable
-from Tutorias.constants import BECAS, PENDIENTE, ACEPTADO, RECHAZADO, PROPUESTA
+from Tutorias.constants import (
+    BECAS,
+    PENDIENTE,
+    ACEPTADO,
+    RECHAZADO,
+    PROPUESTA,
+    CANCELADO,
+    VENCIDA,
+    REPORTADA,
+    REALIZADA,
+)
 from notifications.models import Notification
 
 
@@ -20,6 +30,373 @@ from notifications.models import Notification
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
+
+
+class PanelTutoriasAlumnoTests(TestCase):
+    """Pruebas de las tres pestañas del panel de tutorías del alumno."""
+
+    def setUp(self):
+        self.tutor = Tutor.objects.create_user(
+            first_name="Tutor",
+            last_name="Prueba",
+            email="tutor.panel@cua.uam.mx",
+            matricula="T10001",
+            password="password123",
+            es_tutor=True,
+        )
+        self.alumno = Alumno.objects.create_user(
+            first_name="Alumno",
+            last_name="Prueba",
+            email="alumno.panel@cua.uam.mx",
+            matricula="A10001",
+            password="password123",
+            tutor_asignado=self.tutor,
+        )
+        self.otro_alumno = Alumno.objects.create_user(
+            first_name="Otro",
+            last_name="Alumno",
+            email="otro.alumno@cua.uam.mx",
+            matricula="A10002",
+            password="password123",
+            tutor_asignado=self.tutor,
+        )
+        self.url = reverse("Tutorias-alumno")
+        self.client.force_login(self.alumno)
+
+        session = self.client.session
+        session["role"] = "alumno"
+        session.save()
+
+    def crear_tutoria(
+        self,
+        estado,
+        *,
+        alumno=None,
+        fecha=None,
+        asistencia=None,
+    ):
+        return Tutoria.objects.create(
+            tutor=self.tutor,
+            alumno=alumno or self.alumno,
+            tema=["BEC"],
+            descripcion=f"Tutoría con estado {estado}",
+            fecha=fecha or self.fecha_futura(),
+            estado=estado,
+            asistencia=asistencia,
+        )
+
+    def fecha_futura(self):
+        return timezone.now() + timedelta(days=2)
+
+    def fecha_pasada(self):
+        return timezone.now() - timedelta(days=2)
+
+    def test_requiere_autenticacion(self):
+        self.client.logout()
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("next=", response.url)
+
+    def test_utiliza_plantilla_del_panel(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(
+            response,
+            "Tutorias/panel_tutorias_alumno.html",
+        )
+
+    def test_clasifica_tutorias_en_las_tres_pestanas(self):
+        pendiente = self.crear_tutoria(PENDIENTE)
+        propuesta = self.crear_tutoria(PROPUESTA)
+        aceptada = self.crear_tutoria(ACEPTADO)
+        rechazada = self.crear_tutoria(RECHAZADO)
+        cancelada = self.crear_tutoria(CANCELADO)
+        realizada = self.crear_tutoria(REALIZADA)
+        reportada = self.crear_tutoria(REPORTADA)
+
+        response = self.client.get(self.url)
+
+        self.assertCountEqual(
+            response.context["tutorias_solicitadas"],
+            [pendiente, propuesta],
+        )
+        self.assertCountEqual(
+            response.context["tutorias_agendadas"],
+            [aceptada],
+        )
+        self.assertCountEqual(
+            response.context["tutorias_historial"],
+            [realizada, reportada, rechazada, cancelada],
+        )
+
+    def test_clasifica_estados_efectivos_segun_fecha(self):
+        pendiente_vencida = self.crear_tutoria(
+            PENDIENTE,
+            fecha=self.fecha_pasada(),
+        )
+        propuesta_vencida = self.crear_tutoria(
+            PROPUESTA,
+            fecha=self.fecha_pasada(),
+        )
+        aceptada_realizada = self.crear_tutoria(
+            ACEPTADO,
+            fecha=self.fecha_pasada(),
+            asistencia=None,
+        )
+        aceptada_reportada = self.crear_tutoria(
+            ACEPTADO,
+            fecha=self.fecha_pasada(),
+            asistencia=True,
+        )
+
+        response = self.client.get(self.url)
+
+        solicitadas = response.context["tutorias_solicitadas"]
+        agendadas = response.context["tutorias_agendadas"]
+        historial = response.context["tutorias_historial"]
+
+        self.assertEqual(pendiente_vencida.estado_efectivo, VENCIDA)
+        self.assertEqual(propuesta_vencida.estado_efectivo, VENCIDA)
+        self.assertEqual(aceptada_realizada.estado_efectivo, REALIZADA)
+        self.assertEqual(aceptada_reportada.estado_efectivo, REPORTADA)
+        self.assertIn(pendiente_vencida, solicitadas)
+        self.assertIn(propuesta_vencida, solicitadas)
+        self.assertNotIn(aceptada_realizada, agendadas)
+        self.assertNotIn(aceptada_reportada, agendadas)
+        self.assertIn(aceptada_realizada, historial)
+        self.assertIn(aceptada_reportada, historial)
+
+    def test_no_muestra_tutorias_de_otro_alumno(self):
+        propia = self.crear_tutoria(PENDIENTE)
+        ajena = self.crear_tutoria(
+            PENDIENTE,
+            alumno=self.otro_alumno,
+        )
+
+        response = self.client.get(self.url)
+
+        self.assertIn(propia, response.context["tutorias"])
+        self.assertNotIn(ajena, response.context["tutorias"])
+        self.assertNotIn(
+            ajena,
+            response.context["tutorias_solicitadas"],
+        )
+
+    def test_una_tutoria_no_aparece_en_mas_de_una_pestana(self):
+        for estado in [
+            PENDIENTE,
+            PROPUESTA,
+            ACEPTADO,
+            RECHAZADO,
+            CANCELADO,
+            REALIZADA,
+            REPORTADA,
+        ]:
+            self.crear_tutoria(estado)
+
+        response = self.client.get(self.url)
+
+        clasificadas = (
+            response.context["tutorias_solicitadas"]
+            + response.context["tutorias_agendadas"]
+            + response.context["tutorias_historial"]
+        )
+        ids = [tutoria.pk for tutoria in clasificadas]
+
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertCountEqual(clasificadas, response.context["tutorias"])
+
+    def test_muestra_panel_si_no_existen_tutorias(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["tutorias_solicitadas"], [])
+        self.assertEqual(response.context["tutorias_agendadas"], [])
+        self.assertEqual(response.context["tutorias_historial"], [])
+
+    def test_pendiente_muestra_boton_del_modal_de_edicion(self):
+        tutoria = self.crear_tutoria(PENDIENTE)
+
+        response = self.client.get(self.url)
+
+        url_modal = reverse("Tutorias-update-modal", args=[tutoria.pk])
+        self.assertContains(response, f'data-url="{url_modal}"')
+        self.assertContains(response, "js-abrir-editar-tutoria")
+
+    def test_aceptada_muestra_boton_del_modal_de_edicion(self):
+        tutoria = self.crear_tutoria(ACEPTADO)
+
+        response = self.client.get(self.url)
+
+        self.assertContains(
+            response,
+            reverse("Tutorias-update-modal", args=[tutoria.pk]),
+        )
+
+
+class EditarTutoriaModalTests(TestCase):
+    """Pruebas de la edición de temas y descripción desde el modal."""
+
+    def setUp(self):
+        self.tutor = Tutor.objects.create_user(
+            first_name="Tutor",
+            last_name="Modal",
+            email="tutor.modal@cua.uam.mx",
+            matricula="T20001",
+            password="password123",
+            es_tutor=True,
+        )
+        self.alumno = Alumno.objects.create_user(
+            first_name="Alumno",
+            last_name="Modal",
+            email="alumno.modal@cua.uam.mx",
+            matricula="A20001",
+            password="password123",
+            tutor_asignado=self.tutor,
+        )
+        self.otro_alumno = Alumno.objects.create_user(
+            first_name="Otro",
+            last_name="Modal",
+            email="otro.modal@cua.uam.mx",
+            matricula="A20002",
+            password="password123",
+            tutor_asignado=self.tutor,
+        )
+        self.fecha_original = timezone.now() + timedelta(days=3)
+        self.tutoria = Tutoria.objects.create(
+            tutor=self.tutor,
+            alumno=self.alumno,
+            tema=["BEC"],
+            descripcion="Descripción original",
+            fecha=self.fecha_original,
+            estado=PENDIENTE,
+        )
+        self.url = reverse(
+            "Tutorias-update-modal",
+            args=[self.tutoria.pk],
+        )
+        self.client.force_login(self.alumno)
+
+        session = self.client.session
+        session["role"] = "alumno"
+        session.save()
+
+    def test_get_carga_valores_actuales_y_solo_campos_permitidos(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(
+            response,
+            "Tutorias/includes/_modal_editar_tutoria.html",
+        )
+        self.assertEqual(response.context["form"].initial["tema"], ["BEC"])
+        self.assertEqual(
+            response.context["form"].initial["descripcion"],
+            "Descripción original",
+        )
+        self.assertEqual(
+            set(response.context["form"].fields),
+            {"tema", "descripcion"},
+        )
+        self.assertNotContains(response, 'name="fecha"')
+
+    def test_post_actualiza_tema_y_descripcion_sin_cambiar_fecha(self):
+        response = self.client.post(
+            self.url,
+            {
+                "tema": ["INS", "ING"],
+                "descripcion": "Descripción actualizada",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertJSONEqual(
+            response.content,
+            {
+                "ok": True,
+                "message": "La tutoría se actualizó correctamente.",
+            },
+        )
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.tema, ["INS", "ING"])
+        self.assertEqual(
+            self.tutoria.descripcion,
+            "Descripción actualizada",
+        )
+        self.assertEqual(self.tutoria.fecha, self.fecha_original)
+
+    def test_post_invalido_responde_422_y_muestra_errores(self):
+        response = self.client.post(
+            self.url,
+            {
+                "tema": [],
+                "descripcion": "",
+            },
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertTrue(response.context["form"].errors)
+        self.assertIn("tema", response.context["form"].errors)
+        self.assertIn("descripcion", response.context["form"].errors)
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.tema, ["BEC"])
+        self.assertEqual(self.tutoria.descripcion, "Descripción original")
+
+    def test_alumno_no_puede_editar_tutoria_de_otro_alumno(self):
+        tutoria_ajena = Tutoria.objects.create(
+            tutor=self.tutor,
+            alumno=self.otro_alumno,
+            tema=["BEC"],
+            descripcion="Tutoría ajena",
+            fecha=self.fecha_original,
+            estado=PENDIENTE,
+        )
+        url_ajena = reverse(
+            "Tutorias-update-modal",
+            args=[tutoria_ajena.pk],
+        )
+
+        response_get = self.client.get(url_ajena)
+        response_post = self.client.post(
+            url_ajena,
+            {
+                "tema": ["INS"],
+                "descripcion": "Intento de modificación",
+            },
+        )
+
+        self.assertEqual(response_get.status_code, 404)
+        self.assertEqual(response_post.status_code, 404)
+        tutoria_ajena.refresh_from_db()
+        self.assertEqual(tutoria_ajena.tema, ["BEC"])
+        self.assertEqual(tutoria_ajena.descripcion, "Tutoría ajena")
+
+    def test_usuario_no_autenticado_no_puede_abrir_modal(self):
+        self.client.logout()
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("next=", response.url)
+
+    def test_post_valido_crea_registro_en_historial(self):
+        response = self.client.post(
+            self.url,
+            {
+                "tema": ["INS"],
+                "descripcion": "Cambio registrado",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        cambio = HistorialCambioTutoria.objects.get(tutoria=self.tutoria)
+        self.assertEqual(cambio.correo_editor, self.alumno.email)
+        self.assertIn("Tema(s)", cambio.cambios_realizados)
+        self.assertIn("Observaciones", cambio.cambios_realizados)
+
 
 class ListaTutoriasProximasTest(TestCase):
     """
