@@ -38,6 +38,7 @@ urlpatterns = [
 
     # Las tres URL de las lista de tutorías.
     path('tutorias-tutor/', views.VerTutoriasTutorListView.as_view(),name='Tutorias-tutor'),
+    path('panel-tutorias-tutor/', views.VerTutoriasTutorTabView.as_view(), name='Panel-tutorias-tutor'),
     path("tutorias-proximas/", views.TutorProximasListView.as_view(), name="Tutorias-proximas"),
     path('historial-tutorias/', views.HistorialTutoriasListView.as_view(), name='Tutorias-historial'),
     

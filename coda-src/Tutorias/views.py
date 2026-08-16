@@ -101,7 +101,7 @@ def proponer_fechas_tutoria(request, pk):
                     request,
                     "Alguna de las fechas proporcionadas no es válida.",
                 )
-                return redirect("Tutorias-tutor")    
+                return redirect("Panel-tutorias-tutor")
                                    
             # Si hay dos propuestas, se envían al alumno para que elija. Si solo hay una, se acepta directamente.
             if propuesta_2_raw:
@@ -122,7 +122,7 @@ def proponer_fechas_tutoria(request, pk):
         else:
             messages.error(request, "Debes ingresar al menos la Opción 1.")
 
-    return redirect('Tutorias-tutor')
+    return redirect('Panel-tutorias-tutor')
 
 # Función para que el alumno pueda seleccionar una de las fechas propuestas por el tutor.
 @login_required
@@ -438,7 +438,9 @@ class AceptarTutoriaView(View):
             raise PermissionDenied("No tienes permiso para modificar esta tutoría")
 
         if tutoria.estado == ACEPTADO:
-            return redirect('Tutorias-tutor')
+            return redirect(
+                f"{reverse('Panel-tutorias-tutor')}?tab=agendadas"
+            )
 
         tutoria.estado = ACEPTADO
         tutoria.save(update_fields=["estado"])
@@ -451,7 +453,9 @@ class AceptarTutoriaView(View):
             tutoria=tutoria,
             actor=request.user,
         )
-        return redirect('Tutorias-proximas')  
+        return redirect(
+            f"{reverse('Panel-tutorias-tutor')}?tab=agendadas"
+        )
 
   
 class RechazarTutoriaView(View):
@@ -461,7 +465,7 @@ class RechazarTutoriaView(View):
             raise PermissionDenied("No tienes permiso para modificar esta tutoría")
 
         if tutoria.estado == RECHAZADO:
-            return redirect('Tutorias-tutor')
+            return redirect('Panel-tutorias-tutor')
 
         motivo = request.POST.get("motivo_rechazo", "").strip()
         if motivo == "otro":
@@ -472,7 +476,7 @@ class RechazarTutoriaView(View):
                 request,
                 "Debes seleccionar o escribir una razón para el rechazo.",
             )
-            return redirect("Tutorias-tutor")
+            return redirect("Panel-tutorias-tutor")
         
         tutoria.estado = RECHAZADO
         tutoria.motivo_rechazo = motivo
@@ -492,7 +496,7 @@ class RechazarTutoriaView(View):
             ),
         )
 
-        return redirect('Tutorias-tutor')
+        return redirect('Panel-tutorias-tutor')
 
 class CancelarTutoriaView(View):
     def post(self, request, pk):
@@ -1736,9 +1740,58 @@ class TutorProximasListView(TutorViewMixin, ListView):
                 fecha__date__gte=hoy
             ).order_by("fecha")
         )
-    
+
+class VerTutoriasTutorTabView(TutorViewMixin, ListView):
+    """
+        Organiza las tutorías del tutor por su estado efectivo para
+        presentar 3 listas:
+        1. Tutorías solicitadas.
+        2. Tutorías agendadas.
+        3. Historial de tutorías.
+    """
+
+    model = Tutoria
+    template_name = 'Tutorias/panel_tutorias_tutor.html'
+    context_object_name = 'tutorias'
+
+    def get_queryset(self) -> QuerySet[Any]:
+        return (
+            super()
+            .get_queryset()
+            .filter(tutor_id=self.request.user.pk)
+            .select_related('alumno')
+        )
+
+    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        tutorias = list(context['tutorias'])
+
+        context['tutorias_solicitadas'] = [
+            t
+            for t in tutorias
+            if t.estado_efectivo in [PENDIENTE, PROPUESTA, VENCIDA]
+        ]
+        context['tutorias_agendadas'] = [
+            t
+            for t in tutorias
+            if t.estado_efectivo == ACEPTADO
+        ]
+        context['tutorias_historial'] = [
+            t
+            for t in tutorias
+            if t.estado_efectivo in [REALIZADA, REPORTADA, RECHAZADO, CANCELADO]
+        ]
+
+        return context
+
 class VerTutoriasAlumnoListView(LoginRequiredMixin, ListView):
-    """Organiza las tutorías del alumno por su estado efectivo."""
+    """
+        Organiza las tutorías del alumno por su estado efectivo para
+        presentar 3 listas:
+        1. Tutorías solicitadas.
+        2. Tutorías agendadas.
+        3. Historial de tutorías.
+    """
 
     model = Tutoria
     template_name = 'Tutorias/panel_tutorias_alumno.html'

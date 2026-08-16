@@ -101,6 +101,12 @@
   background-color: var(--bs-red);
 }
 
+.action-cancel:hover,
+.action-cancel:focus {
+  color: #fff;
+  background-color: var(--bs-red);
+}
+
 .action-edit:hover,
 .action-edit:focus {
   color: #fff;
@@ -238,7 +244,7 @@
                                   {% endif %}
                                   <!-- 3. CANCELAR (Se muestra SIEMPRE que no sea PRO, es decir PEN o VEN) -->
                                   <button type="button"
-                                          class="btn action-neutral action-reject"
+                                          class="btn action-neutral action-cancel"
                                           title="Cancelar solicitud">
                                     <i class="bi bi-x-lg"></i>
                                   </button>
@@ -314,7 +320,7 @@
                                 </button>
                                 <!-- 3. CANCELAR (solamente muestra ventana de confirmación ) -->
                                 <button type="button"
-                                        class="btn action-neutral action-reject"
+                                        class="btn action-neutral action-cancel"
                                         title="Cancelar solicitud">
                                   <i class="bi bi-x-lg"></i>
                                 </button>

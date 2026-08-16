@@ -711,7 +711,7 @@ class PropuestasFechaTutoriaTests(TestCase):
 
         self.assertRedirects(
             response,
-            reverse('Tutorias-tutor'),
+            reverse('Panel-tutorias-tutor'),
             fetch_redirect_response=False,
         )
         self.tutoria.refresh_from_db()
@@ -736,7 +736,7 @@ class PropuestasFechaTutoriaTests(TestCase):
 
         self.assertRedirects(
             response,
-            reverse('Tutorias-tutor'),
+            reverse('Panel-tutorias-tutor'),
             fetch_redirect_response=False,
         )
         self.tutoria.refresh_from_db()
@@ -822,7 +822,7 @@ class MotivosRechazoTutoriaTests(TestCase):
 
         self.assertRedirects(
             response,
-            reverse('Tutorias-tutor'),
+            reverse('Panel-tutorias-tutor'),
             fetch_redirect_response=False,
         )
         self.tutoria.refresh_from_db()
@@ -846,7 +846,7 @@ class MotivosRechazoTutoriaTests(TestCase):
 
         self.assertRedirects(
             response,
-            reverse('Tutorias-tutor'),
+            reverse('Panel-tutorias-tutor'),
             fetch_redirect_response=False,
         )
         self.tutoria.refresh_from_db()
@@ -861,7 +861,7 @@ class MotivosRechazoTutoriaTests(TestCase):
 
         self.assertRedirects(
             response,
-            reverse('Tutorias-tutor'),
+            reverse('Panel-tutorias-tutor'),
             fetch_redirect_response=False,
         )
         self.tutoria.refresh_from_db()
@@ -1100,7 +1100,11 @@ class NotificacionesTutoriaTests(TestCase):
 
         response = self.client.post(reverse('aceptar_tutoria', args=[self.tutoria.pk]))
 
-        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(
+            response,
+            f"{reverse('Panel-tutorias-tutor')}?tab=agendadas",
+            fetch_redirect_response=False,
+        )
         self.tutoria.refresh_from_db()
         self.assertEqual(self.tutoria.estado, ACEPTADO)
         self.assertEqual(
