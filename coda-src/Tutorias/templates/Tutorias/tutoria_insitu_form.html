@@ -1,73 +1,85 @@
-{% extends "Usuarios/base.html" %}
+{% extends "Usuarios/HeaderAndFooterFachada.html" %}
 {% load widget_tweaks %}
 {% load static %}
 
+{% block title %} Tutoría in situ {% endblock %}
+
 {% block body %}
 
-<div class="container mt-5 d-flex justify-content-center">
-    <div class="card shadow p-4" style="max-width: 480px; width: 100%; border-radius: 12px;">
+<section id="section" style="background-color: #eee;">
+    <div class="container py-4 py-md-5">
+        <div class="row d-flex justify-content-center align-items-center">
+            <div class="col-12 col-md-8 col-lg-6">
+                <!-- Tarjeta Principal -->
+                <div class="card border-top border-bottom border-4 shadow-sm" style="border-color: #F08200 !important;">
+                    
+                    <!-- card-body agrega el relleno interno (padding) correcto -->
+                    <div class="card-body p-4 p-md-5">
 
-        <h4 class="mb-3 text-center">Registrar Tutoría Presencial</h4>
+                        <h3 class="mb-4 text-title-bold" style="color: #F08200;">Registrar Tutoría In Situ</h3>
 
-        <div class="mb-3 text-center">
-            <strong>Tutor:</strong> {{ tutor.nombre_completo }}
-        </div>
-
-        <form method="POST">
-            {% csrf_token %}
-
-            <!-- Tema(s): checkbox list -->
-            <div class="form-group mb-4 {% if form.tema.errors %}border border-danger rounded p-2{% endif %}">
-                <label class="mb-2 text-muted">Tema(s):</label>
-                <p class="text-muted small">Selecciona al menos un tema.</p>
-
-                <div class="row">
-                    {% for checkbox in form.tema %}
-                        <div class="col-6 mb-2">
-                            <div class="form-check">
-                                {{ checkbox.tag }}
-                                <label class="form-check-label" for="{{ checkbox.id_for_label }}">
-                                    {{ checkbox.choice_label }}
-                                </label>
-                            </div>
+                        <div class="mb-3 text-center">
+                            <strong>Tutor:</strong> {{ tutor.nombre_completo }}
                         </div>
-                    {% endfor %}
-                </div>
 
-                {% if form.tema.errors %}
-                    <div class="text-danger small mt-2">
-                        {{ form.tema.errors.as_text|linebreaksbr }}
-                    </div>
-                {% endif %}
+                        <form method="POST">
+                            {% csrf_token %}
+
+                            <!-- Tema(s): checkbox list -->
+                            <div class="form-group mb-4 {% if form.tema.errors %}border border-danger rounded p-2{% endif %}">
+                                <label class="mb-1 text-body-bold text-muted fw-bold">Tema(s) de la tutoría.</label>
+                                <p class="text-muted small mb-3">Selecciona al menos un tema para tratar en la tutoría</p>
+
+                                <div class="row">
+                                    {% for checkbox in form.tema %}
+                                        <!-- En móviles 1 columna (col-12), en PC 2 columnas (col-md-6) -->
+                                        <div class="col-12 col-md-6 mb-2">
+                                            <div class="form-check d-flex align-items-center">
+                                                {{ checkbox.tag }}
+                                                <label class="form-check-label ms-2" for="{{ checkbox.id_for_label }}">
+                                                    {{ checkbox.choice_label }}
+                                                </label>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+
+                                {% if form.tema.errors %}
+                                    <div class="text-danger small mt-2">
+                                        {{ form.tema.errors.as_text|linebreaksbr }}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Campo "Otro" -->
+                            <div id="otro-campo-container" class="mb-4" style="display: none;">
+                                <label for="id_otro_tema" class="form-label">Especifica el tema:</label>
+                                {% render_field form.otro_tema class="form-control" id="id_otro_tema" placeholder="Describe el tema..." %}
+
+                                {% if form.otro_tema.errors %}
+                                    <div class="text-danger small mt-2">
+                                        {{ form.otro_tema.errors.as_text|linebreaksbr }}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            <!-- Descripción -->
+                            <div class="form-group mb-4">
+                                {% render_field form.descripcion class="form-control" id="descripcion" rows="3" %}
+                                <label class="form-label mt-1 text-muted small" for="descripcion">Detalles adicionales de la tutoría</label>
+                            </div>
+
+                            <button type="submit" class="btn btn-warning w-100 text-white fw-bold py-2 shadow-sm" style="background-color: #F08200; border: none;">
+                                Registrar tutoría
+                            </button>
+                        </form>
+
+                    </div> <!-- Fin card-body -->
+                </div> <!-- Fin card -->
             </div>
-
-            <!-- Campo "Otro" -->
-            <div id="otro-campo-container"
-                 class="form-group mb-4 {% if form.otro_tema.errors %}border border-danger rounded p-2{% endif %}"
-                 style="display: none;">
-                <label for="id_otro_tema" class="form-label">Especifica el tema:</label>
-                {% render_field form.otro_tema class="form-control" id="id_otro_tema" placeholder="Describe el tema..." %}
-
-                {% if form.otro_tema.errors %}
-                    <div class="text-danger small mt-2">
-                        {{ form.otro_tema.errors.as_text|linebreaksbr }}
-                    </div>
-                {% endif %}
-            </div>
-
-            <!-- Descripción -->
-            <div class="mb-3">
-                <label class="form-label">Descripción</label>
-                {% render_field form.descripcion class="form-control" rows="3" %}
-            </div>
-
-            <button type="submit" class="btn btn-primary w-100 mt-2">
-                Registrar tutoría
-            </button>
-        </form>
-
+        </div>
     </div>
-</div>
+</section>
 
 <!-- Script: Mostrar/Ocultar el campo "Otro" -->
 <script>

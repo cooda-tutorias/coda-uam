@@ -4,6 +4,9 @@ from django.views.decorators.http import require_GET
 
 import qrcode
 from django.contrib.auth.mixins import LoginRequiredMixin
+# Importa tu mixin de roles
+from Usuarios.mixins import ContextConRolesMixin
+from django.views.generic import TemplateView
 
 from collections import Counter
 from typing import Any, Dict
@@ -11,7 +14,7 @@ from django.shortcuts import get_object_or_404, redirect
 from django.db.models.query import QuerySet
 from django.forms.models import BaseModelForm
 from django.shortcuts import render, redirect
-from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.views.generic.detail import DetailView
 from django.views.generic.list import ListView
 from django.views.generic.edit import CreateView, UpdateView
@@ -199,6 +202,7 @@ def descargar_ics_tutoria(request, tutoria_id):
     response['Content-Disposition'] = f'attachment; filename="cita_{tutoria.id}.ics"'
 
     return response
+
 
 #Funcion para descargar pdf
 def carta_tutorados_pdf(request):
@@ -2205,7 +2209,8 @@ class QRCodeView(View):
 # pueden solicitarle tutorías In Situ.
 # TODO: agregar a los alumnos un campo de "tutor_sustituto" que normalmente será
 # el coordinador para que también esa persona pueda atenderlo.
-class TutoriaInSituCreateView(LoginRequiredMixin, View):
+
+class TutoriaInSituCreateView(LoginRequiredMixin, ContextConRolesMixin, TemplateView):
 
     template_name = "Tutorias/tutoria_insitu_form.html"
 
@@ -2229,10 +2234,13 @@ class TutoriaInSituCreateView(LoginRequiredMixin, View):
         # 4) Mostrar formulario
         form = FormTutoriasInSitu()
 
-        return render(request, self.template_name, {
-            "form": form,
-            "tutor": tutor,
-        })
+        # Construir contexto con roles
+        context = self.get_context_data(
+            form=form,
+            tutor=tutor,
+        )
+
+        return render(request, self.template_name, context)
 
     def post(self, request, tutor_pk):
 
@@ -2264,10 +2272,13 @@ class TutoriaInSituCreateView(LoginRequiredMixin, View):
 
             return redirect("Tutorias-alumno")
 
-        return render(request, self.template_name, {
-            "form": form,
-            "tutor": tutor
-        })
+        # Si el formulario es inválido, regenerar el contexto completo
+        context = self.get_context_data(
+            form=form,
+            tutor=tutor,
+        )
+
+        return render(request, self.template_name, context)
 
 
 class CrearTutoriaPorAlumnoView(TutorViewMixin, CreateView):
