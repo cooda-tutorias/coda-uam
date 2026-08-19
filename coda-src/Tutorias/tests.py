@@ -1140,6 +1140,7 @@ class NotificacionesTutoriaTests(TestCase):
                 'tema': [self.tema_codigo],
                 'fecha': nueva_fecha,
                 'descripcion': 'Se agenda cita',
+                'fecha_sugerida': nueva_fecha,
             },
         )
 
@@ -1190,6 +1191,7 @@ class NotificacionesTutoriaTests(TestCase):
                 'fecha': '2030-01-01T10:30',
                 'descripcion': 'Cambio de decisión',
                 'estado_tutoria': RECHAZADO,
+                'fecha_sugerida': '2030-01-01T10:30',
             },
         )
 
