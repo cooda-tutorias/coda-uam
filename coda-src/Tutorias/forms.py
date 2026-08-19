@@ -1,6 +1,6 @@
 from django import forms
 from .models import Tutoria
-from Usuarios.models import Documento, Alumno, Tutor
+from Usuarios.models import Documento, Alumno, Tutor, HorarioTutor
 from .constants import TEMAS, ESTADO, ACEPTADO, PENDIENTE, DURACION_ASESORIA, ROLES, CARRERAS
 from Usuarios.constants import ESTADOS_ALUMNO
 
@@ -10,41 +10,145 @@ def str_to_bool(value):
         return value
     return str(value).strip().lower() == 'true'
 
-class FormTutorias(forms.ModelForm):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        # Si existe instancia con fecha, ajustamos el formato para HTML5
-        if self.instance and self.instance.fecha:
-            self.initial['fecha'] = self.instance.fecha.strftime('%Y-%m-%dT%H:%M')
-
-    alumno = forms.CharField(disabled=True, required=False)
-    tutor = forms.CharField(disabled=True, required=False)
-    tema= forms.MultipleChoiceField(
+class FormEditarTutoriaModal(forms.ModelForm):
+    """
+    Formulario para editar los temas y la descripción de la tutoría.
+    """
+    tema = forms.MultipleChoiceField(
         choices=TEMAS,
         widget=forms.CheckboxSelectMultiple,
         label="Temas de la tutoría",
-        required=True
+        required=True,
     )
-    otro_tema = forms.CharField(required=False, label='Especificar tema')
-    fecha = forms.DateTimeField(widget=forms.DateTimeInput(attrs={'type': 'datetime-local'}), required=True)
-    descripcion = forms.CharField(widget=forms.Textarea, max_length=255, required=True)
-    estado = forms.ChoiceField(choices=ESTADO, required=False)
+
+    descripcion = forms.CharField(
+        label="Descripción",
+        max_length=255,
+        required=True,
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": 4,
+            }
+        ),
+    )
 
     class Meta:
         model = Tutoria
-        fields = ['tema', 'fecha', 'descripcion']
+        fields = ["tema", "descripcion"]
+
+#TODO: este formulario fue hecho principalmente para que el alumno solicite una cita con el tutor,
+# pero encontré (Antonio LJ) que también se está usando para que el tutor pueda crear una cita 
+# con el alumno, por lo que hay que revisar si esta función se requiere o no.
+class FormTutorias(forms.ModelForm):
+    """
+    Formulario para solicitar una tutoría.
+    El formulario se adapta según si el tutor definió disponibilidad de horarios no.
+    Cuando hay horarios, el alumno debe seleccionar uno de ellos. En caso contrario, 
+    el alumno puede sugerir una fecha para la tutoría.
+    """
+
+    horario_tutor = forms.ModelChoiceField(
+        queryset=None,
+        required=False,
+        label="Selecciona un horario disponible",
+    )
+
+    fecha_sugerida = forms.DateTimeField(
+        required=False,
+        widget=forms.DateTimeInput(attrs={'type': 'datetime-local'}),
+        label="Sugerir fecha para la cita"
+    )
+
+    class Meta:
+        model = Tutoria
+        fields = ["tema", "fecha", "descripcion", "fecha_sugerida", "horario_tutor"]
+
+    def __init__(self, *args, **kwargs):
+        # Extrae el usuario del contexto (no todos los formularios lo enviarán)
+        self.user = kwargs.pop('user', None)
+        self.skip_fecha_validacion = kwargs.pop("skip_fecha_validacion", False)
+        super().__init__(*args, **kwargs)
+
+        
+        # Caso de ALUMNO solicitando tutoría
+        if self.user and self.user.has_role("ALU"):
+            tutor = self.user.alumno.tutor_asignado
+            horarios = HorarioTutor.objects.filter(
+                tutor=tutor, activo=True
+            ).order_by('dia_semana','hora_inicio')
+            self.fields["horario_tutor"].queryset = horarios
+
+            if horarios.exists():
+                # Hay horarios → ocultamos la fecha sugerida
+                self.fields["fecha_sugerida"].widget = forms.HiddenInput()
+                self.fields["fecha_sugerida"].required = False
+            else:
+                # Sin horarios → ocultamos el selector de horarios
+                self.fields["horario_tutor"].widget = forms.HiddenInput()
+                self.fields["horario_tutor"].required = False
+
+
+        # Personaliza comportamiento según el rol
+        if self.user:
+            if self.user.has_role("ALU"):
+                # Si es alumno, el campo tutor no se edita
+                if "tutor" in self.fields:
+                    self.fields["tutor"].widget = forms.HiddenInput()
+
+            elif self.user.has_role("TUT"):
+                # Si es tutor, el campo alumno no se edita
+                if "alumno" in self.fields:
+                    self.fields["alumno"].widget = forms.HiddenInput()
+
+        # Añade estilos base a los widgets
+        for field_name, field in self.fields.items():
+            css_class = field.widget.attrs.get("class", "")
+            field.widget.attrs["class"] = f"{css_class} form-control".strip()
+
+    alumno = forms.CharField(disabled=True, required=False)
+    tutor = forms.CharField(disabled=True, required=False)
+
+    tema= forms.MultipleChoiceField(
+        choices=TEMAS,
+        widget=forms.CheckboxSelectMultiple(attrs={"class": "form-check-input"}),
+        label="Temas de la tutoría",
+        required=True
+    )
+
+    otro_tema = forms.CharField(required=False, label='Especificar tema')
+    fecha = forms.DateTimeField(widget=forms.DateTimeInput(attrs={'type': 'datetime-local'}), required=False)
+    descripcion = forms.CharField(widget=forms.Textarea, max_length=255, required=True)
+    estado = forms.ChoiceField(choices=ESTADO, required=False)
 
     def clean(self):
         cleaned_data = super().clean()
+
+        horario = cleaned_data.get("horario_tutor")
+        fecha_sugerida = cleaned_data.get("fecha_sugerida")
+
+        # Validación de selección
+        if not getattr(self, "skip_fecha_validacion", False):
+            if not horario and not fecha_sugerida:
+                raise forms.ValidationError(
+                    "Debes seleccionar un horario disponible o sugerir una fecha."
+                )
+                
         temas = cleaned_data.get('tema')
         otro_tema = cleaned_data.get('otro_tema')
+
+        # Validar que haya seleccionado al menos un tema
+        if not temas:
+            self.add_error('tema', 'Debes seleccionar al menos un tema para la tutoría.')
 
         if temas and 'OTRO' in temas:
             if not otro_tema or not otro_tema.strip():
                 self.add_error('otro_tema', 'Este campo es obligatorio si seleccionas "Otro".')
 
+        return cleaned_data
+
+    
 # Formato para la tutorias in-situ
 # forms.py
 class FormTutoriasInSitu(forms.ModelForm):
@@ -414,7 +518,7 @@ class FormVerTutorias(forms.Form):
     estado = forms.TypedChoiceField(
         choices=[('', 'Todos los estados')] + ESTADOS_ALUMNO[1:],
         required=False,
-        label="Estado del Alumno",
+        label="Estado del alumno",
         coerce=int,
         empty_value='',
     )

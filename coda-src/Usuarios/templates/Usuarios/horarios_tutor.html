@@ -1,0 +1,192 @@
+{% extends "Usuarios/perfil_base.html" %}
+
+{% block title %} Mis horarios {% endblock %}
+
+{% block perfil %}
+
+<div class="d-flex justify-content-center">
+<div class="card border-top border-bottom border-4 my-4"
+     style="border-color: #F08200 !important; border-radius: .5rem; width: 100%; max-width: 800px;">
+  <div class="card-body">
+
+    <h5 class="mb-3 text-center">Mis horarios de tutorías</h5>
+
+    <p class="text-muted text-center">
+        Agrega tus horarios de atención para que los alumnos puedan agendar tutorías.
+    </p>
+
+    <form id="horariosForm" method="POST">
+        {% csrf_token %}
+
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th class="text-start">Día</th>
+                    <th class="text-center">Horarios</th>
+                    <th class="text-center">
+                        <button type="button" class="btn btn-success btn-sm px-5" onclick="addAllDays()">
+                            +
+                        </button>
+                    </th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for dia, nombre in dias_semana %}
+                <tr id="row-{{ dia }}">
+                    <td class="fw-bold text-start">{{ nombre }}</td>
+
+                    <td>
+                        <div id="intervals-{{ dia }}">
+                            {% for h in horarios %}
+                                {% if h.dia_semana == dia %}
+                                    <div class="d-flex align-items-center mb-1 interval-item">
+                                        <!-- Se agregan las clases select-inicio y select-fin -->
+                                        <select name="inicio_{{ dia }}[]" class="form-select form-select-sm me-2 select-inicio">
+                                            {% for hora in horas %}
+                                                <option value="{{ hora }}" {% if hora == h.hora_inicio|time:"H:i" %}selected{% endif %}>
+                                                    {{ hora }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+
+                                        <select name="fin_{{ dia }}[]" class="form-select form-select-sm me-2 select-fin">
+                                            {% for hora in horas %}
+                                                <option value="{{ hora }}" {% if hora == h.hora_fin|time:"H:i" %}selected{% endif %}>
+                                                    {{ hora }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+
+                                        <button type="button" class="btn btn-danger btn-sm"
+                                                onclick="this.parentNode.remove()">
+                                            &times;
+                                        </button>
+                                    </div>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </td>
+
+                    <td class="text-center p-0" style="width: 50px;">
+                        <button type="button" class="btn btn-primary btn-sm py-1 me-2"
+                                onclick="addInterval('{{ dia }}')">
+                            +
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="text-end">
+            <button type="submit" class="btn btn-primary">Guardar cambios</button>
+        </div>
+    </form>
+  </div>
+</div>
+</div>
+
+
+<script>
+    // Lista generada desde Django (por ejemplo ["07:00", "07:30", "08:00", ...])
+    const HORAS = {{ horas|safe }};
+
+    // Convierte "HH:MM" a minutos totales
+    function timeToMinutes(timeStr) {
+        if (!timeStr) return 0;
+        const [h, m] = timeStr.split(':').map(Number);
+        return h * 60 + m;
+    }
+
+    // Actualiza las opciones del desplegable de hora final
+    function updateEndSelect(selectInicio) {
+        const container = selectInicio.closest('.interval-item');
+        if (!container) return;
+
+        const selectFin = container.querySelector('.select-fin');
+        if (!selectFin) return;
+
+        const inicioMin = timeToMinutes(selectInicio.value);
+        const minFinAllowed = inicioMin + 30; // Mínimo 30 minutos de diferencia
+
+        let firstValidOption = null;
+
+        Array.from(selectFin.options).forEach(opt => {
+            const optMin = timeToMinutes(opt.value);
+            if (optMin < minFinAllowed) {
+                opt.disabled = true;
+                opt.hidden = true;
+            } else {
+                opt.disabled = false;
+                opt.hidden = false;
+                if (!firstValidOption) firstValidOption = opt.value;
+            }
+        });
+
+        // Si la hora de fin actual es inválida, se ajusta automáticamente a la primera válida
+        if (timeToMinutes(selectFin.value) < minFinAllowed) {
+            if (firstValidOption) {
+                selectFin.value = firstValidOption;
+            }
+        }
+    }    
+
+    // Agrega un nuevo intervalo en el día seleccionado
+    function addInterval(dia) {
+        const cont = document.getElementById("intervals-" + dia);
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "d-flex align-items-center mb-1 interval-item";
+
+        wrapper.innerHTML = `
+            <select name="inicio_${dia}[]" class="form-select form-select-sm me-2 select-inicio">
+                ${HORAS.map(h => `<option value="${h}">${h}</option>`).join("")}
+            </select>
+
+            <select name="fin_${dia}[]" class="form-select form-select-sm me-2 select-fin">
+                ${HORAS.map(h => `<option value="${h}">${h}</option>`).join("")}
+            </select>
+
+            <button type="button" class="btn btn-danger btn-sm" onclick="this.parentNode.remove()">
+                &times;
+            </button>
+        `;
+
+        cont.appendChild(wrapper);
+
+        // Ajustar hora fin inicial por defecto a inicio + 30 min
+        const selectInicio = wrapper.querySelector('.select-inicio');
+        const selectFin = wrapper.querySelector('.select-fin');
+        
+        if (HORAS.length > 1) {
+            selectFin.value = HORAS[1];
+        }
+        
+        // Aplicar la restricción inmediatamente al nuevo bloque
+        updateEndSelect(selectInicio);
+    }
+
+    // Agrega un intervalo en todos los días
+    function addAllDays() {
+        {% for dia, _ in dias_semana %}
+            addInterval('{{ dia }}');
+        {% endfor %}
+    }
+
+    // Escuchar cambios en cualquier selector de hora de inicio
+    document.addEventListener('change', function(e) {
+        if (e.target && e.target.classList.contains('select-inicio')) {
+            updateEndSelect(e.target);
+        }
+    });
+
+    // Validar y ajustar los horarios ya existentes en la BD al cargar la página
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.select-inicio').forEach(sel => {
+            updateEndSelect(sel);
+        });
+    });
+</script>
+
+{% endblock %}

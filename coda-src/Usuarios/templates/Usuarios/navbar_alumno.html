@@ -1,17 +1,15 @@
 {% extends "Usuarios/base.html" %}
-
 {% block navbar %}
-
-<li class="nav-item">
-    <a class="nav-link text-primary" href="{% url 'Tutorias-create' %}" >Solicitar tutoria</a>
-</li>
-<li class="nav-item">
-    <a class="nav-link text-primary" href="{% url 'Tutorias-alumno' %}">Tutorias</a>
-</li>
-
-<li class="nav-item">
-    <a class="nav-link text-primary" href="{% url 'perfil-tutor-alumno' %}">Mi tutor</a>
-</li>
-
+  <li class="nav-item">
+    <a class="nav-link text-primary" href="{% url 'Tutorias-create' %}">
+      <i class="bi bi-send-plus-fill"></i> Solicitar tutoria</a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link text-primary" href="{% url 'Tutorias-alumno' %}">
+      <i class="bi bi-clipboard-data-fill"></i> Panel de tutorías </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link text-primary" href="{% url 'perfil-tutor-alumno' %}">
+      <i class="bi bi-person-badge-fill"></i>Mi tutor</a>
+  </li>
 {% endblock %}
-

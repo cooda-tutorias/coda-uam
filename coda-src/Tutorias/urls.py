@@ -9,6 +9,8 @@ urlpatterns = [
     #path('', views.index, name='index'),
     path('tutorias/<int:pk>/', views.TutoriasDetailView.as_view(), name='Tutorias-detail'),
     path('editar-tutoria/<int:pk>', views.TutoriaUpdateView.as_view(), name='Tutorias-update'),
+    path('editar-tutoria-modal/<int:pk>/', views.TutoriaModalUpdateView.as_view(), name='Tutorias-update-modal'),
+
     path('crear-tutoria/', views.TutoriaCreateView.as_view(), name='Tutorias-create'),
     path('crear-reporte-2/<int:pk>', views.Reporte2CreateView.as_view(), name='Reporte2-create'),
     path('crear-reporte/<int:pk>', views.ReporteCreateView.as_view(), name='Reporte-create'),
@@ -26,23 +28,37 @@ urlpatterns = [
     # URLS ALUMNOS
     path('tutorias-alumno/', views.VerTutoriasAlumnoListView.as_view(), name='Tutorias-alumno'),
     path('tutoria-rapida/', views.QuickCreateTutoriaView.as_view(), name='tutoria-rapida'),
+    path('tutoria/<int:pk>/seleccionar/', views.seleccionar_propuesta_tutoria, name='seleccionar_propuesta_tutoria'),
 
     # URLS TUTORES
     path('tutoria/<int:pk>/aceptar/', views.AceptarTutoriaView.as_view(), name='aceptar_tutoria'),
     path('tutoria/<int:pk>/rechazar/', views.RechazarTutoriaView.as_view(), name='rechazar_tutoria'),
     path('tutoria/<int:pk>/cancelar/', views.CancelarTutoriaView.as_view(), name='cancelar-tutoria'),
+    path('tutoria/<int:pk>/proponer/', views.proponer_fechas_tutoria, name='proponer_fechas_tutoria'),
+
+    # Las tres URL de las lista de tutorías.
+    path('tutorias-tutor/', views.VerTutoriasTutorListView.as_view(),name='Tutorias-tutor'),
+    path('panel-tutorias-tutor/', views.VerTutoriasTutorTabView.as_view(), name='Panel-tutorias-tutor'),
+    path("tutorias-proximas/", views.TutorProximasListView.as_view(), name="Tutorias-proximas"),
     path('historial-tutorias/', views.HistorialTutoriasListView.as_view(), name='Tutorias-historial'),
+    
     path('tutorias-comunicacion-masiva/', views.ComunicacionMasivaTutoriasView.as_view(), name='tutorias-comunicacion-masiva'),
     path('historial-tutorias-generar/', views.HistorialTutoriasGenerateView.as_view(), name='Tutorias-historial-generar'),
     path('tutorados-tutor/', views.VerTutoradosTutorListView.as_view(), name='Tutorados-tutor'),
-    path('tutorias-tutor/', views.VerTutoriasTutorListView.as_view(),name='Tutorias-tutor'),
     path('crear-tutoria/<int:pk_alumno>/', views.CrearTutoriaPorAlumnoView.as_view(), name='crear-tutoria'),
     # In urls.py
     path('tutoria/seguimiento/<int:pk>/', views.RealizarSeguimientoView.as_view(), name='save_seguimiento'),
 
     # Editar estado histórico del alumno
     path('tutoria/<int:pk>/editar-estado-historico/', views.EditarEstadoAlumnoHistoricoView.as_view(), name='editar-estado-historico'),
-    
+
+    path('cita/<int:tutoria_id>/ics/', views.descargar_ics_tutoria, name='descargar_ics'),
+    # API URLS que se usan en el front-end para agendar tutorias cuando el alumno selecciona un slot de horario libre del tutor.
+    path("api/slots/", views.api_slots_tutor, name="api_slots_tutor"),
+    path('api/fechas-slot/<int:slot_id>/', views.api_fechas_slot, name='api_fechas_slot'),
+    path("api/slots-tutor/<int:tutor_id>/", views.api_slots_tutor, name="api_slots_tutor"),
+    path('api/franjas-disponibles/<int:tutor_id>/', views.obtener_franjas_disponibles_api, name='api-franjas-disponibles'),
+
     # URLS CODA 
     path('tutores-coda/', views.VerTutoresListView.as_view(), name='Tutores-Coda'),
     path('alumnos-coda/', views.VerAlumnosListView.as_view(), name='Alumnos-Coda'),

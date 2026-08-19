@@ -40,6 +40,6 @@ urlpatterns = [
 
     # Agregado por Antonio LJ para tutorías in-situ.
     path("mi-qr/", views.VerQRView.as_view(), name="ver_qr_tutor"),
-
-    # ... (other existing URL patterns)
+    path("mis-horarios/", views.HorariosTutorView.as_view(), name="tutor_horarios"),
+    path("mis-horarios/eliminar/<int:pk>/", views.EliminarHorarioTutorView.as_view(), name="tutor_horario_eliminar"),
 ]
