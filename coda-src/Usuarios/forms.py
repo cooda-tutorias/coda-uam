@@ -3,9 +3,23 @@ from django import forms
 from django.core.files.base import File
 from django.db.models.base import Model
 from django.forms.utils import ErrorList
-from .models import Tutor, Alumno, Cordinador, Usuario, Documento
+from .models import Tutor, Alumno, Cordinador, Usuario, Documento, HorarioTutor
 from .constants import ALUMNO, TUTOR, COORDINADOR, CODA, CARRERAS, ESTADOS_ALUMNO, SEXOS
 from django.contrib.auth.forms import UserCreationForm
+
+
+class HorarioTutorForm(forms.ModelForm):
+    """Formulario para crear o actualizar un horario de tutor."""
+    class Meta:
+        model = HorarioTutor
+        fields = ["dia_semana", "hora_inicio", "hora_fin"]
+
+        widgets = {
+            "dia_semana": forms.Select(attrs={"class": "form-select"}),
+            "hora_inicio": forms.TimeInput(attrs={"type": "time", "class": "form-control"}),
+            "hora_fin": forms.TimeInput(attrs={"type": "time", "class": "form-control"}),
+        }
+
 
 class FormUsuario(UserCreationForm):
     class Meta:
