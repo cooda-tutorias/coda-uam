@@ -1,0 +1,41 @@
+<div class="modal fade"
+     id="modalProponer-{{ tutoria.pk }}"
+     tabindex="-1"
+     aria-labelledby="modalProponerLabel-{{ tutoria.pk }}"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{% url 'proponer_fechas_tutoria' tutoria.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="es_reagendacion" value="1">
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalProponerLabel-{{ tutoria.pk }}">Proponer fechas para reagendar</h5>
+          <button type="button" class="btn-close" data-mdb-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small">
+            Selecciona al menos una opción de fecha y hora. Puedes agregar una segunda opción para que el alumno elija el nuevo horario.
+          </p>
+          <div class="mb-3">
+            <label class="form-label fw-bold small" for="reagendar-propuesta-1-{{ tutoria.pk }}">
+              Opción 1 <span class="text-danger">*</span>
+            </label>
+            <input type="datetime-local" id="reagendar-propuesta-1-{{ tutoria.pk }}" name="propuesta_1"
+                   class="form-control form-control-sm input-propuesta-fecha" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold small text-muted" for="reagendar-propuesta-2-{{ tutoria.pk }}">
+              Opción 2 <span class="fw-normal">(opcional)</span>
+            </label>
+            <input type="datetime-local" id="reagendar-propuesta-2-{{ tutoria.pk }}" name="propuesta_2"
+                   class="form-control form-control-sm input-propuesta-fecha">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-mdb-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary btn-sm">Enviar propuesta</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

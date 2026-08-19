@@ -1,104 +1,125 @@
 <!DOCTYPE html>
 <html lang="en">
 
-    <head>
-        <meta charset="UTF-8">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title> {% block title  %}  {% endblock %} </title>
-        {% load static %}
-        <link rel="icon" href="{% static 'Alumnos/img/icon.jpg' %}" sizes="32x32" type="image/png">
-        <!-- Bootstrap CDN Bundle with Popper-->
-        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/js/bootstrap.bundle.min.js"
-        integrity="sha384-p34f1UUtsS3wqzfto5wAAmdvj+osOnFyQFpp4Ua3gs/ZVWx6oOypYoCJhGGScy+8"
-        crossorigin="anonymous"></script>
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+      {% block title %}{% endblock %}
+    </title>
+    {% load static %}
+    <link rel="icon"
+          href="{% static 'Alumnos/img/icon.jpg' %}"
+          sizes="32x32"
+          type="image/png">
+    <!-- Bootstrap CDN Bundle with Popper-->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/js/bootstrap.bundle.min.js"
+            integrity="sha384-p34f1UUtsS3wqzfto5wAAmdvj+osOnFyQFpp4Ua3gs/ZVWx6oOypYoCJhGGScy+8"
+            crossorigin="anonymous"></script>
 
-        <!-- Iconos de Bootstrap -->
-        <link rel="stylesheet"
+    <!-- Iconos de Bootstrap -->
+    <link rel="stylesheet"
           href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
 
-        <!--Link CSS-->
-        <link rel="stylesheet" href="{% static 'Alumnos/css/main.css' %}">
-        <link rel="stylesheet" href="{% static 'Alumnos/css/theme-overrides.css' %}">
-        <link rel="stylesheet" href="{% static 'Alumnos/css/colores-estados-tutoria.css' %}">
+    <!--Link CSS-->
+    <link rel="stylesheet" href="{% static 'Alumnos/css/main.css' %}">
+    <link rel="stylesheet"
+          href="{% static 'Alumnos/css/theme-overrides.css' %}">
+    <link rel="stylesheet"
+          href="{% static 'Alumnos/css/colores-estados-tutoria.css' %}">
 
-        <!-- Icons -->
-        <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
+    <!-- Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+          rel="stylesheet" />
 
-    </head>
-    
-<body class="min-vh-100 d-flex flex-column w-100">
+  </head>
+
+  <body class="min-vh-100 d-flex flex-column w-100">
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg bg-secondary p-2 d-flex flex-row justify-content-center align-items-center">
-        <!-- Container -->
-        <div class="container-fluid d-flex flex-row align-items-center">
-            <!--Boton Toggle-->
-            <button class="navbar-toggler" type="button" data-mdb-toggle="collapse"
-                data-mdb-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false"
+      <!-- Container -->
+      <div class="container-fluid d-flex flex-row align-items-center">
+        <!--Boton Toggle-->
+        <button class="navbar-toggler"
+                type="button"
+                data-mdb-toggle="collapse"
+                data-mdb-target="#navbarSupportedContent"
+                aria-controls="navbarSupportedContent"
+                aria-expanded="false"
                 aria-label="Toggle navigation">
-                <i class="fas fa-bars text-primary"></i>
-            </button>
+          <i class="fas fa-bars text-primary"></i>
+        </button>
 
-            <!-- Collapsible wrapper -->
-            <div class="collapse navbar-collapse" id="navbarSupportedContent">
-                <!-- Navbar brand -->
-                <a class="navbar-brand m-0 p-0" href="{% url 'login'%}">
-                    <img src="{% static 'Alumnos/img/logovariacion2.png'%}" height="55" loading="lazy" />
-                </a>
+        <!-- Collapsible wrapper -->
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+          <!-- Navbar brand -->
+          <a class="navbar-brand m-0 p-0" href="{% url 'login' %}">
+            <img src="{% static 'Alumnos/img/logovariacion2.png' %}"
+                 height="55"
+                 loading="lazy" />
+          </a>
 
+          <!-- Izquierda links -->
+          <ul class="navbar-nav me-auto mb-lg-0 text-title">
+            {% block navbar %}{% endblock %}
+          </ul>
+          <!-- Izquierda links -->
 
-                <!-- Izquierda links -->
-                <ul class="navbar-nav me-auto mb-lg-0 text-title">
-                {% block navbar %}
+        </div>
+        <!-- Collapsible wrapper -->
 
-                {% endblock %}
-                </ul>
-                <!-- Izquierda links -->
+        <!-- Derecha elementos -->
+        <div class="d-flex align-items-center">
+          <!-- Icons -->
+          <!-- Notificaciones -->
+          {% load notifications_tags %}
+          {% notifications_unread as unread_count %}
 
-            </div>
-            <!-- Collapsible wrapper -->
+          <div class="dropdown">
+            <!-- TODO: Acá abajo hay definidos dos id diferentes, hay que dejar uno, tal vez el 2o es el bueno. -->
 
-            <!-- Derecha elementos -->
-            <div class="d-flex align-items-center">
-                <!-- Icons -->
-                <!-- Notificaciones -->
-                {% load notifications_tags %}
-                {% notifications_unread as unread_count %}
+            <a class="fs-6 dropdown-toggle hidden-arrow"
+               href="#"
+               id="navbarDropdownMenuLink"
+               id="navbarDropdownMenuNotification"
+               role="button"
+               data-mdb-toggle="dropdown"
+               aria-expanded="false">
+              <i class="bi bi-bell text-primary fs-4 m-2"></i>
+              {% if unread_count %}
+                <span class="badge rounded-pill badge-notification bg-primary">{{ unread_count }}</span>
+              {% endif %}
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end overflow-auto text-center"
+                style="max-height: 400px;
+                       min-width: 300px"
+                aria-labelledby="navbarDropdownMenuNotification">
+              {% if notificaciones_list %}
+                {% for notificacion in notificaciones_list %}
+                  <li>
+                    <div class="card border border-primary shadow-0 my-1 mx-1"
+                         style="max-width: 18rem">
+                      <h5 class="card-header text-primary">{{ notificacion.header }}</h5>
+                      <div class="card-body text-primary">
+                        <!-- <h6 class="card-title">{{notificacion.title}}</h5> -->
+                        <p class="card-text">{{ notificacion.text }}</p>
+                        {% load humanize %}
+                        <small class="text-muted">{{ notificacion.time|naturaltime }}</small>
+                      </div>
+                    </div>
+                  </li>
+                {% endfor %}
+                <!-- <a href="{% url 'remove-notifications'%}"><small>Eliminar todas</small></a> -->
+                <form method='post' action="{% url 'remove-notifications' %}">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-link my-1">Eliminar notificaciones</button>
+                </form>
+              {% else %}
+                <p class="text-primary mt-3 text-title h8">No hay notificaciones</p>
+              {% endif %}
 
-                <div class="dropdown">
-                    <!-- TODO: Acá abajo hay definidos dos id diferentes, hay que dejar uno, tal vez el 2o es el bueno. -->
-
-                    <a class="fs-6 dropdown-toggle hidden-arrow" href="#" id="navbarDropdownMenuLink"
-                        id="navbarDropdownMenuNotification" role="button" data-mdb-toggle="dropdown" aria-expanded="false">
-                        <i class="far fa-bell text-primary h5 m-3"></i>
-                        {% if unread_count %}
-                        <span class="badge rounded-pill badge-notification bg-primary">{{ unread_count }}</span>
-                        {% endif %}
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end overflow-auto text-center"  style="max-height: 400px; min-width: 300px;" aria-labelledby="navbarDropdownMenuNotification">
-                        {% if notificaciones_list %}
-                        {% for notificacion in notificaciones_list %}
-                        <li>
-                            <div class="card border border-primary shadow-0 my-1 mx-1" style="max-width: 18rem;">
-                                <h5 class="card-header text-primary">{{notificacion.header}}</h5>
-                                <div class="card-body text-primary">
-                                    <!-- <h6 class="card-title">{{notificacion.title}}</h5> -->
-                                    <p class="card-text">{{notificacion.text}}</p>
-                                    {% load humanize %}
-                                    <small class="text-muted">{{notificacion.time|naturaltime}}</small>
-                                </div>
-                            </div>
-                        </li>
-                        {% endfor %}
-                        <!-- <a href="{% url 'remove-notifications'%}"><small>Eliminar todas</small></a> -->
-                        <form method='post' action="{% url 'remove-notifications'%}">{% csrf_token %}
-                            <button type="submit" class="btn btn-sm btn-link my-1">Eliminar notificaciones</button>
-                        </form>
-                        {% else %}
-                        <p class="text-primary mt-3 text-title h8">No hay notificaciones</p>
-                        {% endif %}
-                        
-                        <!-- Example notification
+              <!-- Example notification
                             <li>
                             <div class="card border border-primary shadow-0 my-1" style="max-width: 18rem;">
                                 <h5 class="card-header text-primary">Notificaciones</h5>
@@ -108,105 +129,119 @@
                                 </div>
                             </div>
                         </li> -->
-                        
-                    </ul>
-                </div>
-                
-                <!-- Avatar -->
-                <div class="dropdown p-3">
-                    <a class="dropdown-toggle d-flex align-items-center hidden-arrow" href="#"
-                        id="navbarDropdownMenuAvatar" role="button" data-mdb-toggle="dropdown" aria-expanded="false">
-                        <img src="{% static 'Alumnos/img/user_mini.png'%}" class="rounded-circle" height="30"
-                            alt="" loading="lazy" />
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownMenuAvatar">
-                        <li>
-                            <a href="{% url 'perfil' %}"  class="dropdown-item text-title h8" >Mi perfil</a>
-                        </li>
-                        {% comment %} <li>
+
+            </ul>
+          </div>
+
+          <!-- Avatar -->
+          <div class="dropdown p-3">
+            <a class="dropdown-toggle d-flex align-items-center hidden-arrow"
+               href="#"
+               id="navbarDropdownMenuAvatar"
+               role="button"
+               data-mdb-toggle="dropdown"
+               aria-expanded="false">
+              <i class="bi bi-person-circle fs-3 ms-2"></i>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end"
+                aria-labelledby="navbarDropdownMenuAvatar">
+              <li>
+                <a href="{% url 'perfil' %}"  class="dropdown-item text-title h8">Mi perfil</a>
+              </li>
+              {% comment %} <li>
                             <a class="dropdown-item" href="#">Configuraciones</a>
-                        </li> {% endcomment %}
-                        <li>
-                            <a class="dropdown-item text-title h8" href="{% url 'logout' %}">Cerrar Sesión</a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-            <!-- Right elements -->
+              </li> {% endcomment %}
+              <li>
+                <a class="dropdown-item text-title h8" href="{% url 'logout' %}">Cerrar Sesión</a>
+              </li>
+            </ul>
+          </div>
         </div>
-        <!-- Container wrapper -->
+        <!-- Right elements -->
+      </div>
+      <!-- Container wrapper -->
     </nav>
     <!-- Navbar -->
 
-<!--  Inicia el body -->
-<!-- <div class="container py-5"> -->
+    <!--  Inicia el body -->
+    <!-- <div class="container py-5"> -->
 
-<!-- Mensajes globales de Django -->
-{% if messages %}
-  <div class="container mt-3">
-    {% for message in messages %}
-      <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" data-mdb-dismiss="alert" aria-label="Close"></button>
+    <!-- Mensajes globales de Django -->
+    {% if messages %}
+      <div class="container mt-3">
+        {% for message in messages %}
+          <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show"
+               role="alert">
+            {{ message }}
+            <button type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert"
+                    data-mdb-dismiss="alert"
+                    aria-label="Close"></button>
+          </div>
+        {% endfor %}
       </div>
-    {% endfor %}
-  </div>
-{% endif %}
+    {% endif %}
 
-{% block body %}
-{% endblock %}
+    {% block body %}{% endblock %}
 
-<!-- </div> -->
-    
-<!-- Footer -->
-<footer class="d-flex flex-column bg-secondary text-center text-primary">
-    <!-- Grid container -->
-    <div class="container p-4">
+    <!-- </div> -->
+
+    <!-- Footer -->
+    <footer class="d-flex flex-column bg-secondary text-center text-primary">
+      <!-- Grid container -->
+      <div class="container p-4">
         <!-- Section: Social media -->
         <section class="mb-4">
-            <!-- Facebook -->
-            <a class="btn btn-outline-primary btn-floating m-1" href="https://www.facebook.com/UAMUnidadCuajimalpa1" role="button"><i
-                    class="fab fa-facebook-f"></i></a>
+          <!-- Facebook -->
+          <a class="btn btn-outline-primary btn-floating m-1"
+             href="https://www.facebook.com/UAMUnidadCuajimalpa1"
+             role="button"><i class="fab fa-facebook-f"></i></a>
 
-            <!-- Twitter -->
-            <a class="btn btn-outline-primary btn-floating m-1" href="https://twitter.com/uamcuajimalpa" role="button"><i
-                    class="fab fa-x"></i></a>
+          <!-- Twitter -->
+          <a class="btn btn-outline-primary btn-floating m-1"
+             href="https://twitter.com/uamcuajimalpa"
+             role="button"><i class="fab fa-x"></i></a>
 
-            <!-- Youtube -->
-            <a class="btn btn-outline-primary btn-floating m-1" href="https://www.youtube.com/channel/UCeqAccBtLAr-pOeOUoE4iDw" role="button"><i
-                    class="fab fa-youtube"></i></a>
+          <!-- Youtube -->
+          <a class="btn btn-outline-primary btn-floating m-1"
+             href="https://www.youtube.com/channel/UCeqAccBtLAr-pOeOUoE4iDw"
+             role="button"><i class="fab fa-youtube"></i></a>
 
-            <!-- Instagram -->
-            <a class="btn btn-outline-primary btn-floating m-1" href="https://www.instagram.com/uamcuajimalpa/" role="button"><i
-                    class="fab fa-instagram"></i></a>
+          <!-- Instagram -->
+          <a class="btn btn-outline-primary btn-floating m-1"
+             href="https://www.instagram.com/uamcuajimalpa/"
+             role="button"><i class="fab fa-instagram"></i></a>
         </section>
         <!-- Section: Social media -->
 
         <!-- Section: Text -->
         <section class="mb-4 text-title">
-            <h4>Universidad Autónoma Metropolitana Cuajimalpa</h4>
-            <h5>División de Ciencias Naturales e Ingeniería</h5>
+          <h4>Universidad Autónoma Metropolitana Cuajimalpa</h4>
+          <h5>División de Ciencias Naturales e Ingeniería</h5>
         </section>
         <!-- Section: Text -->
 
-    </div>
-    <!-- Grid container -->
+      </div>
+      <!-- Grid container -->
 
-    <!-- Copyright -->
-    <div id = "copyright" class="text-center p-3 text-title">
-        © 2025 Copyright: 
+      <!-- Copyright -->
+      <div id = "copyright" class="text-center p-3 text-title">
+        © 2025 Copyright:
         <a class="text-primary" href="">GCC</a>
-    </div>
-    <!-- Copyright -->
-</footer>
-<!-- Fin Footer -->
+      </div>
+      <!-- Copyright -->
+    </footer>
+    <!-- Fin Footer -->
 
     <!--Scrip MDB -->
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
+    <script type="text/javascript"
+            src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
 
     <!-- Para la paginacion y la estructuracion de las tablas -->
     <!-- DataTables CSS -->
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" />
+    <link rel="stylesheet"
+          href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" />
 
     <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -251,6 +286,6 @@
     
     </script>
 
-</body>
+  </body>
 
 </html>

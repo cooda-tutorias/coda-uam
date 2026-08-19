@@ -1,0 +1,28 @@
+<div class="modal fade"
+     id="modalCancelar-{{ tutoria.pk }}"
+     tabindex="-1"
+     aria-labelledby="modalCancelarLabel-{{ tutoria.pk }}"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{% url 'cancelar-tutoria' tutoria.pk %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalCancelarLabel-{{ tutoria.pk }}">Cancelar tutoría</h5>
+          <button type="button" class="btn-close" data-mdb-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-2">¿Confirmas que deseas cancelar esta tutoría?</p>
+          <p class="small text-muted mb-0">
+            La fecha sugerida por el alumno ya ha transcurrido. La solicitud permanecerá registrada
+            en el historial con el estado Cancelada.
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-mdb-dismiss="modal">Conservar tutoría</button>
+          <button type="submit" class="btn btn-danger btn-sm">Sí, cancelar tutoría</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

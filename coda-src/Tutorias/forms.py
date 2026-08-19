@@ -94,6 +94,7 @@ class FormSeguimiento(forms.ModelForm):
     asistencia = forms.TypedChoiceField(
         choices=((True, 'Sí'), (False, 'No')),
         required=True,
+        initial=True,
         coerce=str_to_bool,
     )
     duracion = forms.ChoiceField(choices=DURACION_ASESORIA, required=True)
@@ -109,7 +110,12 @@ class FormSeguimiento(forms.ModelForm):
         coerce=str_to_bool,
     )
     observaciones = forms.CharField(widget=forms.Textarea, max_length=1000, required=False)
-    impacto_tutoria = forms.IntegerField(required=True)
+    impacto_tutoria = forms.IntegerField(
+        required=True,
+        error_messages={
+            'required': 'Selecciona un nivel de impacto antes de guardar el reporte.',
+        },
+    )
     resultados_tutoria = forms.CharField(widget=forms.Textarea, max_length=1000, required=False)
 
     class Meta:

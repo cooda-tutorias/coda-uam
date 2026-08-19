@@ -86,10 +86,18 @@ def convertir_fecha_local(valor):
 @login_required
 def proponer_fechas_tutoria(request, pk):
     tutoria = get_object_or_404(Tutoria, pk=pk)
+
+    if tutoria.tutor_id != request.user.pk:
+        raise PermissionDenied
     
     if request.method == 'POST':
         propuesta_1_raw = request.POST.get('propuesta_1')
         propuesta_2_raw = request.POST.get('propuesta_2')
+        es_reagendacion = request.POST.get('es_reagendacion') == '1'
+
+        if es_reagendacion and tutoria.estado_efectivo != ACEPTADO:
+            messages.error(request, "Solo se pueden reagendar tutorías agendadas.")
+            return redirect("Panel-tutorias-tutor")
 
         # Verificar que efectivamente haya al menos una propuesta de fecha.
         if propuesta_1_raw:
@@ -109,13 +117,18 @@ def proponer_fechas_tutoria(request, pk):
                 tutoria.fecha_propuesta_1 = propuesta_1
                 tutoria.fecha_propuesta_2 = propuesta_2
                 tutoria.estado = PROPUESTA
-                messages.success(request, "Se han enviado las alternativas de horario al alumno.")
+                tutoria.reagendacion_pendiente = es_reagendacion
+                if es_reagendacion:
+                    messages.success(request, "Se enviaron al alumno las opciones para reagendar la tutoría.")
+                else:
+                    messages.success(request, "Se han enviado las alternativas de horario al alumno.")
             else:
                 # CASO B: Una sola fecha -> Se reasigna la fecha y se ACEPTA directamente
                 tutoria.fecha = propuesta_1
                 tutoria.fecha_propuesta_1 = None
                 tutoria.fecha_propuesta_2 = None
                 tutoria.estado = ACEPTADO
+                tutoria.reagendacion_pendiente = False
                 messages.success(request, "Se ha actualizado y aceptado la tutoría con la nueva fecha.")
             
             tutoria.save()
@@ -144,6 +157,7 @@ def seleccionar_propuesta_tutoria(request, pk):
         tutoria.estado = ACEPTADO
         tutoria.fecha_propuesta_1 = None
         tutoria.fecha_propuesta_2 = None
+        tutoria.reagendacion_pendiente = False
         tutoria.save()
 
         messages.success(request, "Tu solicitud ha sido agendada con éxito. No faltes a la cita en el día y horario que elegiste 📅.")
@@ -501,9 +515,107 @@ class RechazarTutoriaView(View):
 class CancelarTutoriaView(View):
     def post(self, request, pk):
         tutoria = get_object_or_404(Tutoria, pk=pk)
+
+        es_tutor_propietario = (
+            request.user.has_role("TUT")
+            and tutoria.tutor_id == request.user.pk
+        )
+        es_alumno_propietario = (
+            request.user.has_role("ALU")
+            and tutoria.alumno_id == request.user.pk
+        )
+
+        if not es_tutor_propietario and not es_alumno_propietario:
+            raise PermissionDenied("No tienes permiso para cancelar esta tutoría")
+
+        if es_alumno_propietario:
+            if tutoria.estado_efectivo not in [PENDIENTE, VENCIDA, ACEPTADO]:
+                messages.error(
+                    request,
+                    "Esta tutoría ya no se encuentra disponible para cancelación.",
+                )
+                return redirect('Tutorias-alumno')
+
+            motivo = request.POST.get("motivo_cancelacion", "").strip()
+            motivos_validos = dict(MOTIVOS_CANCELACION_ALUMNO)
+            detalle_motivo = request.POST.get(
+                "detalle_motivo_cancelacion", ""
+            ).strip()
+
+            if motivo not in motivos_validos:
+                messages.error(request, "Debes seleccionar un motivo de cancelación válido.")
+                return redirect('Tutorias-alumno')
+
+            if motivo == "ALU_OTRO" and not detalle_motivo:
+                messages.error(request, "Debes escribir el detalle del motivo de cancelación.")
+                return redirect('Tutorias-alumno')
+
+            tutoria.estado = CANCELADO
+            tutoria.motivo_cancelacion = motivo
+            tutoria.detalle_motivo_cancelacion = (
+                detalle_motivo if motivo == "ALU_OTRO" else None
+            )
+            tutoria.cancelado_por = request.user
+            tutoria.origen_cancelacion = "ALUMNO"
+            tutoria.fecha_propuesta_1 = None
+            tutoria.fecha_propuesta_2 = None
+            tutoria.reagendacion_pendiente = False
+            tutoria.save(update_fields=[
+                "estado",
+                "motivo_cancelacion",
+                "detalle_motivo_cancelacion",
+                "cancelado_por",
+                "origen_cancelacion",
+                "fecha_propuesta_1",
+                "fecha_propuesta_2",
+                "reagendacion_pendiente",
+            ])
+            messages.success(request, "La tutoría se canceló correctamente.")
+            return redirect('Tutorias-alumno')
+
+        if tutoria.estado_efectivo != ACEPTADO:
+            messages.error(
+                request,
+                "Esta tutoría ya no se encuentra disponible para cancelación.",
+            )
+            return redirect('Panel-tutorias-tutor')
+
+        motivo = request.POST.get("motivo_cancelacion", "").strip()
+        motivos_validos = dict(MOTIVOS_CANCELACION_TUTOR)
+        detalle_motivo = request.POST.get(
+            "detalle_motivo_cancelacion", ""
+        ).strip()
+
+        if motivo not in motivos_validos:
+            messages.error(request, "Debes seleccionar un motivo de cancelación válido.")
+            return redirect(
+                f"{reverse('Panel-tutorias-tutor')}?tab=agendadas"
+            )
+
+        if motivo == "TUT_OTRO" and not detalle_motivo:
+            messages.error(request, "Debes escribir el detalle del motivo de cancelación.")
+            return redirect(
+                f"{reverse('Panel-tutorias-tutor')}?tab=agendadas"
+            )
+
         tutoria.estado = CANCELADO
-        tutoria.save()
-        return redirect('Tutorias-tutor')
+        tutoria.motivo_cancelacion = motivo
+        tutoria.detalle_motivo_cancelacion = (
+            detalle_motivo if motivo == "TUT_OTRO" else None
+        )
+        tutoria.cancelado_por = request.user
+        tutoria.origen_cancelacion = "TUTOR"
+        tutoria.save(update_fields=[
+            "estado",
+            "motivo_cancelacion",
+            "detalle_motivo_cancelacion",
+            "cancelado_por",
+            "origen_cancelacion",
+        ])
+        messages.success(request, "La tutoría agendada se canceló correctamente.")
+        return redirect(
+            f"{reverse('Panel-tutorias-tutor')}?tab=historial"
+        )
    
 
 class TutoriaUpdateView(BaseAccessMixin, UpdateView):
@@ -1764,23 +1876,26 @@ class VerTutoriasTutorTabView(TutorViewMixin, ListView):
 
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
+        context['motivos_cancelacion'] = MOTIVOS_CANCELACION_TUTOR
         tutorias = list(context['tutorias'])
 
-        context['tutorias_solicitadas'] = [
-            t
-            for t in tutorias
-            if t.estado_efectivo in [PENDIENTE, PROPUESTA, VENCIDA]
-        ]
-        context['tutorias_agendadas'] = [
-            t
-            for t in tutorias
-            if t.estado_efectivo == ACEPTADO
-        ]
-        context['tutorias_historial'] = [
-            t
-            for t in tutorias
-            if t.estado_efectivo in [REALIZADA, REPORTADA, RECHAZADO, CANCELADO]
-        ]
+        # 1. Solicitadas: ordenadas por fecha de solicitud (las más recientes primero)
+        solicitadas = [t for t in tutorias if t.estado_efectivo in [PENDIENTE, PROPUESTA, VENCIDA]]
+        context['tutorias_solicitadas'] = sorted(
+            solicitadas, key=lambda t: t.fecha_solicitud, reverse=True
+        )
+
+        # 2. Agendadas: ordenadas por fecha de la cita (las más próximas primero)
+        agendadas = [t for t in tutorias if t.estado_efectivo == ACEPTADO]       
+        context['tutorias_agendadas'] = sorted(
+            agendadas, key=lambda t: t.fecha
+        )
+
+        # 3. Historial: ordenadas por fecha de la cita (las más recientes primero)
+        historial = [t for t in tutorias if t.estado_efectivo in [REALIZADA, REPORTADA, RECHAZADO, CANCELADO]]
+        context['tutorias_historial'] = sorted(
+            historial, key=lambda t: t.fecha, reverse=True
+        )
 
         return context
 
@@ -1807,6 +1922,7 @@ class VerTutoriasAlumnoListView(LoginRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
+        context['motivos_cancelacion'] = MOTIVOS_CANCELACION_ALUMNO
         tutorias = list(context['tutorias'])
 
         # HeaderAndFooterFachada.html extiende esta plantilla dinámicamente.
@@ -1814,21 +1930,23 @@ class VerTutoriasAlumnoListView(LoginRequiredMixin, ListView):
         # proporcionar el valor que antes agregaba AlumnoViewMixin.
         context['header_footer'] = TEMPLATES[ALUMNO]
 
-        context['tutorias_solicitadas'] = [
-            t
-            for t in tutorias
-            if t.estado_efectivo in [PENDIENTE, PROPUESTA, VENCIDA]
-        ]
-        context['tutorias_agendadas'] = [
-            t
-            for t in tutorias
-            if t.estado_efectivo == ACEPTADO
-        ]
-        context['tutorias_historial'] = [
-            t
-            for t in tutorias
-            if t.estado_efectivo in [REALIZADA, REPORTADA, RECHAZADO, CANCELADO]
-        ]
+       # 1. Solicitadas: ordenadas por fecha de solicitud (las más recientes primero)
+        solicitadas = [t for t in tutorias if t.estado_efectivo in [PENDIENTE, PROPUESTA, VENCIDA]]
+        context['tutorias_solicitadas'] = sorted(
+            solicitadas, key=lambda t: t.fecha_solicitud, reverse=True
+        )
+
+        # 2. Agendadas: ordenadas por fecha de la cita (las más próximas primero)
+        agendadas = [t for t in tutorias if t.estado_efectivo == ACEPTADO]       
+        context['tutorias_agendadas'] = sorted(
+            agendadas, key=lambda t: t.fecha
+        )
+
+        # 3. Historial: ordenadas por fecha de la cita (las más recientes primero)
+        historial = [t for t in tutorias if t.estado_efectivo in [REALIZADA, REPORTADA, RECHAZADO, CANCELADO]]
+        context['tutorias_historial'] = sorted(
+            historial, key=lambda t: t.fecha, reverse=True
+        )
         
         return context
 
@@ -1983,23 +2101,37 @@ class RealizarSeguimientoView(TutorViewMixin, UpdateView):
         'resultados_tutoria',
     ]
 
-    def _has_existing_report(self, tutoria: Tutoria) -> bool:
-        # Evita falsos positivos por defaults del modelo (False/0/"" en tutorias nuevas).
-        if tutoria.asistencia is not True:
-            return False
+    def _is_modal_request(self) -> bool:
+        return self.request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
-        has_duracion = tutoria.duracion not in (None, 0)
-        has_impacto = tutoria.impacto_tutoria not in (None, 0)
-        has_text_details = any(
-            bool((value or '').strip())
-            for value in [tutoria.beca_otorgada, tutoria.observaciones, tutoria.resultados_tutoria]
+    def get_queryset(self):
+        # Un tutor solamente puede consultar o modificar sus propias tutorías.
+        return (
+            super()
+            .get_queryset()
+            .filter(tutor_id=self.request.user.pk)
+            .select_related('alumno', 'tutor', 'alumno__tutor_asignado')
+            .prefetch_related('historial_cambios')
         )
-        has_positive_flags = any([
-            tutoria.firma_documentos_beca is True,
-            tutoria.asesoria_especializada is True,
-        ])
 
-        return (has_duracion and has_impacto) or (has_duracion and (has_text_details or has_positive_flags))
+    def get_template_names(self):
+        if self._is_modal_request():
+            return ['Tutorias/includes/partials/modal_seguimiento_tutoria.html']
+        return [self.template_name]
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        if self._is_modal_request() and self.request.method == 'POST':
+            # El modal muestra únicamente los siete campos solicitados. Este
+            # campo pertenece al formulario completo y debe conservarse para
+            # no borrar información previa al editar desde el panel.
+            data = kwargs['data'].copy()
+            data['beca_otorgada'] = self.get_object().beca_otorgada or ''
+            kwargs['data'] = data
+        return kwargs
+
+    def _has_existing_report(self, tutoria: Tutoria) -> bool:
+        return tutoria.fecha_reporte is not None
 
     def _format_bool(self, value: Any) -> str:
         if value is True:
@@ -2058,14 +2190,6 @@ class RealizarSeguimientoView(TutorViewMixin, UpdateView):
                 changes.append(f"{label}: '{old_value}' -> '{new_value}'")
 
         return ' | '.join(changes) if changes else 'Se editó el reporte sin cambios detectables.'
-
-    def get_queryset(self):
-        return (
-            super()
-            .get_queryset()
-            .select_related('alumno', 'tutor', 'alumno__tutor_asignado')
-            .prefetch_related('historial_cambios')
-        )
 
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
@@ -2156,6 +2280,10 @@ class RealizarSeguimientoView(TutorViewMixin, UpdateView):
             alumno.estado = estado_actual_nuevo
             alumno.save(update_fields=['estado'])
 
+        # Registrar la fecha del primer llenado del reporte.
+        if form.instance.fecha_reporte is None:
+            form.instance.fecha_reporte = timezone.now()
+
         response = super().form_valid(form)
 
         if has_edit_changes:
@@ -2177,7 +2305,17 @@ class RealizarSeguimientoView(TutorViewMixin, UpdateView):
             tutoria=self.object,
             actor=tutor,
         )
+        if self._is_modal_request():
+            return JsonResponse({'ok': True})
         return response
+
+    def form_invalid(self, form: BaseModelForm) -> HttpResponse:
+        if self._is_modal_request():
+            return self.render_to_response(
+                self.get_context_data(form=form),
+                status=422,
+            )
+        return super().form_invalid(form)
 
 
 class EditarEstadoAlumnoHistoricoView(BaseAccessMixin, View):

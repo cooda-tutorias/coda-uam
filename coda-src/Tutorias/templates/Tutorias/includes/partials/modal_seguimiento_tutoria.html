@@ -1,0 +1,172 @@
+{% load widget_tweaks %}
+<style>
+.reporte-campo-invalido {
+  border-color: #dc3545 !important;
+  border-width: 2px !important;
+  background-color: #fff5f5;
+}
+</style>
+
+<div class="modal fade"
+     id="modalReporteTutoria"
+     tabindex="-1"
+     aria-labelledby="modalReporteTutoriaLabel"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <form method="post"
+            action="{% url 'save_seguimiento' tutoria.pk %}"
+            class="js-form-reporte-tutoria"
+            novalidate>
+        {% csrf_token %}
+        {{ form.estado_alumno_actual.as_hidden }}
+        <input type="hidden" name="edit_confirmed" value="true">
+
+        <div class="modal-header">
+          <div>
+            <h5 class="modal-title text-primary text-title-bold"
+                id="modalReporteTutoriaLabel">Reporte de tutoría</h5>
+            <div class="mt-2">
+              <p class="mb-1">
+                <span class="fw-bold">Estudiante:</span>
+                {{ tutoria.alumno.nombre_completo }}
+              </p>
+              <p class="mb-0">
+                <span class="fw-bold">Fecha de la tutoría:</span>
+                {{ tutoria.fecha|date:'d/m/Y H:i' }}
+              </p>
+            </div>
+          </div>
+          <button type="button"
+                  class="btn-close"
+                  data-mdb-dismiss="modal"
+                  aria-label="Cerrar"></button>
+        </div>
+
+        <div class="modal-body">
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+          {% endif %}
+
+          <fieldset class="p-3 mb-3 border rounded">
+            <legend class="float-none w-auto px-2 fs-6">¿El alumno asistió a la tutoría?</legend>
+            <div class="d-flex flex-wrap gap-3">
+              <div class="form-check">
+                <input class="form-check-input"
+                       type="radio"
+                       name="asistencia"
+                       id="asistencia-{{ tutoria.pk }}-si"
+                       value="True"
+                       {% if form.asistencia.value|stringformat:'s' == 'True' %}checked{% endif %}
+                       required>
+                <label class="form-check-label" for="asistencia-{{ tutoria.pk }}-si">Sí</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input"
+                       type="radio"
+                       name="asistencia"
+                       id="asistencia-{{ tutoria.pk }}-no"
+                       value="False"
+                       {% if form.asistencia.value|stringformat:'s' == 'False' %}checked{% endif %}
+                       required>
+                <label class="form-check-label" for="asistencia-{{ tutoria.pk }}-no">No</label>
+              </div>
+            </div>
+            {% for error in form.asistencia.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+          </fieldset>
+
+          <div class="p-3 mb-3 border rounded">
+            <label class="form-label fw-semibold" for="{{ form.duracion.id_for_label }}">Duración de la tutoría</label>
+            {% render_field form.duracion class="form-select" %}
+            {% for error in form.duracion.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+          </div>
+
+          <fieldset class="p-3 mb-3 border rounded">
+            <legend class="float-none w-auto px-2 fs-6">¿Se firmó algún formato de solicitud de beca?</legend>
+            <div class="d-flex flex-wrap gap-3">
+              <div class="form-check"><input class="form-check-input"
+       type="radio"
+       name="firma_documentos_beca"
+       id="firma-beca-{{ tutoria.pk }}-si"
+       value="True"
+       {% if form.firma_documentos_beca.value|stringformat:'s' == 'True' %}checked{% endif %}
+       required><label class="form-check-label" for="firma-beca-{{ tutoria.pk }}-si">Sí</label></div>
+              <div class="form-check"><input class="form-check-input"
+       type="radio"
+       name="firma_documentos_beca"
+       id="firma-beca-{{ tutoria.pk }}-no"
+       value="False"
+       {% if form.firma_documentos_beca.value|stringformat:'s' == 'False' %}checked{% endif %}
+       required><label class="form-check-label" for="firma-beca-{{ tutoria.pk }}-no">No</label></div>
+            </div>
+            {% for error in form.firma_documentos_beca.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+          </fieldset>
+
+          <fieldset class="p-3 mb-3 border rounded">
+            <legend class="float-none w-auto px-2 fs-6">¿Requirió asesoría especializada?</legend>
+            <div class="d-flex flex-wrap gap-3">
+              <div class="form-check"><input class="form-check-input"
+       type="radio"
+       name="asesoria_especializada"
+       id="asesoria-{{ tutoria.pk }}-si"
+       value="True"
+       {% if form.asesoria_especializada.value|stringformat:'s' == 'True' %}checked{% endif %}
+       required><label class="form-check-label" for="asesoria-{{ tutoria.pk }}-si">Sí</label></div>
+              <div class="form-check"><input class="form-check-input"
+       type="radio"
+       name="asesoria_especializada"
+       id="asesoria-{{ tutoria.pk }}-no"
+       value="False"
+       {% if form.asesoria_especializada.value|stringformat:'s' == 'False' %}checked{% endif %}
+       required><label class="form-check-label" for="asesoria-{{ tutoria.pk }}-no">No</label></div>
+            </div>
+            {% for error in form.asesoria_especializada.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+          </fieldset>
+
+          <div class="p-3 mb-3 border rounded">
+            <label class="form-label fw-semibold"
+                   for="{{ form.observaciones.id_for_label }}">Aspectos tratados, acuerdos o canalizaciones</label>
+            {% render_field form.observaciones class="form-control" rows="4" %}
+            {% for error in form.observaciones.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+          </div>
+
+          <fieldset class="p-3 mb-3 border rounded {% if form.impacto_tutoria.errors %}reporte-campo-invalido{% endif %}">
+            <legend class="float-none w-auto px-2 fs-6">Nivel de impacto en desempeño académico (1 = muy bajo, 5 = muy alto)</legend>
+            <div class="d-flex flex-wrap gap-3">
+              {% for valor in "12345" %}
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input"
+                         type="radio"
+                         name="impacto_tutoria"
+                         value="{{ valor }}"
+                         id="impacto-{{ tutoria.pk }}-{{ valor }}"
+                         {% if form.impacto_tutoria.value|stringformat:'s' == valor %}checked{% endif %}
+                         required>
+                  <label class="form-check-label" for="impacto-{{ tutoria.pk }}-{{ valor }}">{{ valor }}</label>
+                </div>
+              {% endfor %}
+            </div>
+            {% for error in form.impacto_tutoria.errors %}
+              <div class="alert alert-danger mt-3 mb-0" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                {{ error }}
+              </div>
+            {% endfor %}
+          </fieldset>
+
+          <div class="p-3 border rounded">
+            <label class="form-label fw-semibold"
+                   for="{{ form.resultados_tutoria.id_for_label }}">Resultados de la tutoría</label>
+            {% render_field form.resultados_tutoria class="form-control" rows="4" %}
+            {% for error in form.resultados_tutoria.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-mdb-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-primary">Guardar reporte</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

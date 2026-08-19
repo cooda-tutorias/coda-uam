@@ -1,0 +1,52 @@
+<div class="modal fade"
+     id="modalSeleccionar-{{ tutoria.pk }}"
+     tabindex="-1"
+     aria-labelledby="modalLabel-{{ tutoria.pk }}"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{% url 'seleccionar_propuesta_tutoria' pk=tutoria.pk %}">
+        {% csrf_token %}
+        <div class="modal-header bg-light">
+          <h5 class="modal-title text-primary" id="modalLabel-{{ tutoria.pk }}">Horario sugerido por el tutor</h5>
+          <button type="button" class="btn-close" data-mdb-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body text-start">
+          <p class="text-muted small mb-3">
+            Tu tutor(a) <strong>{{ tutoria.tutor.nombre_completo }}</strong> propuso estos horarios. Elige el que mejor te convenga:
+          </p>
+          {% if tutoria.fecha_propuesta_1 %}
+            <div class="form-check p-3 mb-2 border rounded">
+              <input class="form-check-input ms-0 me-2"
+                     type="radio"
+                     name="opcion_elegida"
+                     id="opcion1-{{ tutoria.pk }}"
+                     value="1"
+                     required>
+              <label class="form-check-label fw-bold text-dark" for="opcion1-{{ tutoria.pk }}">
+                Opción 1: {{ tutoria.fecha_propuesta_1|date:"d M Y, h:i a" }}
+              </label>
+            </div>
+          {% endif %}
+          {% if tutoria.fecha_propuesta_2 %}
+            <div class="form-check p-3 mb-2 border rounded">
+              <input class="form-check-input ms-0 me-2"
+                     type="radio"
+                     name="opcion_elegida"
+                     id="opcion2-{{ tutoria.pk }}"
+                     value="2"
+                     required>
+              <label class="form-check-label fw-bold text-dark" for="opcion2-{{ tutoria.pk }}">
+                Opción 2: {{ tutoria.fecha_propuesta_2|date:"d M Y, h:i a" }}
+              </label>
+            </div>
+          {% endif %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-mdb-dismiss="modal">Cerrar</button>
+          <button type="submit" class="btn btn-primary btn-sm">Confirmar horario</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

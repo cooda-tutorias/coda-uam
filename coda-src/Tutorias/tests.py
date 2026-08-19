@@ -74,6 +74,7 @@ class PanelTutoriasAlumnoTests(TestCase):
         alumno=None,
         fecha=None,
         asistencia=None,
+        fecha_reporte=None,
     ):
         return Tutoria.objects.create(
             tutor=self.tutor,
@@ -83,6 +84,7 @@ class PanelTutoriasAlumnoTests(TestCase):
             fecha=fecha or self.fecha_futura(),
             estado=estado,
             asistencia=asistencia,
+            fecha_reporte=fecha_reporte,
         )
 
     def fecha_futura(self):
@@ -150,6 +152,7 @@ class PanelTutoriasAlumnoTests(TestCase):
             ACEPTADO,
             fecha=self.fecha_pasada(),
             asistencia=True,
+            fecha_reporte=timezone.now(),
         )
 
         response = self.client.get(self.url)
@@ -235,6 +238,240 @@ class PanelTutoriasAlumnoTests(TestCase):
             response,
             reverse("Tutorias-update-modal", args=[tutoria.pk]),
         )
+
+
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+class MatrizTransicionesTutoriaIntegrationTests(TestCase):
+    """Matriz funcional de estados y pestañas para tutor y alumno."""
+
+    def setUp(self):
+        self.tutor = Tutor.objects.create_user(
+            first_name="Tutor",
+            last_name="Matriz",
+            email="tutor.matriz@cua.uam.mx",
+            matricula="T17001",
+            password="password123",
+            es_tutor=True,
+        )
+        self.alumno = Alumno.objects.create_user(
+            first_name="Alumno",
+            last_name="Matriz",
+            email="alumno.matriz@cua.uam.mx",
+            matricula="A17001",
+            password="password123",
+            tutor_asignado=self.tutor,
+            estado=1,
+        )
+        self.tutoria = Tutoria.objects.create(
+            tutor=self.tutor,
+            alumno=self.alumno,
+            tema=["BEC"],
+            descripcion="Tutoría para matriz de integración",
+            fecha=timezone.now() + timedelta(days=3),
+            estado=PENDIENTE,
+        )
+
+    def fecha_formulario(self, dias):
+        return (timezone.localtime() + timedelta(days=dias)).strftime('%Y-%m-%dT%H:%M')
+
+    def proponer(self, *, segunda=False, reagendacion=False):
+        self.client.force_login(self.tutor)
+        datos = {
+            'propuesta_1': self.fecha_formulario(5),
+            'propuesta_2': self.fecha_formulario(6) if segunda else '',
+        }
+        if reagendacion:
+            datos['es_reagendacion'] = '1'
+        return self.client.post(
+            reverse('proponer_fechas_tutoria', args=[self.tutoria.pk]),
+            datos,
+        )
+
+    def seleccionar(self, opcion='1'):
+        self.client.force_login(self.alumno)
+        return self.client.post(
+            reverse('seleccionar_propuesta_tutoria', args=[self.tutoria.pk]),
+            {'opcion_elegida': opcion},
+        )
+
+    def assert_en_pestana(self, nombre_pestana, estado_efectivo):
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado_efectivo, estado_efectivo)
+
+        claves = {
+            'solicitadas': 'tutorias_solicitadas',
+            'agendadas': 'tutorias_agendadas',
+            'historial': 'tutorias_historial',
+        }
+        for usuario, rol, url in (
+            (self.tutor, 'tutor', reverse('Panel-tutorias-tutor')),
+            (self.alumno, 'alumno', reverse('Tutorias-alumno')),
+        ):
+            self.client.force_login(usuario)
+            session = self.client.session
+            session['role'] = rol
+            session.save()
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+            for pestana, clave_contexto in claves.items():
+                if pestana == nombre_pestana:
+                    self.assertIn(self.tutoria, response.context[clave_contexto])
+                else:
+                    self.assertNotIn(self.tutoria, response.context[clave_contexto])
+
+    def test_caso_01_tutor_acepta_solicitud(self):
+        self.client.force_login(self.tutor)
+        self.client.post(reverse('aceptar_tutoria', args=[self.tutoria.pk]))
+
+        self.assert_en_pestana('agendadas', ACEPTADO)
+
+    def test_caso_02_tutor_rechaza_solicitud(self):
+        self.client.force_login(self.tutor)
+        self.client.post(
+            reverse('rechazar_tutoria', args=[self.tutoria.pk]),
+            {'motivo_rechazo': 'Sin disponibilidad'},
+        )
+
+        self.assert_en_pestana('historial', RECHAZADO)
+
+    def test_caso_03_tutor_propone_una_fecha_para_solicitud(self):
+        self.proponer()
+
+        self.assert_en_pestana('agendadas', ACEPTADO)
+
+    def test_caso_04_tutor_propone_dos_fechas_para_solicitud(self):
+        self.proponer(segunda=True)
+
+        self.assert_en_pestana('solicitadas', PROPUESTA)
+
+    def test_caso_05_alumno_cancela_tutoria_solicitada(self):
+        self.client.force_login(self.alumno)
+        self.client.post(
+            reverse('cancelar-tutoria', args=[self.tutoria.pk]),
+            {'motivo_cancelacion': 'ALU_RESOL'},
+        )
+
+        self.assert_en_pestana('historial', CANCELADO)
+
+    def test_caso_06_alumno_cancela_tutoria_agendada(self):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.save(update_fields=['estado'])
+        self.client.force_login(self.alumno)
+        self.client.post(
+            reverse('cancelar-tutoria', args=[self.tutoria.pk]),
+            {'motivo_cancelacion': 'ALU_PERSO'},
+        )
+
+        self.assert_en_pestana('historial', CANCELADO)
+
+    def test_caso_07_tutor_cancela_tutoria_agendada(self):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.save(update_fields=['estado'])
+        self.client.force_login(self.tutor)
+        self.client.post(
+            reverse('cancelar-tutoria', args=[self.tutoria.pk]),
+            {'motivo_cancelacion': 'TUT_ACADE'},
+        )
+
+        self.assert_en_pestana('historial', CANCELADO)
+
+    def test_caso_08_tutor_reactiva_vencida_con_una_fecha(self):
+        self.tutoria.fecha = timezone.now() - timedelta(days=1)
+        self.tutoria.save(update_fields=['fecha'])
+        self.proponer()
+
+        self.assert_en_pestana('agendadas', ACEPTADO)
+
+    def test_caso_09_tutor_reactiva_vencida_con_dos_fechas(self):
+        self.tutoria.fecha = timezone.now() - timedelta(days=1)
+        self.tutoria.save(update_fields=['fecha'])
+        self.proponer(segunda=True)
+
+        self.assert_en_pestana('solicitadas', PROPUESTA)
+
+    def test_caso_10_tutor_reagenda_agendada_con_una_fecha(self):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.save(update_fields=['estado'])
+        self.proponer(reagendacion=True)
+
+        self.assert_en_pestana('agendadas', ACEPTADO)
+
+    def test_caso_11_tutor_reagenda_agendada_con_dos_fechas(self):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.save(update_fields=['estado'])
+        self.proponer(segunda=True, reagendacion=True)
+
+        self.assert_en_pestana('solicitadas', PROPUESTA)
+
+    def test_caso_12_alumno_elige_fecha_de_solicitud(self):
+        self.proponer(segunda=True)
+        self.tutoria.refresh_from_db()
+        fecha_elegida = self.tutoria.fecha_propuesta_2
+        self.seleccionar('2')
+
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.fecha, fecha_elegida)
+        self.assertIsNone(self.tutoria.fecha_propuesta_1)
+        self.assertIsNone(self.tutoria.fecha_propuesta_2)
+        self.assert_en_pestana('agendadas', ACEPTADO)
+
+    def test_caso_13_alumno_elige_fecha_de_reagendacion(self):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.save(update_fields=['estado'])
+        self.proponer(segunda=True, reagendacion=True)
+        self.seleccionar('1')
+
+        self.tutoria.refresh_from_db()
+        self.assertFalse(self.tutoria.reagendacion_pendiente)
+        self.assert_en_pestana('agendadas', ACEPTADO)
+
+    def test_caso_14_agendada_pasada_se_muestra_realizada(self):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.fecha = timezone.now() - timedelta(minutes=1)
+        self.tutoria.save(update_fields=['estado', 'fecha'])
+
+        self.assert_en_pestana('historial', REALIZADA)
+
+    def test_caso_15_tutor_registra_reporte_de_tutoria_realizada(self):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.fecha = timezone.now() - timedelta(minutes=1)
+        self.tutoria.save(update_fields=['estado', 'fecha'])
+        self.client.force_login(self.tutor)
+        response = self.client.post(
+            reverse('save_seguimiento', args=[self.tutoria.pk]),
+            {
+                'estado_alumno_actual': 1,
+                'asistencia': True,
+                'duracion': '2',
+                'firma_documentos_beca': False,
+                'asesoria_especializada': False,
+                'impacto_tutoria': 4,
+                'resultados_tutoria': 'Seguimiento registrado',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.tutoria.refresh_from_db()
+        self.assertIsNotNone(self.tutoria.fecha_reporte)
+        self.assert_en_pestana('historial', REPORTADA)
+
+    def test_caso_16_solicitud_pendiente_vence(self):
+        self.tutoria.fecha = timezone.now() - timedelta(minutes=1)
+        self.tutoria.save(update_fields=['fecha'])
+
+        self.assert_en_pestana('solicitadas', VENCIDA)
+
+    def test_caso_17_vencen_las_dos_fechas_propuestas(self):
+        self.tutoria.estado = PROPUESTA
+        self.tutoria.fecha_propuesta_1 = timezone.now() - timedelta(days=2)
+        self.tutoria.fecha_propuesta_2 = timezone.now() - timedelta(days=1)
+        self.tutoria.save(update_fields=[
+            'estado',
+            'fecha_propuesta_1',
+            'fecha_propuesta_2',
+        ])
+
+        self.assert_en_pestana('solicitadas', VENCIDA)
 
 
 class EditarTutoriaModalTests(TestCase):
@@ -770,6 +1007,99 @@ class PropuestasFechaTutoriaTests(TestCase):
         self.assertIsNone(self.tutoria.fecha_propuesta_1)
         self.assertIsNone(self.tutoria.fecha_propuesta_2)
 
+    def test_dos_fechas_reactivan_una_tutoria_vencida(self):
+        self.tutoria.fecha = timezone.now() - timedelta(days=1)
+        self.tutoria.save(update_fields=['fecha'])
+        self.assertEqual(self.tutoria.estado_efectivo, VENCIDA)
+        self.client.force_login(self.tutor)
+
+        propuesta_1 = timezone.localtime() + timedelta(days=1)
+        propuesta_2 = timezone.localtime() + timedelta(days=2)
+        response = self.client.post(
+            reverse('proponer_fechas_tutoria', args=[self.tutoria.pk]),
+            {
+                'propuesta_1': propuesta_1.strftime('%Y-%m-%dT%H:%M'),
+                'propuesta_2': propuesta_2.strftime('%Y-%m-%dT%H:%M'),
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse('Panel-tutorias-tutor'),
+            fetch_redirect_response=False,
+        )
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, PROPUESTA)
+        self.assertEqual(self.tutoria.estado_efectivo, PROPUESTA)
+
+    def test_dos_fechas_marcan_una_tutoria_agendada_por_reagendar(self):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.save(update_fields=['estado'])
+        self.client.force_login(self.tutor)
+
+        response = self.client.post(
+            reverse('proponer_fechas_tutoria', args=[self.tutoria.pk]),
+            {
+                'propuesta_1': '2030-01-15T11:30',
+                'propuesta_2': '2030-01-16T12:00',
+                'es_reagendacion': '1',
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse('Panel-tutorias-tutor'),
+            fetch_redirect_response=False,
+        )
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, PROPUESTA)
+        self.assertTrue(self.tutoria.reagendacion_pendiente)
+
+    def test_una_fecha_reagenda_directamente_la_tutoria(self):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.save(update_fields=['estado'])
+        self.client.force_login(self.tutor)
+
+        response = self.client.post(
+            reverse('proponer_fechas_tutoria', args=[self.tutoria.pk]),
+            {
+                'propuesta_1': '2030-01-15T11:30',
+                'propuesta_2': '',
+                'es_reagendacion': '1',
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse('Panel-tutorias-tutor'),
+            fetch_redirect_response=False,
+        )
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, ACEPTADO)
+        self.assertEqual(
+            self.tutoria.fecha,
+            timezone.make_aware(datetime(2030, 1, 15, 11, 30)),
+        )
+        self.assertIsNone(self.tutoria.fecha_propuesta_1)
+        self.assertIsNone(self.tutoria.fecha_propuesta_2)
+        self.assertFalse(self.tutoria.reagendacion_pendiente)
+
+    def test_alumno_elige_reagenda_y_limpia_la_marca(self):
+        self.tutoria.estado = PROPUESTA
+        self.tutoria.reagendacion_pendiente = True
+        self.tutoria.fecha_propuesta_1 = timezone.make_aware(datetime(2030, 1, 15, 11, 30))
+        self.tutoria.fecha_propuesta_2 = timezone.make_aware(datetime(2030, 1, 16, 12, 0))
+        self.tutoria.save()
+        self.client.force_login(self.alumno)
+
+        self.client.post(
+            reverse('seleccionar_propuesta_tutoria', args=[self.tutoria.pk]),
+            {'opcion_elegida': '2'},
+        )
+
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, ACEPTADO)
+        self.assertFalse(self.tutoria.reagendacion_pendiente)
 
 class MotivosRechazoTutoriaTests(TestCase):
     """Pruebas del registro del motivo al rechazar una tutoría."""
@@ -901,6 +1231,242 @@ class MotivosRechazoTutoriaTests(TestCase):
         self.tutoria.refresh_from_db()
         self.assertEqual(self.tutoria.estado, PENDIENTE)
         self.assertFalse(self.tutoria.motivo_rechazo)
+
+
+class CancelarTutoriaTests(TestCase):
+    """Pruebas de la cancelación de tutorías."""
+
+    def setUp(self):
+        self.tutor = Tutor.objects.create_user(
+            first_name="Tutor",
+            last_name="Cancelación",
+            email="tutor.cancelacion@cua.uam.mx",
+            matricula="T30001",
+            password="password123",
+            es_tutor=True,
+        )
+        self.otro_tutor = Tutor.objects.create_user(
+            first_name="Otro",
+            last_name="Tutor",
+            email="otro.tutor.cancelacion@cua.uam.mx",
+            matricula="T30002",
+            password="password123",
+            es_tutor=True,
+        )
+        self.alumno = Alumno.objects.create_user(
+            first_name="Alumno",
+            last_name="Cancelación",
+            email="alumno.cancelacion@cua.uam.mx",
+            matricula="A30001",
+            password="password123",
+            tutor_asignado=self.tutor,
+        )
+        self.tutoria = Tutoria.objects.create(
+            tutor=self.tutor,
+            alumno=self.alumno,
+            tema=["BEC"],
+            descripcion="Solicitud vencida",
+            fecha=timezone.now() - timedelta(days=1),
+            estado=PENDIENTE,
+        )
+        self.url = reverse("cancelar-tutoria", args=[self.tutoria.pk])
+
+    def test_tutor_propietario_no_puede_cancelar_tutoria_vencida(self):
+        self.client.force_login(self.tutor)
+
+        response = self.client.post(self.url)
+
+        self.assertRedirects(
+            response,
+            reverse("Panel-tutorias-tutor"),
+            fetch_redirect_response=False,
+        )
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, PENDIENTE)
+
+    def test_otro_tutor_no_puede_cancelar_la_tutoria(self):
+        self.client.force_login(self.otro_tutor)
+
+        response = self.client.post(self.url)
+
+        self.assertEqual(response.status_code, 403)
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, PENDIENTE)
+
+    def test_no_permite_cancelar_tutoria_que_no_esta_vencida(self):
+        self.tutoria.fecha = timezone.now() + timedelta(days=1)
+        self.tutoria.save(update_fields=["fecha"])
+        self.client.force_login(self.tutor)
+
+        response = self.client.post(self.url)
+
+        self.assertRedirects(
+            response,
+            reverse("Panel-tutorias-tutor"),
+            fetch_redirect_response=False,
+        )
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, PENDIENTE)
+
+    def test_cancela_agendada_con_motivo_predefinido(self):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.fecha = timezone.now() + timedelta(days=1)
+        self.tutoria.save(update_fields=["estado", "fecha"])
+        self.client.force_login(self.tutor)
+
+        response = self.client.post(
+            self.url,
+            {"motivo_cancelacion": "TUT_ACADE"},
+        )
+
+        self.assertRedirects(
+            response,
+            f"{reverse('Panel-tutorias-tutor')}?tab=historial",
+            fetch_redirect_response=False,
+        )
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, CANCELADO)
+        self.assertEqual(
+            self.tutoria.motivo_cancelacion,
+            "TUT_ACADE",
+        )
+
+    def test_cancela_agendada_con_otro_motivo(self):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.fecha = timezone.now() + timedelta(days=1)
+        self.tutoria.save(update_fields=["estado", "fecha"])
+        self.client.force_login(self.tutor)
+
+        response = self.client.post(
+            self.url,
+            {
+                "motivo_cancelacion": "TUT_OTRO",
+                "detalle_motivo_cancelacion": "Actividad institucional urgente",
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            f"{reverse('Panel-tutorias-tutor')}?tab=historial",
+            fetch_redirect_response=False,
+        )
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, CANCELADO)
+        self.assertEqual(
+            self.tutoria.detalle_motivo_cancelacion,
+            "Actividad institucional urgente",
+        )
+
+    def test_agendada_sin_motivo_no_se_cancela(self):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.fecha = timezone.now() + timedelta(days=1)
+        self.tutoria.save(update_fields=["estado", "fecha"])
+        self.client.force_login(self.tutor)
+
+        response = self.client.post(self.url, {})
+
+        self.assertRedirects(
+            response,
+            f"{reverse('Panel-tutorias-tutor')}?tab=agendadas",
+            fetch_redirect_response=False,
+        )
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, ACEPTADO)
+        self.assertFalse(self.tutoria.motivo_cancelacion)
+
+    def test_otro_sin_detalle_no_cancela_la_tutoria(self):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.fecha = timezone.now() + timedelta(days=1)
+        self.tutoria.save(update_fields=["estado", "fecha"])
+        self.client.force_login(self.tutor)
+
+        self.client.post(
+            self.url,
+            {"motivo_cancelacion": "TUT_OTRO"},
+        )
+
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, ACEPTADO)
+        self.assertFalse(self.tutoria.motivo_cancelacion)
+
+    def test_alumno_no_puede_usar_un_codigo_reservado_al_tutor(self):
+        self.tutoria.fecha = timezone.now() + timedelta(days=1)
+        self.tutoria.save(update_fields=["fecha"])
+        self.client.force_login(self.alumno)
+
+        self.client.post(
+            self.url,
+            {"motivo_cancelacion": "TUT_ACADE"},
+        )
+
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, PENDIENTE)
+        self.assertFalse(self.tutoria.motivo_cancelacion)
+
+    def test_alumno_cancela_solicitud_pendiente_con_motivo(self):
+        self.tutoria.fecha = timezone.now() + timedelta(days=1)
+        self.tutoria.save(update_fields=["fecha"])
+        self.client.force_login(self.alumno)
+
+        response = self.client.post(
+            self.url,
+            {"motivo_cancelacion": "ALU_RESOL"},
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("Tutorias-alumno"),
+            fetch_redirect_response=False,
+        )
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, CANCELADO)
+        self.assertEqual(self.tutoria.origen_cancelacion, "ALUMNO")
+        self.assertEqual(self.tutoria.cancelado_por_id, self.alumno.pk)
+        self.assertEqual(
+            self.tutoria.motivo_cancelacion,
+            "ALU_RESOL",
+        )
+
+    def test_alumno_cancela_tutoria_agendada_con_otro_motivo(self):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.fecha = timezone.now() + timedelta(days=1)
+        self.tutoria.save(update_fields=["estado", "fecha"])
+        self.client.force_login(self.alumno)
+
+        self.client.post(
+            self.url,
+            {
+                "motivo_cancelacion": "ALU_OTRO",
+                "detalle_motivo_cancelacion": "Ya no podré asistir ese día",
+            },
+        )
+
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, CANCELADO)
+        self.assertEqual(
+            self.tutoria.detalle_motivo_cancelacion,
+            "Ya no podré asistir ese día",
+        )
+
+    def test_otro_alumno_no_puede_cancelar_la_tutoria(self):
+        otro_alumno = Alumno.objects.create_user(
+            first_name="Otro",
+            last_name="Alumno",
+            email="otro.alumno.cancelacion@cua.uam.mx",
+            matricula="A30002",
+            password="password123",
+            tutor_asignado=self.tutor,
+        )
+        self.client.force_login(otro_alumno)
+
+        response = self.client.post(
+            self.url,
+            {"motivo_cancelacion": "ALU_PERSO"},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, PENDIENTE)
 
 
 class FormSeguimientoTests(TestCase):

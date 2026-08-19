@@ -2,9 +2,12 @@ from django.db import models
 from django.utils.http import urlencode
 from datetime import timedelta
 from django.contrib.postgres.fields import ArrayField
-from Usuarios.models import Alumno, Tutor
+from Usuarios.models import Alumno, Tutor, Usuario
 from Usuarios.constants import ESTADOS_ALUMNO
-from .constants import TEMAS, SERVICIO, ESTADO, DURACION_ASESORIA
+from .constants import ( 
+    TEMAS, SERVICIO, ESTADO, DURACION_ASESORIA, ORIGEN_CANCELACION, 
+    DIAS_TOLERANCIA_TUTOR, MOTIVOS_CANCELACION
+)
 from django.utils import timezone
 
 # Incluir todos los estados de una tutoría.
@@ -21,24 +24,83 @@ class Tutoria(models.Model):
     # tema = models.CharField(SERVICIO, max_length=4, choices=TEMAS, default=SERVICIO)
     # Se cambia el campo para que sea una lista
     tema = ArrayField(models.CharField(SERVICIO, max_length=4, choices=TEMAS, default=SERVICIO))
+
+    descripcion = models.CharField(max_length=255, blank=True, null=True)
+
+    # Fecha sugerida o agendada para realizar la tutoría.
     fecha = models.DateTimeField()
+
+    # Estados en los que puede transitar una tutoría en su periodo de vida.
+    estado = models.CharField(PENDIENTE, max_length=4, choices=ESTADO, default=PENDIENTE)
+
+    # Fecha en la que el alumno hizo la solicitud de la tutoría.
+    fecha_solicitud = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Fecha de solicitud"
+    )
+
+    # Fecha en la que el tutor llena el reporte de seguimiento de la tutoría.
+    fecha_reporte = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha de llenado del reporte"
+    )
 
     # Propuestas alternativas cuando el tutor acepta la tutoría, pero propone otras fechas.
     fecha_propuesta_1 = models.DateTimeField(null=True, blank=True)
     fecha_propuesta_2 = models.DateTimeField(null=True, blank=True)
 
-    descripcion = models.CharField(max_length=255, blank=True, null=True)
-    estado = models.CharField(PENDIENTE, max_length=4, choices=ESTADO, default=PENDIENTE)
+    # Distingue una propuesta para mover una tutoría ya agendada de una
+    # propuesta hecha al atender una solicitud nueva.
+    reagendacion_pendiente = models.BooleanField(default=False)
 
-    # Campo para registrar el motivo de rechazo de la tutoría.
+    # Atributo para registrar el motivo de rechazo de la tutoría.
     motivo_rechazo = models.CharField(
         max_length=500,
         blank=True,
         null=True,
     )
 
+    # Datos del usuario que canceló la tutoría.
+    cancelado_por = models.ForeignKey(
+        Usuario, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True, 
+        related_name='tutorias_canceladas'
+    )
+
+    # Origen de la cancelación de la tutoría: alumno, tutor, sistema.
+    origen_cancelacion = models.CharField(
+        max_length=15,
+        choices= ORIGEN_CANCELACION,
+        null=True,
+        blank=True
+    )
+
+    # Motivo proporcionado por el tutor o alumno al cancelar una tutoría solicitada/agendada.
+    motivo_cancelacion = models.CharField(
+        max_length=10,
+        choices=MOTIVOS_CANCELACION,
+        null=True,
+        blank=True
+    )
+
+    # Campo opcional únicamente si elige 'OTRO'
+    detalle_motivo_cancelacion = models.CharField(
+        max_length=144,
+        null=True,
+        blank=True
+    )
+
+    # motivo_cancelacion = models.CharField(
+    #     max_length=500,
+    #     blank=True,
+    #     null=True,
+    # )
+
     # campos para el seguimiento de tutoría
-    asistencia = models.BooleanField(default=False, blank=True, null=True)
+    asistencia = models.BooleanField(default=True, blank=True, null=True)
     duracion = models.IntegerField(DURACION_ASESORIA,default=0, blank=True, null=True)
     firma_documentos_beca = models.BooleanField(default=False, blank=True, null=True)
     beca_otorgada = models.CharField(max_length=255, blank=True, null=True)
@@ -65,17 +127,32 @@ class Tutoria(models.Model):
         """
         ahora = timezone.now()
         
-        # 1. Solicitud o propuesta que venció sin ser aceptada
-        if self.estado in [PENDIENTE, PROPUESTA] and self.fecha < ahora:
+        # 1. Una propuesta sigue activa mientras al menos una alternativa
+        # continúe vigente. Esto permite reactivar solicitudes cuya fecha
+        # original ya venció proponiendo nuevos horarios.
+        if self.estado == PROPUESTA:
+            fechas_propuestas = [
+                fecha for fecha in (
+                    self.fecha_propuesta_1,
+                    self.fecha_propuesta_2,
+                ) if fecha is not None
+            ]
+            fecha_limite = max(fechas_propuestas, default=self.fecha)
+            if fecha_limite < ahora:
+                return VENCIDA
+
+        # 2. Solicitud pendiente que venció sin ser atendida
+        if self.estado == PENDIENTE and self.fecha < ahora:
             return VENCIDA
 
-        # 2. Tutoría aceptada que ya pasó la fecha
+        # 3. Tutoría aceptada que ya pasó la fecha (REALIZADA o REPORTADA)
         if self.estado == ACEPTADO and self.fecha < ahora:
-            if self.asistencia is not None:
+            if self.fecha_reporte is not None:
                 return REPORTADA
+            
             return REALIZADA    
                 
-        # 3. En cualquier otro caso, regresa el estado normal grabado en BD
+        # 4. En cualquier otro caso, regresa el estado normal grabado en BD
         return self.estado
 
 
@@ -89,6 +166,38 @@ class Tutoria(models.Model):
             return dict(ESTADO).get(self.estado_efectivo)
         
         return super()._get_FIELD_display(field)
+
+    @property
+    def fecha_cancelacion_automatica(self):
+        """
+        Esta función calcula la fecha en la que una solicitud no respondida por el tutor
+        debe ser calcelada automáticamente. La fecha compensa según el margen con que se
+        hizo la solicitud, entre más margen para la cita, menos días para cancelar automáticamente.
+
+        NOTA: esta fecha no funcionaría si se quiere determinar cuando se cancelaría una solicitud que
+        el alumno no respondió a una propuesta de fechas del tutor.
+        Actualmente el sistema NO le da extesión al alumno, la tutoría se cancela automáticamente
+        al terminar el día de la fecha propuesta por el tutor.
+        """
+        # Días de margen que tiene la fecha solicitada por el alumno para la cita.
+        dias_holgura = (self.fecha.date() - self.fecha_solicitud.date()).days
+
+        # Días restantes que tiene el tutor para responder compensando
+        # con qué tan justa es la fecha para la cita.
+        dias_restantes = DIAS_TOLERANCIA_TUTOR - dias_holgura
+
+        # Solicitudes con mucha holgura tendrán solamente 1 días de extesión,
+        # pero solicitudes muy apretadas tendrán más.
+        dias_extension = max(1, dias_restantes)
+
+        return self.fecha + timedelta(days=dias_extension)
+
+    @property
+    def debe_cancelarse_automaticamente(self):
+        return (
+            self.estado_efectivo == VENCIDA
+            and timezone.now() >= self.fecha_cancelacion_automatica
+        )
 
     @property
     def estado_badge_class(self):
