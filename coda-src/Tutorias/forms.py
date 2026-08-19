@@ -10,6 +10,34 @@ def str_to_bool(value):
         return value
     return str(value).strip().lower() == 'true'
 
+
+class FormEditarTutoriaModal(forms.ModelForm):
+    """
+    Formulario para editar los temas y la descripción de la tutoría.
+    """
+    tema = forms.MultipleChoiceField(
+        choices=TEMAS,
+        widget=forms.CheckboxSelectMultiple,
+        label="Temas de la tutoría",
+        required=True,
+    )
+
+    descripcion = forms.CharField(
+        label="Descripción",
+        max_length=255,
+        required=True,
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": 4,
+            }
+        ),
+    )
+
+    class Meta:
+        model = Tutoria
+        fields = ["tema", "descripcion"]
+
 #TODO: este formulario fue hecho principalmente para que el alumno solicite una cita con el tutor,
 # pero encontré (Antonio LJ) que también se está usando para que el tutor pueda crear una cita 
 # con el alumno, por lo que hay que revisar si esta función se requiere o no.
@@ -490,7 +518,7 @@ class FormVerTutorias(forms.Form):
     estado = forms.TypedChoiceField(
         choices=[('', 'Todos los estados')] + ESTADOS_ALUMNO[1:],
         required=False,
-        label="Estado del Alumno",
+        label="Estado del alumno",
         coerce=int,
         empty_value='',
     )

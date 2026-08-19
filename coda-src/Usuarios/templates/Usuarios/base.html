@@ -14,8 +14,15 @@
         integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL"
         crossorigin="anonymous"></script>
 
+        <!-- Iconos de Bootstrap -->
+        <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
         <!--Link CSS-->
         <link rel="stylesheet" href="{% static 'Alumnos/css/main.css' %}">
+        <link rel="stylesheet" href="{% static 'Alumnos/css/theme-overrides.css' %}">
+        <link rel="stylesheet" href="{% static 'Alumnos/css/colores-estados-tutoria.css' %}">
+
         <!-- Icons -->
         <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
 
@@ -68,6 +75,8 @@
                 {% notifications_unread as unread_count %}
 
                 <div class="dropdown">
+                    <!-- TODO: Acá abajo hay definidos dos id diferentes, hay que dejar uno, tal vez el 2o es el bueno. -->
+
                     <a class="fs-6 dropdown-toggle hidden-arrow" href="#" id="navbarDropdownMenuLink"
                         id="navbarDropdownMenuNotification" role="button" data-mdb-toggle="dropdown" aria-expanded="false">
                         <i class="far fa-bell text-primary h5 m-3"></i>
@@ -159,6 +168,18 @@
 <!--  Inicia el body -->
 <!-- <div class="container py-5"> -->
 
+<!-- Mensajes globales de Django -->
+{% if messages %}
+  <div class="container mt-3">
+    {% for message in messages %}
+      <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" data-mdb-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  </div>
+{% endif %}
+
 {% block body %}
 {% endblock %}
 
@@ -206,8 +227,9 @@
     <!-- Copyright -->
 </footer>
 <!-- Fin Footer -->
-<!--Scrip MDB -->
-<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
+
+    <!--Scrip MDB -->
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
 
     <!-- Para la paginacion y la estructuracion de las tablas -->
     <!-- DataTables CSS -->
