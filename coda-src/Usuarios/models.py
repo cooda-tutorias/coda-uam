@@ -78,6 +78,35 @@ class Usuario(AbstractUser):
         # 2. " ".join(...) los une con un espacio
         return " ".join(filter(None, partes))
 
+    @property
+    def is_tutor(self):
+        """
+        Regresa verdadero si el usuario tiene entre sus roles el de TUTOR.
+        """        
+        return TUTOR in self.rol
+
+    @property
+    def is_alumno(self):
+        """
+        Regresa verdadero si el usuario tiene entre sus roles el de ALUMNO.
+        """
+        return ALUMNO in self.rol
+
+    @property
+    def is_coda(self):
+        """
+        Regresa verdadero si el usuario tiene entre sus roles el de CODA.
+        """
+        return CODA in self.rol
+
+    @property
+    def is_coordinador(self):
+        """
+        Regresa verdadero si el usuario tiene entre sus roles el de COORDINADOR.
+        """
+        return COORDINADOR in self.rol
+
+
     def __str__(self) -> str:
         return str(self.matricula)
     
@@ -219,3 +248,36 @@ class Documento(models.Model):
 #         verbose_name = 'Coordinador'
 #         verbose_name_plural = 'Coordinadores'
    
+
+class HorarioTutor(models.Model):
+    """Modelo para representar los horarios de atención del tutor."""
+
+    # Definimos la clase de opciones dentro o fuera del modelo
+    class DiaSemana(models.IntegerChoices):
+        LUNES = 0, "Lunes"
+        MARTES = 1, "Martes"
+        MIERCOLES = 2, "Miércoles"
+        JUEVES = 3, "Jueves"
+        VIERNES = 4, "Viernes"
+
+    # El campo `tutor` es una clave foránea que se relaciona con el modelo `Usuario`. 
+    # Esto permite que cada horario esté asociado a un tutor específico. 
+    # El parámetro `related_name="horarios"` permite acceder a los horarios de un 
+    # tutor desde el modelo `Usuario` usando `usuario.horarios.all()`.
+    tutor = models.ForeignKey(
+        Usuario,
+        on_delete=models.CASCADE,
+        related_name="horarios"
+    )
+
+    dia_semana = models.IntegerField(choices=DiaSemana.choices)
+    hora_inicio = models.TimeField()
+    hora_fin = models.TimeField()
+    activo = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["dia_semana", "hora_inicio"]
+        unique_together = ("tutor", "dia_semana", "hora_inicio", "hora_fin")
+
+    def __str__(self):
+        return f"{self.get_dia_semana_display()} {self.hora_inicio}–{self.hora_fin}"

@@ -53,6 +53,11 @@ urlpatterns = [
     path('tutoria/<int:pk>/editar-estado-historico/', views.EditarEstadoAlumnoHistoricoView.as_view(), name='editar-estado-historico'),
 
     path('cita/<int:tutoria_id>/ics/', views.descargar_ics_tutoria, name='descargar_ics'),
+    # API URLS que se usan en el front-end para agendar tutorias cuando el alumno selecciona un slot de horario libre del tutor.
+    path("api/slots/", views.api_slots_tutor, name="api_slots_tutor"),
+    path('api/fechas-slot/<int:slot_id>/', views.api_fechas_slot, name='api_fechas_slot'),
+    path("api/slots-tutor/<int:tutor_id>/", views.api_slots_tutor, name="api_slots_tutor"),
+    path('api/franjas-disponibles/<int:tutor_id>/', views.obtener_franjas_disponibles_api, name='api-franjas-disponibles'),
 
     # URLS CODA 
     path('tutores-coda/', views.VerTutoresListView.as_view(), name='Tutores-Coda'),
@@ -68,6 +73,11 @@ urlpatterns = [
     path('generar-txt/<int:pk>', views.generar_archivo_txt, name='generar_txt'),
     #path('debug-tutorias/', views.DebugTutoriasView.as_view(), name='debug-tutorias'),
     path('qr-code/', views.QRCodeView.as_view(), name='qr-code'),
+
+    # Esto lo agregó Antonio LJ para las tutoría in-situ con QR
+    path("tutorias/in-situ/<int:tutor_pk>/", views.TutoriaInSituCreateView.as_view(), name="tutoria_insitu"),
+
+
     # Desactivamos la tutoria por tutor mientras se arregla la coordinacion de horarios
     #path('creartutoria/<int:pk_alumno>/', views.CrearTutoriaPorAlumnoView.as_view(),name='crear-tutoria-por-alumno'),
 ]

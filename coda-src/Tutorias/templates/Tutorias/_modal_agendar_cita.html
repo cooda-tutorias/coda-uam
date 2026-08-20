@@ -1,0 +1,77 @@
+<!-- Modal Agendar Cita -->
+<div class="modal fade" id="modalAgendarCita" tabindex="-1"
+     aria-labelledby="modalAgendarCitaLabel" aria-hidden="true">
+
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalAgendarCitaLabel">
+                    {{ titulo_formulario|default:"Agendar tutoría" }}
+                </h5>
+
+                <button type="button" class="btn-close"
+                        data-bs-dismiss="modal"
+                        aria-label="Cerrar"></button>
+            </div>
+
+            <div class="modal-body">
+
+                <!-- BLOQUE A → Selección de horario similar a Calendly -->
+                <div id="bloqueSlots" style="display:none;">
+                    <div class="alert alert-info mt-2 mb-3" id="nota-slots">
+                       {{ subtitulo_modal }} 
+                    </div>
+
+                    <div class="row">
+                        <!-- Columna Izquierda: Calendario Inline -->
+                        <div class="col-md-7 d-flex justify-content-center mb-3">
+                            <div id="calendarioContainer"></div>
+                        </div>
+
+                        <!-- Columna Derecha: Franjas Horarias de 30 min -->
+                        <div class="col-md-5">
+                            <label class="form-label fw-bold" id="tituloFranjas">
+                                Selecciona una fecha y horario
+                            </label>
+                            
+                            <div id="contenedorFranjas" class="d-grid gap-2 overflow-auto" style="max-height: 280px;">
+                                <small class="text-muted">Haz clic en un día del calendario para ver los horarios disponibles.</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Input oculto para almacenar la fecha/hora seleccionada (formato ISO) -->
+                    <input type="hidden" id="inputFechaFinal" name="fecha_seleccionada">
+                </div>
+
+                <!-- BLOQUE B → Sugerencia de fecha -->
+                <div id="bloqueSugerencia" style="display:none;">
+                    <div class="alert alert-info mt-3" id="nota-slots">
+                       {{ subtitulo_modal }}
+                    </div>
+
+                    <label class="form-label">Sugiere una fecha</label>
+                    <input id="inputSugerencia"
+                           type="datetime-local"
+                           class="form-control mb-3">
+                    <a href="https://www.cua.uam.mx/servicios/sistemas-escolares/programacion-academica-de-evaluacion-global"
+                         target="_blank" class="text-muted small">
+                        <i class="bi bi-calendar-plus hover-primary"></i> Ver horarios de clases del profesor.
+                    </a>
+                </div>
+
+            </div>
+
+            <div class="modal-footer">
+                <button id="btnAceptarCita"
+                        type="button"
+                        class="btn btn-primary">
+                    Aceptar
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+</div>

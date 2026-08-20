@@ -129,33 +129,41 @@
                                 </div>
                             </div>
                         </li> -->
+                        
+                    </ul>
+                </div>
+                
+                <!-- Avatar -->
+                <div class="dropdown p-3">
+                    <a class="dropdown-toggle d-flex align-items-center hidden-arrow" 
+                       href="#"
+                       id="navbarDropdownMenuAvatar" 
+                       role="button" 
+                       data-mdb-toggle="dropdown" 
+                       aria-expanded="false">
+                       <i class="bi bi-person-circle fs-3 ms-2"></i>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end" 
+                        aria-labelledby="navbarDropdownMenuAvatar">
+                        <li>
+                            <a href="{% url 'perfil' %}"  class="dropdown-item text-title h8" >Mi perfil</a>
+                        </li>
 
-            </ul>
-          </div>
+                        {% if user.is_tutor %}
+                        <li>
+                            <a class="dropdown-item" href="{% url 'tutor_horarios' %}">
+                                Mis horarios de tutoría
+                            </a>
+                        </li>
+                        {% endif %}
 
-          <!-- Avatar -->
-          <div class="dropdown p-3">
-            <a class="dropdown-toggle d-flex align-items-center hidden-arrow"
-               href="#"
-               id="navbarDropdownMenuAvatar"
-               role="button"
-               data-mdb-toggle="dropdown"
-               aria-expanded="false">
-              <i class="bi bi-person-circle fs-3 ms-2"></i>
-            </a>
-            <ul class="dropdown-menu dropdown-menu-end"
-                aria-labelledby="navbarDropdownMenuAvatar">
-              <li>
-                <a href="{% url 'perfil' %}"  class="dropdown-item text-title h8">Mi perfil</a>
-              </li>
-              {% comment %} <li>
-                            <a class="dropdown-item" href="#">Configuraciones</a>
-              </li> {% endcomment %}
-              <li>
-                <a class="dropdown-item text-title h8" href="{% url 'logout' %}">Cerrar Sesión</a>
-              </li>
-            </ul>
-          </div>
+                        <li>
+                            <a class="dropdown-item text-title h8" href="{% url 'logout' %}">Cerrar Sesión</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <!-- Right elements -->
         </div>
         <!-- Right elements -->
       </div>

@@ -1,0 +1,42 @@
+{% if alerta_texto %}
+  <div class="p-3 mb-4 rounded-3 shadow-sm fade-in
+              border-top border-bottom border-4
+              {% if alerta_tipo == 'info' %}
+                border-info-subtle
+              {% elif alerta_tipo == 'warning' %}
+                border-warning-subtle
+              {% elif alerta_tipo == 'success' %}
+                border-success-subtle
+              {% else %}
+                border-secondary-subtle
+              {% endif %}"
+       style="background-color: #f8f9fa;">
+
+    <div class="d-flex align-items-start">
+      <div class="me-3 fs-4">
+        {% if alerta_tipo == 'info' %}
+          <i class="bi bi-info-circle-fill text-info"></i>
+        {% elif alerta_tipo == 'warning' %}
+          <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+        {% elif alerta_tipo == 'success' %}
+          <i class="bi bi-check-circle-fill text-success"></i>
+        {% else %}
+          <i class="bi bi-bell-fill text-secondary"></i>
+        {% endif %}
+      </div>
+      <div class="text-body small mt-1">
+        {{ alerta_texto }}
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+<style>
+  .fade-in {
+    animation: fadeIn 0.4s ease-in-out;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
