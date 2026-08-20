@@ -189,7 +189,8 @@
                           <th>Matrícula</th>
                           <th>Estudiante</th>
                           <th>Estado académico</th>
-                          <th>Fecha solicitada</th>
+                          <th>Fecha solicitud</th>
+                          <th>Fecha sugerida cita</th>
                           <th>Tema(s)</th>
                           <th>Descripción</th>
                           <th>Estado</th>
@@ -202,6 +203,13 @@
                             <td>{{ tutoria.alumno.matricula }}</td>
                             <td>{{ tutoria.alumno.nombre_completo }}</td>
                             <td>{{ tutoria.alumno.get_estado_display }}</td>
+                            <td class="text-nowrap">
+                              <span class="d-block fw-semibold">{{ tutoria.fecha_solicitud|date:"j M Y" }}</span>
+                              <small class="text-muted">
+                                <i class="bi bi-clock me-1"></i>
+                                {{ tutoria.fecha|date:"P" }}
+                              </small>
+                            </td>
                             <td class="text-nowrap">
                               <span class="d-block fw-semibold">{{ tutoria.fecha|date:"j M Y" }}</span>
                               <small class="text-muted">
@@ -220,16 +228,21 @@
                             </td>
                             <!-- Celda que muestra el estado de la tutoría con un badge -->
                             <td>
-                              <span class="badge rounded-pill {{ tutoria.estado_badge_class }}">{{ tutoria.get_estado_display }}</span>
+                              {% if tutoria.reagendacion_pendiente %}
+                                <span class="badge rounded-pill bg-propuesta">Por reagendar</span>
+                              {% else %}
+                                <span class="badge rounded-pill {{ tutoria.estado_badge_class }}">{{ tutoria.get_estado_display }}</span>
+                              {% endif %}
                             </td>
 
                             <!-- ACCIONES: celda que muestra los botones de acción para el tutor -->
                             <td>
-                              <!-- CASO 1: PENDIENTE (el alumno mandó la solcitud ) -->
+                              <!-- CASO 1: Solicitudes PENDIENTEs (el alumno mandó la solcitud ) -->
                               {% if tutoria.estado_efectivo == 'PEN' %}
                                 <div class="btn-group btn-group-sm action-group"
                                      role="group"
                                      aria-label="Acciones de tutoría">
+                                  <!-- Acción ACEPTAR: se acepta directo -->
                                   <form method="post"
                                         action="{% url 'aceptar_tutoria' tutoria.pk %}"
                                         class="d-flex">
@@ -241,6 +254,8 @@
                                       <i class="bi bi-check-lg" aria-hidden="true"></i>
                                     </button>
                                   </form>
+
+                                  <!-- Acción PROPONER: abre modal para poner dos fechas -->
                                   <button type="button"
                                           class="btn action-neutral action-reschedule"
                                           data-mdb-toggle="modal"
@@ -249,6 +264,7 @@
                                           title="Proponer otra fecha para aceptar">
                                     <i class="bi bi-calendar-range" aria-hidden="true"></i>
                                   </button>
+                                  <!-- Acción RECHAZAR: abre modal para elegir motivo del rechazo -->
                                   <button type="button"
                                           class="btn action-neutral action-reject"
                                           data-mdb-toggle="modal"
@@ -259,8 +275,25 @@
                                   </button>
                                 </div>
 
-                                <!-- CASO 2: PROPUESTA (esperando que el alumno acepte una fecha propuesta) -->
+                                <!-- CASO 2: Solicitudes VENCIDAs  -->
+                              {% elif tutoria.estado_efectivo == 'VEN' %}
+                                <div class="btn-group btn-group-sm action-group"
+                                     role="group"
+                                     aria-label="Acciones de tutoría">
+                                  <!-- Acción REACTIVAR: reutiliza el modal para proponer nuevas fechas -->
+                                  <button type="button"
+                                          class="btn action-neutral action-reschedule"
+                                          data-mdb-toggle="modal"
+                                          data-mdb-target="#modalProponer-{{ tutoria.pk }}"
+                                          aria-label="Reactivar tutoría proponiendo nuevas fechas"
+                                          title="Proponer nuevas fechas para reactivar">
+                                    <i class="bi bi-calendar-range" aria-hidden="true"></i>
+                                  </button>
+                                </div>
+
+                                <!-- CASO 3: Solicitudes PROPUESTA -->
                               {% elif tutoria.estado_efectivo == 'PRO' %}
+                                <!-- Acción: solamente sale el badge con info -->
                                 <span class="badge badge-espera-alumno"
                                       data-mdb-toggle="tooltip"
                                       title="Se agendará cuando el alumno elija una fecha.">En espera del alumno</span>
@@ -290,7 +323,8 @@
                         <tr class="text-title text-center">
                           <th>Matrícula</th>
                           <th>Estudiante</th>
-                          <th>Fecha agendada</th>
+                          <th>Fecha solicitud</th>
+                          <th>Fecha cita</th>
                           <th>Tema(s)</th>
                           <th>Descripción</th>
                           <th>Estado</th>
@@ -302,6 +336,13 @@
                           <tr class="text-body text-center">
                             <td>{{ tutoria.alumno.matricula }}</td>
                             <td>{{ tutoria.alumno.nombre_completo }}</td>
+                            <td class="text-nowrap">
+                              <span class="d-block fw-semibold">{{ tutoria.fecha_solicitud|date:"j M Y" }}</span>
+                              <small class="text-muted">
+                                <i class="bi bi-clock me-1"></i>
+                                {{ tutoria.fecha|date:"P" }}
+                              </small>
+                            </td>
                             <td class="text-nowrap">
                               <span class="d-block fw-semibold">{{ tutoria.fecha|date:"j M Y" }}</span>
                               <small class="text-muted">
@@ -328,6 +369,9 @@
                                 <!-- 1. REAGENDAR (Abre Modal para que el tutor proponga 1 o 2 fechas) -->
                                 <button type="button"
                                         class="btn action-neutral action-reschedule"
+                                        data-mdb-toggle="modal"
+                                        data-mdb-target="#modalProponer-{{ tutoria.pk }}"
+                                        aria-label="Proponer fechas para reagendar"
                                         title="Reagendar para otra fecha">
                                   <i class="bi bi-calendar-range" aria-hidden="true"></i>
                                 </button>
@@ -335,7 +379,10 @@
                                 <!-- 2. CANCELAR (Abre Modal para que el tutor elija el motivo) -->
                                 <button type="button"
                                         class="btn action-neutral action-cancel"
-                                        title="Cancelar cita">
+                                        data-mdb-toggle="modal"
+                                        data-mdb-target="#modalCancelarAgendada-{{ tutoria.pk }}"
+                                        aria-label="Cancelar tutoría agendada"
+                                        title="Cancelar tutoría agendada">
                                   <i class="bi bi-x-lg" aria-hidden="true"></i>
                                 </button>
                               </div>
@@ -362,10 +409,12 @@
                         <tr class="text-title text-center">
                           <th>Matrícula</th>
                           <th>Estudiante</th>
+                          <th>Fecha solicitud</th>
                           <th>Fecha de tutoría</th>
                           <th>Tema(s)</th>
                           <th>Descripción</th>
                           <th>Estado</th>
+                          <th>Acción</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -373,6 +422,13 @@
                           <tr class="text-body text-center">
                             <td>{{ tutoria.alumno.matricula }}</td>
                             <td>{{ tutoria.alumno.nombre_completo }}</td>
+                            <td class="text-nowrap">
+                              <span class="d-block fw-semibold">{{ tutoria.fecha_solicitud|date:"j M Y" }}</span>
+                              <small class="text-muted">
+                                <i class="bi bi-clock me-1"></i>
+                                {{ tutoria.fecha|date:"P" }}
+                              </small>
+                            </td>
                             <td class="text-nowrap">
                               <span class="d-block fw-semibold">{{ tutoria.fecha|date:"j M Y" }}</span>
                               <small class="text-muted">
@@ -389,7 +445,37 @@
                               </span>
                             </td>
                             <td>
-                              <span class="badge rounded-pill {{ tutoria.estado_badge_class }}">{{ tutoria.get_estado_display }}</span>
+                              {% if tutoria.estado_efectivo == 'CAN' %}
+                                <span class="badge rounded-pill bg-cancelada"
+                                      data-mdb-toggle="tooltip"
+                                      title="Cancelada por el {{ tutoria.get_origen_cancelacion_display|lower }}">
+                                  Cancelada
+                                  {% if tutoria.origen_cancelacion == 'TUTOR' %}
+                                    <i class="bi bi-person-video ms-1" aria-hidden="true"></i>
+                                  {% elif tutoria.origen_cancelacion == 'ALUMNO' %}
+                                    <i class="bi bi-mortarboard ms-1" aria-hidden="true"></i>
+                                  {% elif tutoria.origen_cancelacion == 'SISTEMA' %}
+                                    <i class="bi bi-robot ms-1" aria-hidden="true"></i>
+                                  {% endif %}
+                                </span>
+                              {% else %}
+                                <span class="badge rounded-pill {{ tutoria.estado_badge_class }}">{{ tutoria.get_estado_display }}</span>
+                              {% endif %}
+                            </td>
+                            <td>
+                              {% if tutoria.estado_efectivo == 'REA' %}
+                                <button type="button"
+                                        class="btn btn-primary btn-sm js-abrir-reporte"
+                                        data-url="{% url 'save_seguimiento' tutoria.pk %}">Llenar reporte</button>
+                              {% elif tutoria.estado_efectivo == 'REP' %}
+                                <button type="button"
+                                        class="btn btn-outline-primary btn-sm js-abrir-reporte"
+                                        data-url="{% url 'save_seguimiento' tutoria.pk %}">Ver/Editar</button>
+                              {% else %}
+                                <span class="text-muted"
+                                      title="No hay acciones disponibles"
+                                      aria-label="No hay acciones disponibles">—</span>
+                              {% endif %}
                             </td>
                           </tr>
                         {% empty %}
@@ -410,143 +496,95 @@
   </section>
 
   {% for tutoria in tutorias_solicitadas %}
+    {% if tutoria.estado_efectivo == 'PEN' or tutoria.estado_efectivo == 'VEN' %}
+      {% include "Tutorias/includes/partials/modal_proponer_horario.html" with tutoria=tutoria %}
+    {% endif %}
     {% if tutoria.estado_efectivo == 'PEN' %}
-      <div class="modal fade"
-           id="modalProponer-{{ tutoria.pk }}"
-           tabindex="-1"
-           aria-labelledby="modalProponerLabel-{{ tutoria.pk }}"
-           aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-          <div class="modal-content">
-            <form method="post" action="{% url 'proponer_fechas_tutoria' tutoria.pk %}">
-              {% csrf_token %}
-              <div class="modal-header">
-                <h5 class="modal-title" id="modalProponerLabel-{{ tutoria.pk }}">Proponer horario alternativo</h5>
-                <button type="button"
-                        class="btn-close"
-                        data-mdb-dismiss="modal"
-                        aria-label="Cerrar"></button>
-              </div>
-              <div class="modal-body">
-                <p class="text-muted small">Ingresa una fecha para aceptar directamente o dos para que el alumno elija.</p>
-                <div class="mb-3">
-                  <label class="form-label fw-bold small" for="propuesta-1-{{ tutoria.pk }}">
-                    Opción 1 <span class="text-danger">*</span>
-                  </label>
-                  <input type="datetime-local"
-                         id="propuesta-1-{{ tutoria.pk }}"
-                         name="propuesta_1"
-                         class="form-control form-control-sm input-propuesta-fecha"
-                         required>
-                </div>
-                <div class="mb-3">
-                  <label class="form-label fw-bold small text-muted"
-                         for="propuesta-2-{{ tutoria.pk }}">
-                    Opción 2 <span class="fw-normal">(opcional)</span>
-                  </label>
-                  <input type="datetime-local"
-                         id="propuesta-2-{{ tutoria.pk }}"
-                         name="propuesta_2"
-                         class="form-control form-control-sm input-propuesta-fecha">
-                </div>
-              </div>
-              <div class="modal-footer">
-                <button type="button"
-                        class="btn btn-secondary btn-sm"
-                        data-mdb-dismiss="modal">Cancelar</button>
-                <button type="submit" class="btn btn-primary btn-sm">Enviar propuesta</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-
-      <div class="modal fade"
-           id="modalRechazar-{{ tutoria.pk }}"
-           tabindex="-1"
-           aria-labelledby="modalRechazarLabel-{{ tutoria.pk }}"
-           aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-          <div class="modal-content">
-            <form method="post" action="{% url 'rechazar_tutoria' tutoria.pk %}">
-              {% csrf_token %}
-              <div class="modal-header">
-                <h5 class="modal-title" id="modalRechazarLabel-{{ tutoria.pk }}">Rechazar solicitud</h5>
-                <button type="button"
-                        class="btn-close"
-                        data-mdb-dismiss="modal"
-                        aria-label="Cerrar"></button>
-              </div>
-              <div class="modal-body">
-                <p class="text-muted small">Selecciona la razón del rechazo.</p>
-                <div class="form-check mb-2">
-                  <input class="form-check-input motivo-rechazo"
-                         type="radio"
-                         name="motivo_rechazo"
-                         id="sin-disponibilidad-{{ tutoria.pk }}"
-                         value="SIN_DISPONIBILIDAD_FECHAS"
-                         required>
-                  <label class="form-check-label" for="sin-disponibilidad-{{ tutoria.pk }}">
-                    No tengo disponibilidad y no puedo proponer otro horario.
-                  </label>
-                </div>
-                <div class="form-check mb-2">
-                  <input class="form-check-input motivo-rechazo"
-                         type="radio"
-                         name="motivo_rechazo"
-                         id="fuera-ambito-{{ tutoria.pk }}"
-                         value="FUERA_AMBITO">
-                  <label class="form-check-label" for="fuera-ambito-{{ tutoria.pk }}">
-                    El tema está fuera de mi ámbito de atención.
-                  </label>
-                </div>
-                <div class="form-check mb-2">
-                  <input class="form-check-input motivo-rechazo"
-                         type="radio"
-                         name="motivo_rechazo"
-                         id="canalizacion-{{ tutoria.pk }}"
-                         value="REQUIERE_CANALIZACION">
-                  <label class="form-check-label" for="canalizacion-{{ tutoria.pk }}">
-                    El tema requiere canalización especializada.
-                  </label>
-                </div>
-                <div class="form-check mb-3">
-                  <input class="form-check-input motivo-rechazo"
-                         type="radio"
-                         name="motivo_rechazo"
-                         id="otro-{{ tutoria.pk }}"
-                         value="otro"
-                         data-textarea-id="otro-motivo-{{ tutoria.pk }}">
-                  <label class="form-check-label" for="otro-{{ tutoria.pk }}">Otro</label>
-                </div>
-                <div id="otro-motivo-{{ tutoria.pk }}" class="d-none">
-                  <label class="form-label" for="motivo-personalizado-{{ tutoria.pk }}">Escribe la razón</label>
-                  <textarea id="motivo-personalizado-{{ tutoria.pk }}"
-                            name="motivo_rechazo_otro"
-                            class="form-control"
-                            rows="3"
-                            maxlength="500"></textarea>
-                </div>
-              </div>
-              <div class="modal-footer">
-                <button type="button"
-                        class="btn btn-secondary btn-sm"
-                        data-mdb-dismiss="modal">Cancelar</button>
-                <button type="submit" class="btn btn-danger btn-sm">Rechazar solicitud</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
+      {% include "Tutorias/includes/partials/modal_rechazar_solicitud.html" with tutoria=tutoria %}
+    {% elif tutoria.estado_efectivo == 'VEN' %}
+      {% include "Tutorias/includes/partials/modal_cancelar_vencida.html" with tutoria=tutoria %}
     {% endif %}
   {% endfor %}
 
+  {% for tutoria in tutorias_agendadas %}
+    {% include "Tutorias/includes/partials/modal_reagendar_tutoria.html" with tutoria=tutoria %}
+    {% include "Tutorias/includes/partials/modal_cancelar_agendada.html" with tutoria=tutoria motivos_cancelacion=motivos_cancelacion %}
+  {% endfor %}
+
   <div id="contenedor-modal-editar-tutoria"></div>
+  <div id="contenedor-modal-reporte"></div>
 
   <script>
 document.addEventListener("DOMContentLoaded", function () {
   const contenedorModal = document.getElementById("contenedor-modal-editar-tutoria");
+  const contenedorReporte = document.getElementById("contenedor-modal-reporte");
   let modalEdicion = null;
+  let modalReporte = null;
+
+  document.addEventListener("click", async function (event) {
+    const boton = event.target.closest(".js-abrir-reporte");
+    if (!boton) return;
+
+    boton.disabled = true;
+    try {
+      const respuesta = await fetch(boton.dataset.url, {
+        headers: {"X-Requested-With": "XMLHttpRequest"}
+      });
+      if (!respuesta.ok) throw new Error("No fue posible cargar el reporte.");
+
+      contenedorReporte.innerHTML = await respuesta.text();
+      const elementoModal = contenedorReporte.querySelector("#modalReporteTutoria");
+      modalReporte = new mdb.Modal(elementoModal);
+      modalReporte.show();
+    } catch (error) {
+      console.error(error);
+      alert("No fue posible abrir el reporte de la tutoría.");
+    } finally {
+      boton.disabled = false;
+    }
+  });
+
+  contenedorReporte.addEventListener("submit", async function (event) {
+    const formulario = event.target.closest(".js-form-reporte-tutoria");
+    if (!formulario) return;
+
+    event.preventDefault();
+    const botonGuardar = formulario.querySelector('button[type="submit"]');
+    botonGuardar.disabled = true;
+
+    try {
+      const respuesta = await fetch(formulario.action, {
+        method: "POST",
+        body: new FormData(formulario),
+        headers: {"X-Requested-With": "XMLHttpRequest"}
+      });
+
+      if (respuesta.ok) {
+        const resultado = await respuesta.json();
+        if (resultado.ok) {
+          modalReporte.hide();
+          sessionStorage.setItem("pestañaTutoriasTutorActiva", "#historial");
+          window.location.reload();
+          return;
+        }
+      }
+
+      if (respuesta.status === 422) {
+        const documento = new DOMParser().parseFromString(await respuesta.text(), "text/html");
+        const contenidoNuevo = documento.querySelector(".modal-content");
+        const contenidoActual = contenedorReporte.querySelector(".modal-content");
+        if (contenidoNuevo && contenidoActual) contenidoActual.replaceWith(contenidoNuevo);
+        return;
+      }
+      throw new Error("No fue posible guardar el reporte.");
+    } catch (error) {
+      console.error(error);
+      alert("Ocurrió un error al guardar el reporte.");
+    } finally {
+      const botonActual = contenedorReporte.querySelector('button[type="submit"]');
+      if (botonActual) botonActual.disabled = false;
+    }
+  });
 
   document.addEventListener("click", async function (event) {
     const boton = event.target.closest(".js-abrir-editar-tutoria");
@@ -684,15 +722,23 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   });
 
-  document.querySelectorAll(".motivo-rechazo").forEach(function (radio) {
+  document.querySelectorAll(".motivo-rechazo, .motivo-cancelacion").forEach(function (radio) {
     radio.addEventListener("change", function () {
       const formulario = radio.closest("form");
-      const otro = formulario.querySelector('input[value="otro"]');
-      const contenedorOtro = document.getElementById(otro.dataset.textareaId);
+      const esCancelacion = radio.classList.contains("motivo-cancelacion");
+      const otro = esCancelacion
+        ? radio
+        : formulario.querySelector('input[value="otro"]');
+      const contenedorOtro = esCancelacion
+        ? formulario.querySelector('[id^="otro-motivo-cancelacion-"]')
+        : document.getElementById(otro.dataset.textareaId);
       const textarea = contenedorOtro.querySelector("textarea");
-      contenedorOtro.classList.toggle("d-none", !otro.checked);
-      textarea.required = otro.checked;
-      if (!otro.checked) textarea.value = "";
+      const mostrarOtro = esCancelacion
+        ? radio.dataset.requiereDetalle === "true"
+        : otro.checked;
+      contenedorOtro.classList.toggle("d-none", !mostrarOtro);
+      textarea.required = mostrarOtro;
+      if (!mostrarOtro) textarea.value = "";
     });
   });
 });

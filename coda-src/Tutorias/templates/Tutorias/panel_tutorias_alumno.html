@@ -112,6 +112,13 @@
   color: #fff;
   background-color: #79bdc8;
 }
+
+  .badge-espera-tutor {
+    color: #212529 !important;
+    background-color: var(--bs-yellow) !important;
+    border: 1px solid #d39e00;
+  }
+
   </style>
   <section id="section" style="background-color: #eee;">
     <div class="container py-5 min-vh-100">
@@ -181,6 +188,7 @@
                       <thead>
                         <tr class="text-title text-center">
                           <th>Tutor</th>
+                          <th>Fecha solicitud</th>
                           <th>Fecha sugerida</th>
                           <th>Tema(s)</th>
                           <th>Descripción</th>
@@ -192,6 +200,13 @@
                         {% for tutoria in tutorias_solicitadas %}
                           <tr class="text-body text-center">
                             <td>{{ tutoria.tutor.nombre_completo }}</td>
+                            <td class="text-nowrap">
+                              <span class="d-block fw-semibold">{{ tutoria.fecha_solicitud|date:"j M Y" }}</span>
+                              <small class="text-muted">
+                                <i class="bi bi-clock me-1"></i>
+                                {{ tutoria.fecha|date:"P" }}
+                              </small>
+                            </td>
                             <td class="text-nowrap">
                               <span class="d-block fw-semibold">{{ tutoria.fecha|date:"j M Y" }}</span>
                               <small class="text-muted">
@@ -221,34 +236,43 @@
                                         class="btn btn-sm btn-primary text-white text-capitalize shadow-0"
                                         data-mdb-toggle="modal"
                                         data-mdb-target="#modalSeleccionar-{{ tutoria.pk }}">Elegir horario</button>
-                              {% else %}
-                                <!-- CASO 2 y 3: PENDIENTE O VENCIDA -->
+
+                                <!-- CASO 2: PENDIENTE -->
+                              {% elif tutoria.estado_efectivo == 'PEN' %}
                                 <div class="btn-group btn-group-sm action-group"
                                      role="group"
                                      aria-label="Acciones de tutoría">
-                                  {% if tutoria.estado_efectivo == 'PEN' %}
-                                    <!-- 1. EDITAR (Abre un modal) -->
-                                    <button type="button"
-                                            class="btn action-neutral action-edit js-abrir-editar-tutoria"
-                                            data-url="{% url 'Tutorias-update-modal' pk=tutoria.pk %}"
-                                            aria-label="Editar tema y descripción"
-                                            title="Editar tema y descripción">
-                                      <i class="bi bi-pencil-square" aria-hidden="true"></i>
-                                    </button>
-                                    <!-- 2. REAGENDAR (Abre un modal, FALTA) -->
-                                    <button type="button"
-                                            class="btn action-neutral action-reschedule"
-                                            title="Cambiar fecha sugerida">
-                                      <i class="bi bi-calendar-event"></i>
-                                    </button>
-                                  {% endif %}
-                                  <!-- 3. CANCELAR (Se muestra SIEMPRE que no sea PRO, es decir PEN o VEN) -->
+                                  <!-- 1. EDITAR (Abre un modal) -->
+                                  <button type="button"
+                                          class="btn action-neutral action-edit js-abrir-editar-tutoria"
+                                          data-url="{% url 'Tutorias-update-modal' pk=tutoria.pk %}"
+                                          aria-label="Editar tema y descripción"
+                                          title="Editar tema y descripción">
+                                    <i class="bi bi-pencil-square" aria-hidden="true"></i>
+                                  </button>
+                                  <!-- 2. REAGENDAR (Abre un modal, FALTA) -->
+                                  <button type="button"
+                                          class="btn action-neutral action-reschedule"
+                                          title="Cambiar fecha sugerida">
+                                    <i class="bi bi-calendar-event"></i>
+                                  </button>
                                   <button type="button"
                                           class="btn action-neutral action-cancel"
+                                          data-mdb-toggle="modal"
+                                          data-mdb-target="#modalCancelarAlumno-{{ tutoria.pk }}"
+                                          aria-label="Cancelar tutoría"
                                           title="Cancelar solicitud">
                                     <i class="bi bi-x-lg"></i>
                                   </button>
                                 </div>
+
+                                <!-- CASO 3: VENCIDA -->
+                              {% elif tutoria.estado_efectivo == 'VEN' %}
+                                <span class="badge badge-espera-tutor"
+                                      data-mdb-toggle="tooltip"
+                                      title="Espera nuevas propuestas de fechas del tutor.">En espera del tutor</span>
+                              {% else %}
+                                <span class="text-muted" aria-label="Sin acciones disponibles">—</span>
                               {% endif %}
                             </td>
                           </tr>
@@ -271,7 +295,8 @@
                       <thead>
                         <tr class="text-title text-center">
                           <th>Tutor</th>
-                          <th>Fecha agendada</th>
+                          <th>Fecha solicitud</th>
+                          <th>Fecha cita</th>
                           <th>Tema(s)</th>
                           <th>Descripción</th>
                           <th>Estado</th>
@@ -282,6 +307,13 @@
                         {% for tutoria in tutorias_agendadas %}
                           <tr class="text-body text-center">
                             <td>{{ tutoria.tutor.nombre_completo }}</td>
+                            <td class="text-nowrap">
+                              <span class="d-block fw-semibold">{{ tutoria.fecha_solicitud|date:"j M Y" }}</span>
+                              <small class="text-muted">
+                                <i class="bi bi-clock me-1"></i>
+                                {{ tutoria.fecha|date:"P" }}
+                              </small>
+                            </td>
                             <td class="text-nowrap">
                               <span class="d-block fw-semibold">{{ tutoria.fecha|date:"j M Y" }}</span>
                               <small class="text-muted">
@@ -312,7 +344,7 @@
                                         title="Editar tema y descripción">
                                   <i class="bi bi-pencil-square" aria-hidden="true"></i>
                                 </button>
-                                <!-- 2. REAGENDAR (Abre Modal, temporalmente) -->
+                                <!-- 2. REAGENDAR (Abre Modal) -->
                                 <button type="button"
                                         class="btn action-neutral action-reschedule"
                                         title="Cambiar fecha sugerida">
@@ -321,6 +353,9 @@
                                 <!-- 3. CANCELAR (solamente muestra ventana de confirmación ) -->
                                 <button type="button"
                                         class="btn action-neutral action-cancel"
+                                        data-mdb-toggle="modal"
+                                        data-mdb-target="#modalCancelarAlumno-{{ tutoria.pk }}"
+                                        aria-label="Cancelar tutoría"
                                         title="Cancelar solicitud">
                                   <i class="bi bi-x-lg"></i>
                                 </button>
@@ -346,6 +381,7 @@
                       <thead>
                         <tr class="text-title text-center">
                           <th>Tutor</th>
+                          <th>Fecha solicitud</th>
                           <th>Fecha tutoría</th>
                           <th>Tema(s)</th>
                           <th>Descripción</th>
@@ -356,6 +392,13 @@
                         {% for tutoria in tutorias_historial %}
                           <tr class="text-body text-center">
                             <td>{{ tutoria.tutor.nombre_completo }}</td>
+                            <td class="text-nowrap">
+                              <span class="d-block fw-semibold">{{ tutoria.fecha_solicitud|date:"j M Y" }}</span>
+                              <small class="text-muted">
+                                <i class="bi bi-clock me-1"></i>
+                                {{ tutoria.fecha|date:"P" }}
+                              </small>
+                            </td>
                             <td class="text-nowrap">
                               <span class="d-block fw-semibold">{{ tutoria.fecha|date:"j M Y" }}</span>
                               <small class="text-muted">
@@ -375,7 +418,22 @@
                             </td>
                             <!-- Celda que muestra el estado de la tutoría con un badge -->
                             <td>
-                              <span class="badge rounded-pill {{ tutoria.estado_badge_class }}">{{ tutoria.get_estado_display }}</span>
+                              {% if tutoria.estado_efectivo == 'CAN' %}
+                                <span class="badge rounded-pill bg-cancelada"
+                                      data-mdb-toggle="tooltip"
+                                      title="Cancelada por el {{ tutoria.get_origen_cancelacion_display|lower }}">
+                                  Cancelada
+                                  {% if tutoria.origen_cancelacion == 'TUTOR' %}
+                                    <i class="bi bi-person-video ms-1" aria-hidden="true"></i>
+                                  {% elif tutoria.origen_cancelacion == 'ALUMNO' %}
+                                    <i class="bi bi-mortarboard ms-1" aria-hidden="true"></i>
+                                  {% elif tutoria.origen_cancelacion == 'SISTEMA' %}
+                                    <i class="bi bi-robot ms-1" aria-hidden="true"></i>
+                                  {% endif %}
+                                </span>
+                              {% else %}
+                                <span class="badge rounded-pill {{ tutoria.estado_badge_class }}">{{ tutoria.get_estado_display }}</span>
+                              {% endif %}
                             </td>
                           </tr>
                         {% empty %}
@@ -396,67 +454,15 @@
   </section>
   {% for tutoria in tutorias_solicitadas %}
     {% if tutoria.estado_efectivo == 'PRO' %}
-      <div class="modal fade"
-           id="modalSeleccionar-{{ tutoria.pk }}"
-           tabindex="-1"
-           aria-labelledby="modalLabel-{{ tutoria.pk }}"
-           aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-          <div class="modal-content">
-            <form method="post"
-                  action="{% url 'seleccionar_propuesta_tutoria' pk=tutoria.pk %}">
-              {% csrf_token %}
-              <div class="modal-header bg-light">
-                <h5 class="modal-title text-primary" id="modalLabel-{{ tutoria.pk }}">Horario sugerido por el tutor</h5>
-                <button type="button"
-                        class="btn-close"
-                        data-mdb-dismiss="modal"
-                        aria-label="Cerrar"></button>
-              </div>
-              <div class="modal-body text-start">
-                <p class="text-muted small mb-3">
-                  Tu tutor(a) <strong>{{ tutoria.tutor.nombre_completo }}</strong> propuso estos horarios. Elige el que mejor te convenga:
-                </p>
-                {% if tutoria.fecha_propuesta_1 %}
-                  <div class="form-check p-3 mb-2 border rounded">
-                    <input class="form-check-input ms-0 me-2"
-                           type="radio"
-                           name="opcion_elegida"
-                           id="opcion1-{{ tutoria.pk }}"
-                           value="1"
-                           required>
-                    <label class="form-check-label fw-bold text-dark"
-                           for="opcion1-{{ tutoria.pk }}">
-                      Opción 1: {{ tutoria.fecha_propuesta_1|date:"d M Y, h:i a" }}
-                    </label>
-                  </div>
-                {% endif %}
-                {% if tutoria.fecha_propuesta_2 %}
-                  <div class="form-check p-3 mb-2 border rounded">
-                    <input class="form-check-input ms-0 me-2"
-                           type="radio"
-                           name="opcion_elegida"
-                           id="opcion2-{{ tutoria.pk }}"
-                           value="2"
-                           required>
-                    <label class="form-check-label fw-bold text-dark"
-                           for="opcion2-{{ tutoria.pk }}">
-                      Opción 2: {{ tutoria.fecha_propuesta_2|date:"d M Y, h:i a" }}
-                    </label>
-                  </div>
-                {% endif %}
-              </div>
-              <div class="modal-footer">
-                <button type="button"
-                        class="btn btn-secondary btn-sm"
-                        data-mdb-dismiss="modal">Cerrar</button>
-                <button type="submit" class="btn btn-primary btn-sm">Confirmar horario</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
+      {% include "Tutorias/includes/partials/modal_seleccionar_horario.html" with tutoria=tutoria %}
     {% endif %}
+    {% if tutoria.estado_efectivo != 'PRO' %}
+      {% include "Tutorias/includes/partials/modal_cancelar_alumno.html" with tutoria=tutoria %}
+    {% endif %}
+  {% endfor %}
+
+  {% for tutoria in tutorias_agendadas %}
+    {% include "Tutorias/includes/partials/modal_cancelar_alumno.html" with tutoria=tutoria %}
   {% endfor %}
 
   <div id="contenedor-modal-editar-tutoria"></div>
@@ -608,6 +614,21 @@ document.addEventListener("DOMContentLoaded", function () {
 
   <script>
 document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.motivo-cancelacion-alumno').forEach(function (radio) {
+    radio.addEventListener('change', function () {
+      const formulario = radio.closest('form');
+      const contenedorOtro = formulario.querySelector('.otro-motivo-cancelacion-alumno');
+      const textarea = contenedorOtro.querySelector('textarea');
+      const mostrarOtro = radio.dataset.requiereDetalle === 'true';
+
+      contenedorOtro.classList.toggle('d-none', !mostrarOtro);
+      textarea.required = mostrarOtro;
+      if (!mostrarOtro) {
+        textarea.value = '';
+      }
+    });
+  });
+
   // Para que después de hacer la edición de temas o descripción
   // se regrese la pestaña actual.
   const selectorPestañaGuardada = sessionStorage.getItem(
