@@ -252,7 +252,9 @@
                                   </button>
                                   <!-- 2. REAGENDAR (Abre un modal, FALTA) -->
                                   <button type="button"
-                                          class="btn action-neutral action-reschedule"
+                                          class="btn action-neutral action-reschedule js-solicitar-cambio-fecha"
+                                          data-tutor-id="{{ tutoria.tutor_id }}"
+                                          data-action="{% url 'solicitar_cambio_fecha_tutoria' tutoria.pk %}"
                                           title="Cambiar fecha sugerida">
                                     <i class="bi bi-calendar-event"></i>
                                   </button>
@@ -346,8 +348,10 @@
                                 </button>
                                 <!-- 2. REAGENDAR (Abre Modal) -->
                                 <button type="button"
-                                        class="btn action-neutral action-reschedule"
-                                        title="Cambiar fecha sugerida">
+                                        class="btn action-neutral action-reschedule js-solicitar-cambio-fecha"
+                                        data-tutor-id="{{ tutoria.tutor_id }}"
+                                        data-action="{% url 'solicitar_cambio_fecha_tutoria' tutoria.pk %}"
+                                        title="Solicitar cambio de fecha">
                                   <i class="bi bi-calendar-event"></i>
                                 </button>
                                 <!-- 3. CANCELAR (solamente muestra ventana de confirmación ) -->
@@ -466,6 +470,7 @@
   {% endfor %}
 
   <div id="contenedor-modal-editar-tutoria"></div>
+  {% include "Tutorias/includes/partials/modal_solicitar_cambio_fecha.html" %}
 
   <script>
 document.addEventListener("DOMContentLoaded", function () {
