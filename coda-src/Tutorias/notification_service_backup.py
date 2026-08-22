@@ -125,6 +125,19 @@ def _build_email_html(event: str, tutoria: Any) -> str:
             'style="height: 54px; width: auto; display: block; margin-bottom: 8px;">'
         )
 
+    context = {
+        "alumno_nombre": tutoria.alumno.get_full_name(),
+        "encabezado": _event_headline(event, tutor_nombre),
+        "tutor_nombre": tutor_nombre,
+        "tutor_email": tutoria.tutor.email,
+        "fecha_local": timezone.localtime(tutoria.fecha).strftime("%d/%m/%Y %H:%M"),
+        "temas": ", ".join(tutoria.get_tema_display()),
+        "tutoria": tutoria,
+        "contact": contact,
+        "uam_phone_href": _phone_href(contact["uam_phone"]),
+        "coddaa_phone_href": _phone_href(contact["coddaa_phone"]),
+    }
+
     return f"""
 <html>
     <body style="margin: 0; padding: 0; background: #f4f4f4; font-family: Arial, Helvetica, sans-serif; color: #222;">
@@ -263,7 +276,7 @@ def notify_student_tutoria_event(event: str, tutoria: Any, actor: Any) -> None:
 
     recipient = Alumno.objects.filter(pk=tutoria.alumno_id)
     description = f"Tutoria #{tutoria.pk} - {timezone.localtime(tutoria.fecha).strftime('%d/%m/%Y %H:%M')}"
-    notify.send(actor, recipient=recipient, verb=config["verb"], description=description)
+    #notify.send(actor, recipient=recipient, verb=config["verb"], description=description)
 
     emails = _student_emails(tutoria.alumno)
     if not emails:

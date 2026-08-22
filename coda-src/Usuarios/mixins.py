@@ -41,7 +41,7 @@ class ContextNotificationsMixin:
         for notification in notifications_raw:
             notificacion_temp = {
                 "header": "Notificacion" if not notification.description else f"{notification.description}",
-                "text": f'{notification.verb} por {Usuario.objects.get(matricula=notification.actor).get_full_name()}',
+                "text": f'{Usuario.objects.get(matricula=notification.actor).get_full_name()} {notification.verb}',
                 "time": notification.timestamp
             }
             unread_notifications.append(notificacion_temp)

@@ -1,0 +1,126 @@
+<html>
+  <body style="margin: 0;
+               padding: 0;
+               background: #f4f4f4;
+               font-family: Arial, Helvetica, sans-serif;
+               color: #222">
+    <table role="presentation"
+           width="100%"
+           cellspacing="0"
+           cellpadding="0"
+           style="background: #f4f4f4;
+                  padding: 24px 0">
+      <tr>
+        <td align="center">
+          <table role="presentation"
+                 width="640"
+                 cellspacing="0"
+                 cellpadding="0"
+                 style="width: 640px;
+                        max-width: 94%;
+                        background: #ffffff;
+                        border-radius: 10px;
+                        overflow: hidden;
+                        box-shadow: 0 1px 10px rgba(0,0,0,0.08)">
+            <tr>
+              <td style="background: #F08200; color: #ffffff; padding: 18px 24px;">
+                {% if contact.logo_url %}
+                  <img src="{{ contact.logo_url }}"
+                       alt="UAM"
+                       style="height: 54px;
+                              width: auto;
+                              display: block;
+                              margin-bottom: 8px">
+                {% endif %}
+                <div style="font-size: 20px; font-weight: 700; line-height: 1.35;">Notificación de Tutoría</div>
+                <div style="font-size: 14px; opacity: 0.98; margin-top: 3px;">Universidad Autónoma Metropolitana Unidad Cuajimalpa</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 22px 24px 8px 24px;">
+                <p style="margin: 0 0 14px 0; font-size: 16px;">Hola <strong>{{ alumno_nombre }}</strong>,</p>
+                <p style="margin: 0; font-size: 15px; line-height: 1.6;">{{ encabezado }}</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 10px 24px 20px 24px;">
+                <table role="presentation"
+                       width="100%"
+                       cellspacing="0"
+                       cellpadding="0"
+                       style="border: 1px solid #ececec;
+                              border-radius: 8px">
+                  <tr>
+                    <td style="padding: 12px 14px;
+                               font-size: 14px;
+                               border-bottom: 1px solid #ececec"><strong>Tutor:</strong> {{ tutor_nombre }}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 12px 14px;
+                               font-size: 14px;
+                               border-bottom: 1px solid #ececec"><strong>Correo institucional del tutor:</strong> <a href="mailto:{{ tutor_email }}"
+    style="color: #b25800;
+           text-decoration: none">{{ tutor_email }}</a></td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 12px 14px;
+                               font-size: 14px;
+                               border-bottom: 1px solid #ececec"><strong>Fecha y hora:</strong> {{ fecha_local }}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 12px 14px;
+                               font-size: 14px;
+                               border-bottom: 1px solid #ececec"><strong>Tema(s):</strong> {{ temas }}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 12px 14px; font-size: 14px;"><strong>Descripción:</strong> {{ tutoria.descripcion|default:"-" }}</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 0 24px 24px 24px;">
+                <table role="presentation"
+                       width="100%"
+                       cellspacing="0"
+                       cellpadding="0"
+                       style="background: #fff8ef;
+                              border: 1px solid #ffd8a6;
+                              border-radius: 8px">
+                  <tr>
+                    <td style="padding: 14px;
+                               font-size: 13px;
+                               line-height: 1.65;
+                               color: #4d4d4d">
+                      <div style="font-size: 14px;
+                                  font-weight: 700;
+                                  color: #7a4a00;
+                                  margin-bottom: 6px">Contacto institucional</div>
+                      <div><strong>Dirección:</strong> {{ contact.address }}</div>
+                      <div><strong>Google Maps:</strong> <a href="{{ contact.maps_url }}" style="color: #b25800;">Ver ubicación</a></div>
+                      <div><strong>Teléfono UAM:</strong> <a href="tel:{{ uam_phone_href }}"
+    style="color: #b25800;
+           text-decoration: none">{{ contact.uam_phone }}</a></div>
+                      <div><strong>Teléfono CODDAA:</strong> <a href="tel:{{ coddaa_phone_href }}"
+    style="color: #b25800;
+           text-decoration: none">{{ contact.coddaa_phone }}</a></div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="background: #f8f8f8;
+                         color: #777;
+                         font-size: 12px;
+                         padding: 14px 24px;
+                         border-top: 1px solid #eee">
+                Este es un correo automático del Sistema de Acompañamiento al Alumnado (CODDAA).
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

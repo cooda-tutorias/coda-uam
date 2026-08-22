@@ -13,14 +13,20 @@
           href="{% static 'Alumnos/img/icon.jpg' %}"
           sizes="32x32"
           type="image/png">
+
     <!-- Bootstrap CDN Bundle with Popper-->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/js/bootstrap.bundle.min.js"
-            integrity="sha384-p34f1UUtsS3wqzfto5wAAmdvj+osOnFyQFpp4Ua3gs/ZVWx6oOypYoCJhGGScy+8"
-            crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous">
+    </script>
 
     <!-- Iconos de Bootstrap -->
     <link rel="stylesheet"
           href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+
+    <!-- Estilos de Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+          rel="stylesheet"
+          integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
+          crossorigin="anonymous">
 
     <!--Link CSS-->
     <link rel="stylesheet" href="{% static 'Alumnos/css/main.css' %}">
@@ -129,137 +135,135 @@
                                 </div>
                             </div>
                         </li> -->
-                        
-                    </ul>
-                </div>
-                
-                <!-- Avatar -->
-                <div class="dropdown p-3">
-                    <a class="dropdown-toggle d-flex align-items-center hidden-arrow" 
-                       href="#"
-                       id="navbarDropdownMenuAvatar" 
-                       role="button" 
-                       data-mdb-toggle="dropdown" 
-                       aria-expanded="false">
-                       <i class="bi bi-person-circle fs-3 ms-2"></i>
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end" 
-                        aria-labelledby="navbarDropdownMenuAvatar">
-                        <li>
-                            <a href="{% url 'perfil' %}"  class="dropdown-item text-title h8" >Mi perfil</a>
-                        </li>
 
-                        {% if user.is_tutor %}
-                        <li>
-                            <a class="dropdown-item" href="{% url 'tutor_horarios' %}">
-                                Mis horarios de tutoría
-                            </a>
-                        </li>
-                        {% endif %}
+            </ul>
+          </div>
 
-                        <li>
-                            <a class="dropdown-item text-title h8" href="{% url 'logout' %}">Cerrar Sesión</a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-            <!-- Right elements -->
+          <!-- Avatar -->
+          <div class="dropdown p-3">
+            <a class="dropdown-toggle d-flex align-items-center hidden-arrow"
+               href="#"
+               id="navbarDropdownMenuAvatar"
+               role="button"
+               data-mdb-toggle="dropdown"
+               aria-expanded="false">
+              <i class="bi bi-person-circle fs-3 ms-2"></i>
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end"
+                aria-labelledby="navbarDropdownMenuAvatar">
+              <li>
+                <a href="{% url 'perfil' %}"  class="dropdown-item text-title h8">Mi perfil</a>
+              </li>
+
+              {% if user.is_tutor %}
+                <li>
+                  <a class="dropdown-item" href="{% url 'tutor_horarios' %}">Mis horarios de tutoría</a>
+                </li>
+              {% endif %}
+
+              <li>
+                <a class="dropdown-item text-title h8" href="{% url 'logout' %}">Cerrar Sesión</a>
+              </li>
+            </ul>
+          </div>
         </div>
         <!-- Right elements -->
       </div>
-      <!-- Container wrapper -->
-    </nav>
-    <!-- Navbar -->
+      <!-- Right elements -->
+    </div>
+    <!-- Container wrapper -->
+  </nav>
+  <!-- Navbar -->
 
-    <!--  Inicia el body -->
-    <!-- <div class="container py-5"> -->
+  <!--  Inicia el body -->
+  <!-- <div class="container py-5"> -->
 
-    <!-- Mensajes globales de Django -->
-    {% if messages %}
-      <div class="container mt-3">
-        {% for message in messages %}
-          <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show"
-               role="alert">
-            {{ message }}
-            <button type="button"
-                    class="btn-close"
-                    data-bs-dismiss="alert"
-                    data-mdb-dismiss="alert"
-                    aria-label="Close"></button>
-          </div>
-        {% endfor %}
-      </div>
-    {% endif %}
+  <!-- Mensajes globales de Django -->
+  {% if messages %}
+    <div class="container mt-3">
+      {% for message in messages %}
+        <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show"
+             role="alert">
+          {{ message }}
+          <button type="button"
+                  class="btn-close"
+                  data-bs-dismiss="alert"
+                  data-mdb-dismiss="alert"
+                  aria-label="Close"></button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
 
-    {% block body %}{% endblock %}
+  {% block body %}{% endblock %}
 
-    <!-- </div> -->
+  <!-- </div> -->
 
-    <!-- Footer -->
-    <footer class="d-flex flex-column bg-secondary text-center text-primary">
-      <!-- Grid container -->
-      <div class="container p-4">
-        <!-- Section: Social media -->
-        <section class="mb-4">
-          <!-- Facebook -->
-          <a class="btn btn-outline-primary btn-floating m-1"
-             href="https://www.facebook.com/UAMUnidadCuajimalpa1"
-             role="button"><i class="fab fa-facebook-f"></i></a>
+  <!-- Footer -->
+  <footer class="d-flex flex-column bg-secondary text-center text-primary">
+    <!-- Grid container -->
+    <div class="container p-4">
+      <!-- Section: Social media -->
+      <section class="mb-4">
+        <!-- Facebook -->
+        <a class="btn btn-outline-primary btn-floating m-1"
+           href="https://www.facebook.com/UAMUnidadCuajimalpa1"
+           role="button"><i class="fab fa-facebook-f"></i></a>
 
-          <!-- Twitter -->
-          <a class="btn btn-outline-primary btn-floating m-1"
-             href="https://twitter.com/uamcuajimalpa"
-             role="button"><i class="fab fa-x"></i></a>
+        <!-- Twitter -->
+        <a class="btn btn-outline-primary btn-floating m-1"
+           href="https://twitter.com/uamcuajimalpa"
+           role="button"><i class="fab fa-x"></i></a>
 
-          <!-- Youtube -->
-          <a class="btn btn-outline-primary btn-floating m-1"
-             href="https://www.youtube.com/channel/UCeqAccBtLAr-pOeOUoE4iDw"
-             role="button"><i class="fab fa-youtube"></i></a>
+        <!-- Youtube -->
+        <a class="btn btn-outline-primary btn-floating m-1"
+           href="https://www.youtube.com/channel/UCeqAccBtLAr-pOeOUoE4iDw"
+           role="button"><i class="fab fa-youtube"></i></a>
 
-          <!-- Instagram -->
-          <a class="btn btn-outline-primary btn-floating m-1"
-             href="https://www.instagram.com/uamcuajimalpa/"
-             role="button"><i class="fab fa-instagram"></i></a>
-        </section>
-        <!-- Section: Social media -->
+        <!-- Instagram -->
+        <a class="btn btn-outline-primary btn-floating m-1"
+           href="https://www.instagram.com/uamcuajimalpa/"
+           role="button"><i class="fab fa-instagram"></i></a>
+      </section>
+      <!-- Section: Social media -->
 
-        <!-- Section: Text -->
-        <section class="mb-4 text-title">
-          <h4>Universidad Autónoma Metropolitana Cuajimalpa</h4>
-          <h5>División de Ciencias Naturales e Ingeniería</h5>
-        </section>
-        <!-- Section: Text -->
+      <!-- Section: Text -->
+      <section class="mb-4 text-title">
+        <h4>Universidad Autónoma Metropolitana Cuajimalpa</h4>
+        <h5>División de Ciencias Naturales e Ingeniería</h5>
+      </section>
+      <!-- Section: Text -->
 
-      </div>
-      <!-- Grid container -->
+    </div>
+    <!-- Grid container -->
 
-      <!-- Copyright -->
-      <div id = "copyright" class="text-center p-3 text-title">
-        © 2025 Copyright:
-        <a class="text-primary" href="">GCC</a>
-      </div>
-      <!-- Copyright -->
-    </footer>
-    <!-- Fin Footer -->
+    <!-- Copyright -->
+    <div id = "copyright" class="text-center p-3 text-title">
+      © 2025 Copyright:
+      <a class="text-primary" href="">GCC</a>
+    </div>
+    <!-- Copyright -->
+  </footer>
+  <!-- Fin Footer -->
 
-    <!--Scrip MDB -->
-    <script type="text/javascript"
-            src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
+  <!--Scrip MDB -->
+  <script type="text/javascript"
+          src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
 
-    <!-- Para la paginacion y la estructuracion de las tablas -->
-    <!-- DataTables CSS -->
-    <link rel="stylesheet"
-          href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" />
+  <!-- Para la paginacion y la estructuracion de las tablas -->
+  <!-- DataTables CSS -->
+  <link rel="stylesheet"
+        href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" />
 
-    <!-- jQuery -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <!-- jQuery -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
-    <!-- DataTables JS -->
-    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+  <!-- DataTables JS -->
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
-    <!-- Configuración global -->
-    <script>
+  <!-- Configuración global -->
+  <script>
     $(document).ready(function () {
         $('.datatable').DataTable({
         language: {
@@ -292,8 +296,8 @@
         });
     });
     
-    </script>
+  </script>
 
-  </body>
+</body>
 
 </html>
