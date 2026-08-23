@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_POST
 
 import qrcode
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -96,6 +97,32 @@ def convertir_fecha_local(valor):
 
     return timezone.make_aware(
         fecha_sin_zona,
+        timezone.get_current_timezone(),
+    )
+
+
+def resolver_franja_tutor(slot, valor_franja):
+    """Valida y convierte una franja de 30 minutos perteneciente a un horario."""
+    try:
+        fecha_sin_zona = datetime.fromisoformat(valor_franja)
+    except (TypeError, ValueError):
+        raise ValueError("La franja seleccionada no tiene un formato válido.")
+
+    hora = fecha_sin_zona.time()
+    inicio = datetime.combine(fecha_sin_zona.date(), slot.hora_inicio)
+    final = datetime.combine(fecha_sin_zona.date(), slot.hora_fin)
+    seleccion = datetime.combine(fecha_sin_zona.date(), hora)
+
+    if (
+        fecha_sin_zona.date().weekday() != slot.dia_semana
+        or seleccion < inicio
+        or seleccion + timedelta(minutes=30) > final
+        or (seleccion - inicio).total_seconds() % (30 * 60) != 0
+    ):
+        raise ValueError("La franja seleccionada no pertenece al horario del tutor.")
+
+    return timezone.make_aware(
+        seleccion,
         timezone.get_current_timezone(),
     )
 
@@ -972,7 +999,7 @@ def obtener_franjas_disponibles_api(request, tutor_id):
     tutorias_existentes = Tutoria.objects.filter(
         tutor_id=tutor_id,
         fecha__date=fecha_dt,
-        estado__in=['PENDIENTE', 'ACEPTADA']
+        estado__in=[PENDIENTE, ACEPTADO],
     )
     horas_ocupadas = [t.fecha.strftime("%H:%M") for t in tutorias_existentes if t.fecha]
 
@@ -995,6 +1022,82 @@ def obtener_franjas_disponibles_api(request, tutor_id):
             actual += duracion
 
     return JsonResponse({'franjas': franjas})
+
+
+@login_required
+@require_POST
+def solicitar_cambio_fecha_tutoria(request, pk):
+    """Permite al alumno cambiar una solicitud o pedir reagendar una cita."""
+    tutoria = get_object_or_404(Tutoria, pk=pk)
+
+    if tutoria.alumno_id != request.user.pk or not request.user.has_role("ALU"):
+        raise PermissionDenied("No tienes permiso para modificar esta tutoría")
+
+    if tutoria.estado_efectivo not in (PENDIENTE, ACEPTADO):
+        messages.error(request, "Esta tutoría ya no permite solicitar un cambio de fecha.")
+        return redirect("Tutorias-alumno")
+
+    horario_id = request.POST.get("horario_tutor", "").strip()
+    franja_seleccionada = request.POST.get("franja_seleccionada", "").strip()
+    fecha_sugerida = request.POST.get("fecha_sugerida", "").strip()
+
+    try:
+        if horario_id:
+            slot = HorarioTutor.objects.get(pk=horario_id, tutor=tutoria.tutor, activo=True)
+            nueva_fecha = resolver_franja_tutor(slot, franja_seleccionada)
+            nuevo_estado = ACEPTADO
+        else:
+            nueva_fecha = convertir_fecha_local(fecha_sugerida)
+            nuevo_estado = PENDIENTE
+    except (HorarioTutor.DoesNotExist, TypeError, ValueError):
+        messages.error(request, "La fecha u horario seleccionado no es válido.")
+        return redirect("Tutorias-alumno")
+
+    if nueva_fecha <= timezone.now():
+        messages.error(request, "La nueva fecha debe ser posterior a la fecha actual.")
+        return redirect("Tutorias-alumno")
+
+    if horario_id and Tutoria.objects.filter(
+        tutor=tutoria.tutor,
+        fecha=nueva_fecha,
+        estado__in=[PENDIENTE, ACEPTADO],
+    ).exclude(pk=tutoria.pk).exists():
+        messages.error(request, "Ese horario acaba de ocuparse. Selecciona otro.")
+        return redirect("Tutorias-alumno")
+
+    fecha_anterior = timezone.localtime(tutoria.fecha)
+    tutoria.fecha = nueva_fecha
+    tutoria.estado = nuevo_estado
+    tutoria.fecha_propuesta_1 = None
+    tutoria.fecha_propuesta_2 = None
+    tutoria.reagendacion_pendiente = False
+    tutoria.save(update_fields=[
+        "fecha", "estado", "fecha_propuesta_1", "fecha_propuesta_2",
+        "reagendacion_pendiente",
+    ])
+
+    HistorialCambioTutoria.objects.create(
+        tutoria=tutoria,
+        correo_editor=request.user.email,
+        cambios_realizados=(
+            f"Solicitud de cambio de fecha: '{fecha_anterior:%d/%m/%Y %H:%M}' "
+            f"-> '{timezone.localtime(nueva_fecha):%d/%m/%Y %H:%M}'"
+        ),
+    )
+    tutoria_notification_requested.send(
+        sender=solicitar_cambio_fecha_tutoria,
+        event="tutoria_modificada",
+        tutoria=tutoria,
+        actor=request.user,
+        recipient=Tutor.objects.filter(pk=tutoria.tutor_id),
+        verb="Solicitud de cambio de fecha",
+    )
+
+    if nuevo_estado == ACEPTADO:
+        messages.success(request, "La tutoría se reagendó en un horario disponible del tutor.")
+    else:
+        messages.success(request, "La nueva fecha se envió al tutor para su confirmación.")
+    return redirect("Tutorias-alumno")
 
     
 # Vista para que el ALUMNO solicite tutorias, ya sea:
@@ -1089,7 +1192,7 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
         # ====================================================
         request = self.request
         horario_id = request.POST.get("horario_tutor")
-        fecha_slot = request.POST.get("fecha_seleccionada")  # fecha ISO YYYY-MM-DD
+        franja_seleccionada = request.POST.get("franja_seleccionada")
         fecha_final = request.POST.get("fecha_sugerida")
 
         if not horario_id and not fecha_final:
@@ -1115,22 +1218,23 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
                 form.add_error(None, "El horario seleccionado ya no está disponible.")
                 return self.form_invalid(form)
 
-            if not fecha_slot:
-                form.add_error(None, "Debes elegir una fecha para el horario.")
+            if not franja_seleccionada:
+                form.add_error(None, "Debes elegir una franja para el horario.")
                 return self.form_invalid(form)
 
-            # Cuando se elige un horario del tutor:
-            #   fecha_slot solo tiene fecha sin horario y
-            #   slo.hora_inicio tiene la hora
             try:
-                fecha_dt = datetime.fromisoformat(fecha_slot)
-            except(ValueError, TypeError):
-                form.add_error(None, "La fecha recibida no tiene un formato válido.")
+                fecha_final_dt = resolver_franja_tutor(slot, franja_seleccionada)
+            except ValueError as error:
+                form.add_error(None, str(error))
                 return self.form_invalid(form)
 
-            # Combinar fecha del día + hora_inicio del slot porque así es el
-            # tipo de fecha en el modelo Tutoria.
-            fecha_final_dt = datetime.combine(fecha_dt, slot.hora_inicio)
+            if Tutoria.objects.filter(
+                tutor=tutor,
+                fecha=fecha_final_dt,
+                estado__in=[PENDIENTE, ACEPTADO],
+            ).exists():
+                form.add_error(None, "Ese horario acaba de ocuparse. Selecciona otro.")
+                return self.form_invalid(form)
 
             form.instance.fecha = fecha_final_dt
 

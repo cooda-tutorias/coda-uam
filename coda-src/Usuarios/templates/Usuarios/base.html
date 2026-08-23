@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="es-MX">
 
   <head>
     <meta charset="UTF-8">
@@ -9,6 +9,16 @@
       {% block title %}{% endblock %}
     </title>
     {% load static %}
+
+    <!-- Estas líneas es para que las notificaciones push funcionen en el iPad -->
+    <link rel="manifest" href="{% static 'manifest.json' %}">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style"
+          content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Tutorías DCNI">
+    <link rel="apple-touch-icon"
+          href="{% static 'Alumnos/img/tutorias_dcni_icon2.png' %}">
+
     <link rel="icon"
           href="{% static 'Alumnos/img/icon.jpg' %}"
           sizes="32x32"
@@ -78,16 +88,13 @@
         <!-- Derecha elementos -->
         <div class="d-flex align-items-center">
           <!-- Icons -->
-          <!-- Notificaciones -->
+          <!-- Notificaciones 
           {% load notifications_tags %}
-          {% notifications_unread as unread_count %}
+          {% notifications_unread as unread_count %}-->
 
           <div class="dropdown">
-            <!-- TODO: Acá abajo hay definidos dos id diferentes, hay que dejar uno, tal vez el 2o es el bueno. -->
-
             <a class="fs-6 dropdown-toggle hidden-arrow"
                href="#"
-               id="navbarDropdownMenuLink"
                id="navbarDropdownMenuNotification"
                role="button"
                data-mdb-toggle="dropdown"
@@ -157,12 +164,31 @@
 
               {% if user.is_tutor %}
                 <li>
-                  <a class="dropdown-item" href="{% url 'tutor_horarios' %}">Mis horarios de tutoría</a>
+                  <a href="{% url 'ver_qr_tutor' %}" class="dropdown-item text-title h8">
+                    <i class="bi bi-qr-code"></i>
+                  Ver mi QR</a>
                 </li>
+
+                <li>
+                  <a class="dropdown-item" href="{% url 'tutor_horarios' %}">
+                    <i class="bi bi-calendar-week"></i>
+                    Mis horarios de tutoría
+                  </a>
+                </li>
+
+                <li>
+                  <a class="dropdown-item" href="{% url 'configuracion_app' %}">
+                    <i class="bi bi-gear"></i>
+                    Configuración
+                  </a>
+                </li>
+
               {% endif %}
 
               <li>
-                <a class="dropdown-item text-title h8" href="{% url 'logout' %}">Cerrar Sesión</a>
+                <a class="dropdown-item text-title h8" href="{% url 'logout' %}">
+                  <i class="bi bi-box-arrow-right"></i>
+                Cerrar Sesión</a>
               </li>
             </ul>
           </div>
@@ -170,100 +196,99 @@
         <!-- Right elements -->
       </div>
       <!-- Right elements -->
-    </div>
-    <!-- Container wrapper -->
-  </nav>
-  <!-- Navbar -->
+      <!-- Container wrapper -->
+    </nav>
+    <!-- Navbar -->
 
-  <!--  Inicia el body -->
-  <!-- <div class="container py-5"> -->
+    <!--  Inicia el body -->
+    <!-- <div class="container py-5"> -->
 
-  <!-- Mensajes globales de Django -->
-  {% if messages %}
-    <div class="container mt-3">
-      {% for message in messages %}
-        <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show"
-             role="alert">
-          {{ message }}
-          <button type="button"
-                  class="btn-close"
-                  data-bs-dismiss="alert"
-                  data-mdb-dismiss="alert"
-                  aria-label="Close"></button>
-        </div>
-      {% endfor %}
-    </div>
-  {% endif %}
+    <!-- Mensajes globales de Django -->
+    {% if messages %}
+      <div class="container mt-3">
+        {% for message in messages %}
+          <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show"
+               role="alert">
+            {{ message }}
+            <button type="button"
+                    class="btn-close"
+                    data-bs-dismiss="alert"
+                    data-mdb-dismiss="alert"
+                    aria-label="Close"></button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
 
-  {% block body %}{% endblock %}
+    {% block body %}{% endblock %}
 
-  <!-- </div> -->
+    <!-- </div> -->
 
-  <!-- Footer -->
-  <footer class="d-flex flex-column bg-secondary text-center text-primary">
-    <!-- Grid container -->
-    <div class="container p-4">
-      <!-- Section: Social media -->
-      <section class="mb-4">
-        <!-- Facebook -->
-        <a class="btn btn-outline-primary btn-floating m-1"
-           href="https://www.facebook.com/UAMUnidadCuajimalpa1"
-           role="button"><i class="fab fa-facebook-f"></i></a>
+    <!-- Footer -->
+    <footer class="d-flex flex-column bg-secondary text-center text-primary">
+      <!-- Grid container -->
+      <div class="container p-4">
+        <!-- Section: Social media -->
+        <section class="mb-4">
+          <!-- Facebook -->
+          <a class="btn btn-outline-primary btn-floating m-1"
+             href="https://www.facebook.com/UAMUnidadCuajimalpa1"
+             role="button"><i class="fab fa-facebook-f"></i></a>
 
-        <!-- Twitter -->
-        <a class="btn btn-outline-primary btn-floating m-1"
-           href="https://twitter.com/uamcuajimalpa"
-           role="button"><i class="fab fa-x"></i></a>
+          <!-- Twitter -->
+          <a class="btn btn-outline-primary btn-floating m-1"
+             href="https://twitter.com/uamcuajimalpa"
+             role="button"><i class="fab fa-x"></i></a>
 
-        <!-- Youtube -->
-        <a class="btn btn-outline-primary btn-floating m-1"
-           href="https://www.youtube.com/channel/UCeqAccBtLAr-pOeOUoE4iDw"
-           role="button"><i class="fab fa-youtube"></i></a>
+          <!-- Youtube -->
+          <a class="btn btn-outline-primary btn-floating m-1"
+             href="https://www.youtube.com/channel/UCeqAccBtLAr-pOeOUoE4iDw"
+             role="button"><i class="fab fa-youtube"></i></a>
 
-        <!-- Instagram -->
-        <a class="btn btn-outline-primary btn-floating m-1"
-           href="https://www.instagram.com/uamcuajimalpa/"
-           role="button"><i class="fab fa-instagram"></i></a>
-      </section>
-      <!-- Section: Social media -->
+          <!-- Instagram -->
+          <a class="btn btn-outline-primary btn-floating m-1"
+             href="https://www.instagram.com/uamcuajimalpa/"
+             role="button"><i class="fab fa-instagram"></i></a>
+        </section>
+        <!-- Section: Social media -->
 
-      <!-- Section: Text -->
-      <section class="mb-4 text-title">
-        <h4>Universidad Autónoma Metropolitana Cuajimalpa</h4>
-        <h5>División de Ciencias Naturales e Ingeniería</h5>
-      </section>
-      <!-- Section: Text -->
+        <!-- Section: Text -->
+        <section class="mb-4 text-title">
+          <h4>Universidad Autónoma Metropolitana Cuajimalpa</h4>
+          <h5>División de Ciencias Naturales e Ingeniería</h5>
+        </section>
+        <!-- Section: Text -->
 
-    </div>
-    <!-- Grid container -->
+      </div>
+      <!-- Grid container -->
 
-    <!-- Copyright -->
-    <div id = "copyright" class="text-center p-3 text-title">
-      © 2025 Copyright:
-      <a class="text-primary" href="">GCC</a>
-    </div>
-    <!-- Copyright -->
-  </footer>
-  <!-- Fin Footer -->
+      <!-- Copyright -->
+      <div id="copyright" class="text-center p-3 text-title">
+        © 2025 Copyright:
+        <a class="text-primary" href="">GCC</a>
+      </div>
+      <!-- Copyright -->
+    </footer>
+    <!-- Fin Footer -->
 
-  <!--Scrip MDB -->
-  <script type="text/javascript"
-          src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
+    <!--Scrip MDB -->
+    <script type="text/javascript"
+            src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
 
-  <!-- Para la paginacion y la estructuracion de las tablas -->
-  <!-- DataTables CSS -->
-  <link rel="stylesheet"
-        href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" />
+    <!-- Para la paginacion y la estructuracion de las tablas -->
+    <!-- DataTables CSS -->
+    <link rel="stylesheet"
+          href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" />
 
-  <!-- jQuery -->
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
-  <!-- DataTables JS -->
-  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-  <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+    <!-- DataTables JS -->
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
-  <!-- Configuración global -->
-  <script>
+    <!-- Configuración global -->
+    <script>
     $(document).ready(function () {
         $('.datatable').DataTable({
         language: {
@@ -296,8 +321,8 @@
         });
     });
     
-  </script>
+    </script>
 
-</body>
+  </body>
 
 </html>

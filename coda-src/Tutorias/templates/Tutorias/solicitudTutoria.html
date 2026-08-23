@@ -74,18 +74,11 @@
                 <!-- Campos ocultos para guardar selección -->
                 <input type="hidden" id="id_horario_tutor" name="horario_tutor">
                 <input type="hidden" id="id_fecha_seleccionada" name="fecha_seleccionada">
+                <input type="hidden" id="id_franja_seleccionada" name="franja_seleccionada">
                 <input type="hidden" id="id_fecha_sugerida" name="fecha_sugerida">
 
                 <!-- Botón que abre el modal -->
                 <button type="button" id="btnAbrirModalCita" class="btn btn-outline-primary">Elegir fecha cita...</button>
-
-                {% comment %} 
-                            <!-- Botón que abre el modal -->
-                            <button type="button" id="btnAbrirModalCita" class="btn btn-outline-primary"
-                                data-bs-toggle="modal" data-bs-target="#modalAgendarCita">
-                                Elegir fecha cita...
-                            </button>
-                {% endcomment %}
 
                 <!-- AQUÍ INSERTA EL RESUMEN -->
                 <div class="alert alert-info mt-3" id="resumenCita">No has seleccionado fecha aún.</div>
@@ -132,6 +125,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const btnAbrirModal = document.getElementById("btnAbrirModalCita");
     const campoSlotHidden = document.getElementById("id_horario_tutor");
     const campoFechaSeleccionadaHidden = document.getElementById("id_fecha_seleccionada");
+    const campoFranjaSeleccionadaHidden = document.getElementById("id_franja_seleccionada");
     const campoFechaSugeridaHidden = document.getElementById("id_fecha_sugerida");
     const resumenDiv = document.getElementById("resumenCita");
 
@@ -265,6 +259,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
                         slotSeleccionadoVal = f.slot_id;
                         fechaSeleccionadaVal = fechaStr;
+                        campoFranjaSeleccionadaHidden.value = f.datetime_iso;
                         textoResumenSeleccionado = formatearFechaEspanol(fechaStr, f.hora_inicio, f.hora_fin);
 
                         if (btnAceptar) btnAceptar.disabled = false;
@@ -331,6 +326,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 }
                 campoSlotHidden.value = "";
                 campoFechaSeleccionadaHidden.value = "";
+                campoFranjaSeleccionadaHidden.value = "";
                 campoFechaSugeridaHidden.value = fechaSug;
 
                 // Formatear solo para la presentación visual
