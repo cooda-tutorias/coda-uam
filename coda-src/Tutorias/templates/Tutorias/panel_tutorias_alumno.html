@@ -636,9 +636,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Para que después de hacer la edición de temas o descripción
   // se regrese la pestaña actual.
-  const selectorPestañaGuardada = sessionStorage.getItem(
-    'pestañaTutoriasActiva'
+  const pestañaDesdeUrl = new URLSearchParams(window.location.search).get(
+    'tab'
   );
+  const pestañasPermitidas = ['solicitadas', 'agendadas', 'historial'];
+  const selectorDesdeUrl = pestañasPermitidas.includes(pestañaDesdeUrl)
+    ? `#${pestañaDesdeUrl}`
+    : null;
+  const selectorPestañaGuardada = selectorDesdeUrl
+    || sessionStorage.getItem('pestañaTutoriasActiva');
 
   if (selectorPestañaGuardada) {
     const botonPestaña = document.querySelector(

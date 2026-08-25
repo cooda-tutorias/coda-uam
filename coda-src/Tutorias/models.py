@@ -93,6 +93,7 @@ class Tutoria(models.Model):
         blank=True
     )
 
+
     # motivo_cancelacion = models.CharField(
     #     max_length=500,
     #     blank=True,

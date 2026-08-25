@@ -7,6 +7,8 @@ class EventoTutoria(models.TextChoices):
     TUT_ACEPTA_SOLICITUD = 'tut_acepta_solicitud'
     TUT_PROPONE_1_FECHA = 'tut_propone_1_fecha'
     TUT_PROPONE_2_FECHAS = 'tut_propone_2_fechas'
+    TUT_REACTIVA_1_FECHA = 'tut_reactiva_1_fecha'
+    TUT_REACTIVA_2_FECHAS = 'tut_reactiva_2_fechas'
     TUT_RECHAZA_SOLICITUD = 'tut_rechaza_solicitud'
     ALU_SOL_CAMBIO_FECHA_SUG = 'alu_sol_cambio_fecha_sug'
     ALU_SOL_CAMBIO_FECHA_AGEN = 'alu_sol_cambio_fecha_agen'

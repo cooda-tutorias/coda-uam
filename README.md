@@ -60,7 +60,7 @@ docker compose exec web python manage.py migrate
 ## Docker manual
 Antes de empezar, descomenta la línea 17 del archivo `coda-src/ssocial/settings.py` como se muestra a continuación:
 ```python
-# TODO mochar esto en prod
+# TODO: mochar esto en prod
 from .env_vars import *
 ```
 

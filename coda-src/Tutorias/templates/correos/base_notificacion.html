@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+  <body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,Helvetica,sans-serif;color:#222">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f4f4f4;padding:24px 0">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="640" cellspacing="0" cellpadding="0" style="width:640px;max-width:94%;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 10px rgba(0,0,0,.08)">
+            <tr>
+              <td style="background:#f08200;color:#fff;padding:18px 24px">
+                {% if contact.logo_url %}<img src="{{ contact.logo_url }}" alt="UAM" style="height:54px;width:auto;display:block;margin-bottom:8px">{% endif %}
+                <div style="font-size:20px;font-weight:700;line-height:1.35">Notificación de Tutoría</div>
+                <div style="font-size:14px;margin-top:3px">Universidad Autónoma Metropolitana Unidad Cuajimalpa</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:22px 24px 8px">
+                <p style="margin:0 0 14px;font-size:16px">Hola <strong>{{ destinatario_nombre }}</strong>,</p>
+                <h1 style="margin:0 0 10px;font-size:21px;line-height:1.35;color:#333">{{ titulo }}</h1>
+                <p style="margin:0;font-size:15px;line-height:1.6">{{ mensaje }}</p>
+              </td>
+            </tr>
+            {% block contenido %}{% endblock %}
+            {% if mostrar_accion %}
+              <tr>
+                <td align="center" style="padding:2px 24px 24px">
+                  <a href="{{ accion_url }}" style="display:inline-block;background:#b25800;color:#fff;text-decoration:none;font-size:15px;font-weight:700;padding:12px 22px;border-radius:6px">{{ accion_texto }}</a>
+                </td>
+              </tr>
+            {% endif %}
+            <tr>
+              <td style="padding:0 24px 24px">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#fff8ef;border:1px solid #ffd8a6;border-radius:8px">
+                  <tr>
+                    <td style="padding:14px;font-size:13px;line-height:1.65;color:#4d4d4d">
+                      <div style="font-size:14px;font-weight:700;color:#7a4a00;margin-bottom:6px">Contacto institucional</div>
+                      <div><strong>Dirección:</strong> {{ contact.address }}</div>
+                      <div><strong>Google Maps:</strong> <a href="{{ contact.maps_url }}" style="color:#b25800">Ver ubicación</a></div>
+                      <div><strong>Teléfono UAM:</strong> <a href="tel:{{ uam_phone_href }}" style="color:#b25800;text-decoration:none">{{ contact.uam_phone }}</a></div>
+                      <div><strong>Teléfono CODDAA:</strong> <a href="tel:{{ coddaa_phone_href }}" style="color:#b25800;text-decoration:none">{{ contact.coddaa_phone }}</a></div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#f8f8f8;color:#777;font-size:12px;padding:14px 24px;border-top:1px solid #eee">Este es un correo automático del Sistema de Acompañamiento al Alumnado (CODDAA).</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

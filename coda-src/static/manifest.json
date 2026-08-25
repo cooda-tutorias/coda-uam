@@ -1,0 +1,20 @@
+{
+  "name": "Sistema de Tutorías DCNI",
+  "short_name": "Tutorías DCNI",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#F08200",
+  "icons": [
+    {
+      "src": "/static/Alumnos/img/tutorias_dcni_icon2.png", 
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/Alumnos/img/tutorias_dcni_icon2.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

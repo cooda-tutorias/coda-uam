@@ -20,7 +20,7 @@
           href="{% static 'Alumnos/img/tutorias_dcni_icon2.png' %}">
 
     <link rel="icon"
-          href="{% static 'Alumnos/img/icon.jpg' %}"
+          href="{% static 'Alumnos/img/icon.png' %}"
           sizes="32x32"
           type="image/png">
 
@@ -159,14 +159,18 @@
             <ul class="dropdown-menu dropdown-menu-end"
                 aria-labelledby="navbarDropdownMenuAvatar">
               <li>
-                <a href="{% url 'perfil' %}"  class="dropdown-item text-title h8">Mi perfil</a>
+                <a href="{% url 'perfil' %}"  class="dropdown-item text-title h8">
+                  <i class="bi bi-person"></i>
+                  Mi perfil
+                </a>
               </li>
 
               {% if user.is_tutor %}
                 <li>
                   <a href="{% url 'ver_qr_tutor' %}" class="dropdown-item text-title h8">
                     <i class="bi bi-qr-code"></i>
-                  Ver mi QR</a>
+                    Ver mi QR
+                  </a>
                 </li>
 
                 <li>
@@ -175,15 +179,14 @@
                     Mis horarios de tutoría
                   </a>
                 </li>
-
-                <li>
-                  <a class="dropdown-item" href="{% url 'configuracion_app' %}">
-                    <i class="bi bi-gear"></i>
-                    Configuración
-                  </a>
-                </li>
-
               {% endif %}
+
+              <li>
+                <a class="dropdown-item" href="{% url 'configuracion_app' %}">
+                  <i class="bi bi-gear"></i>
+                  Configuración
+                </a>
+              </li>
 
               <li>
                 <a class="dropdown-item text-title h8" href="{% url 'logout' %}">
@@ -322,6 +325,24 @@
     });
     
     </script>
+
+    <script>
+      // El Service Worker está bajo /static/js/ y no puede usar navigate() en
+      // las páginas de la aplicación. La pestaña recibe el destino y se navega
+      // a sí misma después de comprobar que sea una URL del mismo origen.
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('message', function (event) {
+          if (!event.data || event.data.type !== 'PUSH_NAVIGATE') return;
+
+          const targetUrl = new URL(event.data.url, window.location.origin);
+          if (targetUrl.origin === window.location.origin) {
+            window.location.assign(targetUrl.href);
+          }
+        });
+      }
+    </script>
+
+    {% block scripts %}{% endblock %}
 
   </body>
 

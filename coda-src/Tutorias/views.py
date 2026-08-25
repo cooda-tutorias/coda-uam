@@ -139,6 +139,10 @@ def proponer_fechas_tutoria(request, pk):
         propuesta_1_raw = request.POST.get('propuesta_1')
         propuesta_2_raw = request.POST.get('propuesta_2')
         es_reagendacion = request.POST.get('es_reagendacion') == '1'
+        # Debe calcularse antes de modificar el estado de la tutoría. Una
+        # solicitud pendiente cuya fecha ya pasó tiene estado efectivo VENCIDA,
+        # aunque el valor persistido en ``estado`` continúe siendo PENDIENTE.
+        es_reactivacion = tutoria.estado_efectivo == VENCIDA
 
         if es_reagendacion and tutoria.estado_efectivo != ACEPTADO:
             messages.error(request, "Solo se pueden reagendar tutorías agendadas.")
@@ -166,7 +170,9 @@ def proponer_fechas_tutoria(request, pk):
                 if es_reagendacion:
                     messages.success(request, "Se enviaron al alumno las opciones para reagendar la tutoría.")
                     evento = EventoTutoria.TUT_REAGENDA_2_FECHAS
-
+                elif es_reactivacion:
+                    messages.success(request, "Se reactivó la solicitud y se enviaron al alumno las nuevas opciones de fecha.")
+                    evento = EventoTutoria.TUT_REACTIVA_2_FECHAS
                 else:
                     messages.success(request, "Se han enviado las alternativas de horario al alumno.")
                     evento = EventoTutoria.TUT_PROPONE_2_FECHAS
@@ -180,6 +186,8 @@ def proponer_fechas_tutoria(request, pk):
                 messages.success(request, "Se ha actualizado y aceptado la tutoría con la nueva fecha.")
                 if es_reagendacion:
                     evento = EventoTutoria.TUT_REAGENDA_1_FECHA
+                elif es_reactivacion:
+                    evento = EventoTutoria.TUT_REACTIVA_1_FECHA
                 else:
                     evento = EventoTutoria.TUT_PROPONE_1_FECHA
 
@@ -626,6 +634,11 @@ class CancelarTutoriaView(View):
                 messages.error(request, "Debes escribir el detalle del motivo de cancelación.")
                 return redirect('Tutorias-alumno')
 
+            if tutoria.estado_efectivo in [PENDIENTE, VENCIDA]:
+                evento = EventoTutoria.ALU_CANCELA_SOLICITUD
+            else: # Es decir, cuando el estado es CANCELADO
+                evento = EventoTutoria.ALU_CANCELA_AGENDADA
+
             tutoria.estado = CANCELADO
             tutoria.motivo_cancelacion = motivo
             tutoria.detalle_motivo_cancelacion = (
@@ -647,11 +660,6 @@ class CancelarTutoriaView(View):
                 "reagendacion_pendiente",
             ])
             messages.success(request, "La tutoría se canceló correctamente.")
-
-            if tutoria.estado_efectivo == PENDIENTE:
-                evento = EventoTutoria.ALU_CANCELA_SOLICITUD
-            else:
-                evento = EventoTutoria.ALU_CANCELA_AGENDADA
 
             # El alumno cancela, y el tutor debe recibir notificación.
             tutoria_notification_requested.send(
@@ -1046,9 +1054,11 @@ def solicitar_cambio_fecha_tutoria(request, pk):
             slot = HorarioTutor.objects.get(pk=horario_id, tutor=tutoria.tutor, activo=True)
             nueva_fecha = resolver_franja_tutor(slot, franja_seleccionada)
             nuevo_estado = ACEPTADO
+            evento = EventoTutoria.ALU_SOL_CAMBIO_FECHA_AGEN
         else:
             nueva_fecha = convertir_fecha_local(fecha_sugerida)
             nuevo_estado = PENDIENTE
+            evento = EventoTutoria.ALU_SOL_CAMBIO_FECHA_SUG
     except (HorarioTutor.DoesNotExist, TypeError, ValueError):
         messages.error(request, "La fecha u horario seleccionado no es válido.")
         return redirect("Tutorias-alumno")
@@ -1084,15 +1094,15 @@ def solicitar_cambio_fecha_tutoria(request, pk):
             f"-> '{timezone.localtime(nueva_fecha):%d/%m/%Y %H:%M}'"
         ),
     )
+
     tutoria_notification_requested.send(
         sender=solicitar_cambio_fecha_tutoria,
-        event="tutoria_modificada",
+        event=evento,
         tutoria=tutoria,
         actor=request.user,
-        recipient=Tutor.objects.filter(pk=tutoria.tutor_id),
-        verb="Solicitud de cambio de fecha",
+        recipient=tutoria.tutor,
     )
-
+    
     if nuevo_estado == ACEPTADO:
         messages.success(request, "La tutoría se reagendó en un horario disponible del tutor.")
     else:
@@ -2994,7 +3004,7 @@ class ExportarTutoriasAceptadasExcelView(CodaViewMixin, View):
 
 class ComunicacionMasivaTutoriasView(FormView):
 
-    print("Inicializando vista de comunicación masiva")
+    #print("Inicializando vista de comunicación masiva")
 
     template_name = 'Tutorias/comunicacionMasiva.html'
     form_class = ComunicacionMasivaForm

@@ -42,4 +42,9 @@ urlpatterns = [
     path("mi-qr/", views.VerQRView.as_view(), name="ver_qr_tutor"),
     path("mis-horarios/", views.HorariosTutorView.as_view(), name="tutor_horarios"),
     path("mis-horarios/eliminar/<int:pk>/", views.EliminarHorarioTutorView.as_view(), name="tutor_horario_eliminar"),
+
+    # Para la configuración de la notificaciones push del tutor.
+    path("configuracion_app/", views.SettingsTutorView.as_view(), name="configuracion_app"),
+    path('webpush/save_information/', views.save_information, name='save_webpush_info'),
+    # ... (other existing URL patterns)    
 ]

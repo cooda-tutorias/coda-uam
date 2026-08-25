@@ -34,24 +34,32 @@ SYSTEM_NOTIFICATION_INFO: dict[EventoTutoria, dict[str, str]] = {
         "description": "Solicitud de tutoría aceptada",
     },
     EventoTutoria.TUT_PROPONE_1_FECHA: {
-        "verb": "agendó tu sesión de tutoría en otra fecha",
+        "verb": "agendó tu sesión de tutoría en un nueva fecha",
         "description": "Tutoría agendada en otra fecha",
     },
     EventoTutoria.TUT_PROPONE_2_FECHAS: {
         "verb": "propuso opciones de fecha para la tutoría",
         "description": "Propuestas de fecha de tutoría",
     },
+    EventoTutoria.TUT_REACTIVA_1_FECHA: {
+        "verb": "reactivó y agendó tu solicitud de tutoría en una nueva fecha",
+        "description": "Solicitud de tutoría reactivada y agendada",
+    },
+    EventoTutoria.TUT_REACTIVA_2_FECHAS: {
+        "verb": "reactivó tu solicitud y propuso opciones de fecha",
+        "description": "Solicitud de tutoría reactivada; elige una fecha",
+    },
     EventoTutoria.TUT_RECHAZA_SOLICITUD: {
         "verb": "rechazó la solicitud de tutoría",
         "description": "Solicitud de tutoría rechazada",
     },
     EventoTutoria.ALU_SOL_CAMBIO_FECHA_SUG: {
-        "verb": "solicitó cambiar la fecha de tutoría",
+        "verb": "solicitó cambiar la fecha de tutoría pendiente",
         "description": "Cambio de fecha en solicitud pendiente",
     },
     EventoTutoria.ALU_SOL_CAMBIO_FECHA_AGEN: {
-        "verb": "reprogramó la tutoría agendada",
-        "description": "Solicitud de reubicación de tutoría",
+        "verb": "reprogramó su tutoría solicitada/agendada",
+        "description": "Reprogramación de tutoría",
     },
     EventoTutoria.ALU_CANCELA_SOLICITUD: {
         "verb": "canceló la solicitud de tutoría",
@@ -73,7 +81,7 @@ SYSTEM_NOTIFICATION_INFO: dict[EventoTutoria, dict[str, str]] = {
         "verb": "reprogramó la tutoría agendada",
         "description": "Reprogramación de tutoría agendada",
     },
-    EventoTutoria.TUT_REAGENDA_2_FECHA: {
+    EventoTutoria.TUT_REAGENDA_2_FECHAS: {
         "verb": "propuso opciones de fecha para reagendar la tutoría",
         "description": "Opciones para reagendar tutoría",
     },

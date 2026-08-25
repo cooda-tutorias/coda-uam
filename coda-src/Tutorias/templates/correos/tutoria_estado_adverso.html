@@ -1,0 +1,18 @@
+{% extends "correos/base_notificacion.html" %}
+
+{% block contenido %}
+  <tr>
+    <td style="padding:14px 24px 20px">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #ecd3d3;border-radius:8px">
+        <tr><td style="padding:11px 14px;font-size:14px;background:#fff1f1;color:#7a3030"><strong>Estado:</strong> {{ tipo_estado|capfirst }}</td></tr>
+        <tr><td style="padding:11px 14px;font-size:14px;border-top:1px solid #ecd3d3"><strong>Fecha afectada:</strong> {{ fecha_actual }}</td></tr>
+        <tr><td style="padding:11px 14px;font-size:14px;border-top:1px solid #ecd3d3"><strong>Alumno:</strong> {{ alumno_nombre }}</td></tr>
+        <tr><td style="padding:11px 14px;font-size:14px;border-top:1px solid #ecd3d3"><strong>Tutor:</strong> {{ tutor_nombre }}</td></tr>
+        <tr><td style="padding:11px 14px;font-size:14px;border-top:1px solid #ecd3d3"><strong>Tema(s):</strong> {{ temas }}</td></tr>
+        {% if motivo %}<tr><td style="padding:11px 14px;font-size:14px;border-top:1px solid #ecd3d3"><strong>Motivo:</strong> {{ motivo }}</td></tr>{% endif %}
+        {% if fecha_limite %}<tr><td style="padding:11px 14px;font-size:14px;border-top:1px solid #ecd3d3"><strong>Fecha límite antes de la cancelación automática:</strong> {{ fecha_limite }}</td></tr>{% endif %}
+      </table>
+      {% if not es_cancelacion_definitiva %}<p style="margin:12px 0 0;font-size:13px;line-height:1.5;color:#666">Este aviso no representa necesariamente el cierre definitivo de la solicitud.</p>{% endif %}
+    </td>
+  </tr>
+{% endblock %}

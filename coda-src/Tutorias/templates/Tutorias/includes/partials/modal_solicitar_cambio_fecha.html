@@ -1,5 +1,7 @@
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/material_blue.css">
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/material_blue.css">
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://npmcdn.com/flatpickr/dist/l10n/es.js"></script>
 
@@ -26,14 +28,20 @@
   }
 </style>
 
-<div class="modal fade" id="modalSolicitarCambioFecha" tabindex="-1"
-     aria-labelledby="modalSolicitarCambioFechaLabel" aria-hidden="true">
+<div class="modal fade"
+     id="modalSolicitarCambioFecha"
+     tabindex="-1"
+     aria-labelledby="modalSolicitarCambioFechaLabel"
+     aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <form method="post" id="formSolicitarCambioFecha" class="modal-content">
       {% csrf_token %}
       <div class="modal-header">
         <h5 class="modal-title" id="modalSolicitarCambioFechaLabel">Solicitar cambio de fecha</h5>
-        <button type="button" class="btn-close" data-mdb-dismiss="modal" aria-label="Cerrar"></button>
+        <button type="button"
+                class="btn-close"
+                data-mdb-dismiss="modal"
+                aria-label="Cerrar"></button>
       </div>
       <div class="modal-body">
         <div id="cambioFechaCargando" class="py-4 text-center">
@@ -42,28 +50,39 @@
         <div id="cambioFechaSlots" class="d-none">
           <div class="alert alert-info">Selecciona un horario libre del tutor. El cambio quedará agendado al confirmarlo.</div>
           <div class="row">
-            <div class="col-md-7 d-flex justify-content-center mb-3"><div id="calendarioCambioFecha"></div></div>
+            <div class="col-md-7 d-flex justify-content-center mb-3">
+              <div id="calendarioCambioFecha"></div>
+            </div>
             <div class="col-md-5">
               <label class="form-label fw-bold">Selecciona una fecha y horario</label>
-              <div id="franjasCambioFecha" class="d-grid gap-2 overflow-auto" style="max-height:280px">
+              <div id="franjasCambioFecha"
+                   class="d-grid gap-2 overflow-auto"
+                   style="max-height:280px">
                 <small class="text-muted">Elige un día para consultar sus horarios.</small>
               </div>
             </div>
           </div>
         </div>
         <div id="cambioFechaSugerencia" class="d-none">
-          <div class="alert alert-warning">El tutor no tiene horarios predefinidos. Sugiere una nueva fecha; deberá confirmarla antes de que quede agendada.</div>
+          <div class="alert alert-warning">Tu tutor(a) no tiene horarios predefinidos, pero puedes sugerir una nueva fecha. Tu tutora deberá confirmarla antes de que quede agendada.</div>
           <label for="inputCambioFechaSugerida" class="form-label">Nueva fecha sugerida</label>
-          <input id="inputCambioFechaSugerida" type="datetime-local" class="form-control">
+          <input id="inputCambioFechaSugerida"
+                 type="datetime-local"
+                 class="form-control">
         </div>
         <input type="hidden" name="horario_tutor" id="cambioFechaHorario">
         <input type="hidden" name="fecha_seleccionada" id="cambioFechaSeleccionada">
-        <input type="hidden" name="franja_seleccionada" id="cambioFranjaSeleccionada">
+        <input type="hidden"
+               name="franja_seleccionada"
+               id="cambioFranjaSeleccionada">
         <input type="hidden" name="fecha_sugerida" id="cambioFechaSugerida">
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-light" data-mdb-dismiss="modal">Cancelar</button>
-        <button type="submit" class="btn btn-primary" id="confirmarCambioFecha" disabled>Solicitar cambio</button>
+        <button type="submit"
+                class="btn btn-primary"
+                id="confirmarCambioFecha"
+                disabled>Solicitar cambio</button>
       </div>
     </form>
   </div>
