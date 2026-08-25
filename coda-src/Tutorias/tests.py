@@ -8,7 +8,7 @@ from django.test import override_settings
 from django.core import mail
 from django.utils import timezone
 
-from Usuarios.models import Tutor, Alumno
+from Usuarios.models import Tutor, Alumno, HorarioTutor
 from Tutorias.models import Tutoria, HistorialCambioTutoria
 from Tutorias.forms import FormSeguimiento
 from Tutorias.services.docx_reportes import _tutoria_es_reportable
@@ -109,6 +109,89 @@ class PanelTutoriasAlumnoTests(TestCase):
             response,
             "Tutorias/panel_tutorias_alumno.html",
         )
+
+    def test_cambio_sugerido_de_agendada_vuelve_a_pendiente(self):
+        tutoria = self.crear_tutoria(ACEPTADO)
+        nueva_fecha = timezone.localtime(timezone.now() + timedelta(days=5)).replace(
+            hour=12, minute=30, second=0, microsecond=0
+        )
+
+        response = self.client.post(
+            reverse("solicitar_cambio_fecha_tutoria", args=[tutoria.pk]),
+            {"fecha_sugerida": nueva_fecha.strftime("%Y-%m-%dT%H:%M")},
+        )
+
+        self.assertRedirects(response, self.url)
+        tutoria.refresh_from_db()
+        self.assertEqual(tutoria.estado, PENDIENTE)
+        self.assertEqual(timezone.localtime(tutoria.fecha), nueva_fecha)
+        self.assertTrue(HistorialCambioTutoria.objects.filter(tutoria=tutoria).exists())
+
+    def test_cambio_a_horario_libre_queda_agendado(self):
+        tutoria = self.crear_tutoria(PENDIENTE)
+        dia = timezone.localdate() + timedelta(days=1)
+        while dia.weekday() > 4:
+            dia += timedelta(days=1)
+        horario = HorarioTutor.objects.create(
+            tutor=self.tutor,
+            dia_semana=dia.weekday(),
+            hora_inicio=time(10, 0),
+            hora_fin=time(11, 0),
+        )
+
+        response = self.client.post(
+            reverse("solicitar_cambio_fecha_tutoria", args=[tutoria.pk]),
+            {
+                "horario_tutor": horario.pk,
+                "franja_seleccionada": f"{dia.isoformat()}T10:30:00",
+            },
+        )
+
+        self.assertRedirects(response, self.url)
+        tutoria.refresh_from_db()
+        self.assertEqual(tutoria.estado, ACEPTADO)
+        self.assertEqual(timezone.localtime(tutoria.fecha).date(), dia)
+        self.assertEqual(timezone.localtime(tutoria.fecha).time(), time(10, 30))
+
+    def test_alumnos_distintos_pueden_agendar_franjas_del_mismo_dia(self):
+        dia = timezone.localdate() + timedelta(days=1)
+        while dia.weekday() > 4:
+            dia += timedelta(days=1)
+        horario = HorarioTutor.objects.create(
+            tutor=self.tutor,
+            dia_semana=dia.weekday(),
+            hora_inicio=time(8, 0),
+            hora_fin=time(11, 0),
+        )
+        url = reverse("Tutorias-create")
+
+        respuestas = []
+        for alumno, hora in ((self.alumno, "08:00:00"), (self.otro_alumno, "10:00:00")):
+            self.client.force_login(alumno)
+            respuestas.append(self.client.post(url, {
+                "tema": ["BEC"],
+                "descripcion": "Prueba de franja independiente",
+                "horario_tutor": horario.pk,
+                "franja_seleccionada": f"{dia.isoformat()}T{hora}",
+            }))
+
+        self.assertTrue(all(respuesta.status_code == 302 for respuesta in respuestas))
+        citas = list(Tutoria.objects.filter(fecha__date=dia).order_by("fecha"))
+        self.assertEqual(len(citas), 2)
+        self.assertEqual(
+            [timezone.localtime(cita.fecha).strftime("%H:%M") for cita in citas],
+            ["08:00", "10:00"],
+        )
+
+    def test_no_permite_cambiar_tutoria_de_otro_alumno(self):
+        tutoria = self.crear_tutoria(PENDIENTE, alumno=self.otro_alumno)
+
+        response = self.client.post(
+            reverse("solicitar_cambio_fecha_tutoria", args=[tutoria.pk]),
+            {"fecha_sugerida": "2030-01-01T10:00"},
+        )
+
+        self.assertEqual(response.status_code, 403)
 
     def test_clasifica_tutorias_en_las_tres_pestanas(self):
         pendiente = self.crear_tutoria(PENDIENTE)
