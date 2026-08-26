@@ -644,13 +644,13 @@ class ImportAlumnosView(CodaViewMixin, FormView):
                         print("sexo :",sexo)
                         print("tutor_id :",tutor_id)
                         print("trimestre_ingreso :",trimestre_ingreso)
-                        warnings.append(f"Alumno {matricula}: Datos obligatorios faltantes. Asegúrese de que todos los campos obligatorios de información estén presentes.")
+                        warnings.append(f"Alumno {matricula}: faltan datos obligatorios. Asegúrese de que todos los campos obligatorios de información estén presentes.")
                         continue  # Skip to the next student
 
                     # Find assigned tutor
                     tutor_asignado = Tutor.objects.filter(matricula=tutor_id).first()
                     if not tutor_asignado:
-                        warnings.append(f"Alumno {matricula}: Tutor con número económico {tutor_id} no encontrado. Aseegúrese de que el tutor esté registrado en el sistema.")
+                        warnings.append(f"Alumno {matricula}: Tutor con número económico {tutor_id} no encontrado. Asegúrese de que el tutor esté registrado en el sistema.")
                         continue
 
                     # Generate password (increment each digit of matricula by 1)

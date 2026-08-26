@@ -1,9 +1,9 @@
 {% extends "Usuarios/navbar_coda.html" %}
 
-{% block title %} Tutorias Aceptadas CODDAA {% endblock %}
+{% block title %}Tutorías aceptadas CODDAA{% endblock %}
 
 {% block body %}
-<style>
+  <style>
   body {
     background-color: #f8f9fa;
   }
@@ -14,16 +14,18 @@
     background-color: #ff6600;
     color: black;
   }
-</style>
+  </style>
 
-<section id="section" style="background-color: #eee;">
-  <!-- <div class="container"> -->
-    <div class="d-flex mb-5 mt-5 card border-top border-bottom border-4" style="border-color: #F08200 !important;">
+  <section id="section" style="background-color: #eee;">
+    <!-- <div class="container"> -->
+    <div class="d-flex mb-5 mt-5 card border-top border-bottom border-4"
+         style="border-color: #F08200 !important">
       <div class="card-body p-4 w-100">
         <div class="w-100 d-flex justify-content-between">
-          <h3 class="mb-4 text-primary text-title-bold">Tutorias Impartidas</h3>
+          <h3 class="mb-4 text-primary text-title-bold">Tutorías impartidas</h3>
           <div class="mb-3">
-              <a href="{% url 'exportar-tutorias-aceptadas' %}" class="btn btn-primary">Exportar a Excel</a>
+            <a href="{% url 'exportar-tutorias-aceptadas' %}"
+               class="btn btn-primary">Exportar a Excel</a>
           </div>
         </div>
         <table class="table table-striped table-hover datatable text-body">
@@ -32,7 +34,7 @@
               <th>Id</th>
               <th>Matrícula</th>
               <th>Alumno</th>
-              <th>Carrera</th>
+              <th>Licenciatura</th>
               <th>Estado Guardado</th>
               <th>Estado Actual</th>
               <th>Fecha</th>
@@ -44,36 +46,37 @@
           </thead>
           <tbody id="data">
             {% for tutoria in object_list %}
-            <tr class="" data-docente="{{ tutoria.tutor.first_name }} {{ tutoria.tutor.last_name }} {{ tutoria.tutor.second_last_name }}">
-              <td>{{ tutoria.pk }}</td>
-              <td>{{ tutoria.alumno.matricula }}</td>
-              <td>{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}</td>
-              <td>{{ tutoria.alumno.get_carrera_display }}</td>
-              <td>{{ tutoria.get_estado_alumno_historico_display }}</td>
-              <td>{{ tutoria.alumno.get_estado_display }}</td>
-              <td>{{ tutoria.fecha|date }}</td>
-              <td>{{ tutoria.fecha|date:"P" }}</td>
-              <td>{{ tutoria.tutor.first_name }} {{ tutoria.tutor.last_name }} {{ tutoria.tutor.second_last_name }}</td>
-              <td>{{ tutoria.get_tema_display|join:", " }}</td>
-              <td class="text-center">
-                {% if tutoria.asistencia %}
-                  Sí
-                {% else %}
-                  No
-                {% endif %}
-              </td>
-            </tr>
+              <tr class=""
+                  data-docente="{{ tutoria.tutor.first_name }} {{ tutoria.tutor.last_name }} {{ tutoria.tutor.second_last_name }}">
+                <td>{{ tutoria.pk }}</td>
+                <td>{{ tutoria.alumno.matricula }}</td>
+                <td>{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}</td>
+                <td>{{ tutoria.alumno.get_carrera_display }}</td>
+                <td>{{ tutoria.get_estado_alumno_historico_display }}</td>
+                <td>{{ tutoria.alumno.get_estado_display }}</td>
+                <td>{{ tutoria.fecha|date }}</td>
+                <td>{{ tutoria.fecha|date:"P" }}</td>
+                <td>{{ tutoria.tutor.first_name }} {{ tutoria.tutor.last_name }} {{ tutoria.tutor.second_last_name }}</td>
+                <td>{{ tutoria.get_tema_display|join:", " }}</td>
+                <td class="text-center">
+                  {% if tutoria.asistencia %}
+                    Sí
+                  {% else %}
+                    No
+                  {% endif %}
+                </td>
+              </tr>
             {% endfor %}
           </tbody>
         </table>
       </div>
     </div>
-  <!-- </div> -->
-</section>
+    <!-- </div> -->
+  </section>
 
-<!-- Script de filtro por docente -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script>
+  <!-- Script de filtro por docente -->
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script>
 $(document).ready(function() {
   $('#docente-filter').on('change', function() {
     const selectedDocente = $(this).val();
@@ -86,5 +89,5 @@ $(document).ready(function() {
     }
   });
 });
-</script>
+  </script>
 {% endblock %}

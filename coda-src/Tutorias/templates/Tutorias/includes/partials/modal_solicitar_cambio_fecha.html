@@ -37,7 +37,7 @@
     <form method="post" id="formSolicitarCambioFecha" class="modal-content">
       {% csrf_token %}
       <div class="modal-header">
-        <h5 class="modal-title" id="modalSolicitarCambioFechaLabel">Solicitar cambio de fecha</h5>
+        <h5 class="modal-title text-primary" id="modalSolicitarCambioFechaLabel">Solicitar cambio de fecha</h5>
         <button type="button"
                 class="btn-close"
                 data-mdb-dismiss="modal"
@@ -64,7 +64,7 @@
           </div>
         </div>
         <div id="cambioFechaSugerencia" class="d-none">
-          <div class="alert alert-warning">Tu tutor(a) no tiene horarios predefinidos, pero puedes sugerir una nueva fecha. Tu tutora deberá confirmarla antes de que quede agendada.</div>
+          <div class="alert alert-warning">Tu tutora no tiene horarios predefinidos, pero puedes sugerir una nueva fecha. Tu tutora deberá confirmarla antes de que quede agendada.</div>
           <label for="inputCambioFechaSugerida" class="form-label">Nueva fecha sugerida</label>
           <input id="inputCambioFechaSugerida"
                  type="datetime-local"

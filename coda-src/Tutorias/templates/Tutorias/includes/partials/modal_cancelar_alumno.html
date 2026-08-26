@@ -8,7 +8,8 @@
       <form method="post" action="{% url 'cancelar-tutoria' tutoria.pk %}">
         {% csrf_token %}
         <div class="modal-header">
-          <h5 class="modal-title" id="modalCancelarAlumnoLabel-{{ tutoria.pk }}">Cancelar tutoría</h5>
+          <h5 class="modal-title text-primary"
+              id="modalCancelarAlumnoLabel-{{ tutoria.pk }}">Cancelar tutoría</h5>
           <button type="button"
                   class="btn-close"
                   data-mdb-dismiss="modal"
@@ -26,16 +27,13 @@
                      value="{{ codigo }}"
                      data-requiere-detalle="{% if codigo == 'ALU_OTRO' %}true{% else %}false{% endif %}"
                      {% if forloop.first %}checked{% endif %}>
-              <label class="form-check-label" for="motivo-{{ codigo }}-{{ tutoria.pk }}">
-                {{ texto }}
-              </label>
+              <label class="form-check-label" for="motivo-{{ codigo }}-{{ tutoria.pk }}">{{ texto }}</label>
             </div>
           {% endfor %}
 
           <div class="otro-motivo-cancelacion-alumno d-none">
-            <label class="form-label" for="motivo-cancelacion-alumno-otro-{{ tutoria.pk }}">
-              Escribe el motivo
-            </label>
+            <label class="form-label"
+                   for="motivo-cancelacion-alumno-otro-{{ tutoria.pk }}">Escribe el motivo</label>
             <textarea id="motivo-cancelacion-alumno-otro-{{ tutoria.pk }}"
                       name="detalle_motivo_cancelacion"
                       class="form-control"

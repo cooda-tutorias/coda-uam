@@ -1,63 +1,63 @@
-{% extends "Usuarios/HeaderAndFooterFachada.html"%}
+{% extends "Usuarios/HeaderAndFooterFachada.html" %}
 
-{% block title %} Lista de tutores {% endblock %}
+{% block title %}Lista de tutores{% endblock %}
 
 {% block body %}
-<section id="section">
-  <div class="container py-5">
+  <section id="section">
+    <div class="container py-5">
       <div class="row d-flex justify-content-center align-items-center w-100">
-          <div class="col-lg-8 col-xl-10 w-100">
-              <div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
-                  <div class="card-body p-4">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                      <h3 class=" text-primary text-title-bold">Lista de tutores</h3>
-                      <a href="{% url 'Reporte-tutorias-masivo' %}" class="btn btn-primary">
-                        Generar reportes masivos
-                      </a>
-                      </div>
-                      <!--Inicio de table-->
-                      <div class="table-responsive">
-                        <table id="tabla-tutores" class="table table-striped table-hover">
-                          <thead>
-                            <tr class="text-center text-title h6">
-                              <th>N. Económico</th>
-                              <th>Nombre</th>
-                              <th>Correo</th>
-                              <th>Coordinación</th>
-                              <th>Tutorias</th>
-                              <th>Tutorados</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {% for tutor in object_list %}
-                            <tr class="text-body">
-                              <td>{{ tutor.matricula }}</td>
-                              <td>{{ tutor.first_name }} {{ tutor.last_name }} {% if tutor.second_last_name %}{{ tutor.second_last_name }}{% endif %}</td>
-                              <td>{{ tutor.email }}</td>
-                              <td>{{ tutor.get_coordinacion_display }}</td>
-                              <td><a class="text-body-bold" href="{% url 'Tutorias-Coda' tutor.pk %}">Ver Tutorias</a></td>
-                              <td><a class="text-body-bold" href="{% url 'Tutorados-Coda' tutor.pk %}">Ver Tutorados</a></td>
-                            </tr>
-                            {% endfor %}
-                          </tbody>
-                        </table>
-                      </div>
-                      <!--Fin de table-->
-                  </div>
+        <div class="col-lg-8 col-xl-10 w-100">
+          <div class="card border-top border-bottom border-4"
+               style="border-color: #F08200 !important">
+            <div class="card-body p-4">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3 class="text-primary text-title-bold">Lista de tutores</h3>
+                <a href="{% url 'Reporte-tutorias-masivo' %}" class="btn btn-primary">Generar reportes masivos</a>
               </div>
+              <!--Inicio de table-->
+              <div class="table-responsive">
+                <table id="tabla-tutores" class="table table-striped table-hover">
+                  <thead>
+                    <tr class="text-center text-title h6">
+                      <th>N. Económico</th>
+                      <th>Nombre</th>
+                      <th>Correo</th>
+                      <th>Coordinación</th>
+                      <th>Tutorías</th>
+                      <th>Tutorados</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for tutor in object_list %}
+                      <tr class="text-body">
+                        <td>{{ tutor.matricula }}</td>
+                        <td>{{ tutor.first_name }} {{ tutor.last_name }} {% if tutor.second_last_name %}{{ tutor.second_last_name }}{% endif %}</td>
+                        <td>{{ tutor.email }}</td>
+                        <td>{{ tutor.get_coordinacion_display }}</td>
+                        <td><a class="text-body-bold" href="{% url 'Tutorias-Coda' tutor.pk %}">Ver tutorías</a></td>
+                        <td><a class="text-body-bold" href="{% url 'Tutorados-Coda' tutor.pk %}">Ver tutorados</a></td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              <!--Fin de table-->
+            </div>
           </div>
+        </div>
       </div>
-  </div>
-</section>
+    </div>
+  </section>
 
-<!-- Scripts necesarios para DataTables -->
-<link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" />
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+  <!-- Scripts necesarios para DataTables -->
+  <link rel="stylesheet"
+        href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" />
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 
-<!-- Inicialización de DataTables con idioma español -->
-<script>
+  <!-- Inicialización de DataTables con idioma español -->
+  <script>
   $(document).ready(function () {
     $('#tabla-tutores').DataTable({
       language: {
@@ -68,6 +68,6 @@
       order: [[1, 'asc']]  // Ordena inicialmente por nombre
     });
   });
-</script>
+  </script>
 
 {% endblock %}

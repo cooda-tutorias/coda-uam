@@ -308,7 +308,7 @@ class FormReporte(forms.ModelForm):
             ("BM", "Biología Molecular"),
         ])
 
-        self.fields['carrera'].initial = carreras_dict.get(tutor_instance.coordinacion, "Carrera desconocida")
+        self.fields['carrera'].initial = carreras_dict.get(tutor_instance.coordinacion, "Licenciatura desconocida")
 
 class FormCartasDeAsignacion(forms.ModelForm):
     no_inicio = forms.IntegerField(min_value=0)
@@ -346,7 +346,7 @@ class FormCartasDeAsignacion(forms.ModelForm):
             ("BM", "Biología Molecular"),
         ])
 
-        self.fields['carrera'].initial = carreras_dict.get(tutor_instance.coordinacion, "Carrera desconocida")
+        self.fields['carrera'].initial = carreras_dict.get(tutor_instance.coordinacion, "Licenciatura desconocida")
 
 class FormReporteDeTutorias(forms.ModelForm):
 
@@ -412,7 +412,7 @@ class FormReporteTutoriasMasivo(forms.Form):
         label="Tutores específicos"
     )
 
-    oficio_inicial = forms.IntegerField(required=True, min_value=1, label="Número de Oficio inicial")
+    oficio_inicial = forms.IntegerField(required=True, min_value=1, label="Número de oficio inicial")
     fecha_inicio = forms.DateField(required=True, widget=forms.DateInput(attrs={'type': 'date'}))
     fecha_fin = forms.DateField(required=True, widget=forms.DateInput(attrs={'type': 'date'}))
     fecha = forms.DateTimeField(
@@ -467,7 +467,7 @@ class ComunicacionMasivaForm(forms.Form):
     filtro_carrera = forms.ChoiceField(
         choices=OPCIONES_CARRERA,
         required=False,
-        label="Filtrar por Carrera",
+        label="Filtrar por licenciatura",
         widget=forms.Select(attrs={'class': 'form-select', 'id': 'id_filtro_carrera'})
     )
 
@@ -483,14 +483,14 @@ class ComunicacionMasivaForm(forms.Form):
     filtro_asunto_tutoria = forms.ChoiceField(
         choices=OPCIONES_ASUNTO,
         required=False,
-        label="Asunto de Tutoría (Categoría)",
+        label="Asunto de tutoría (categoría)",
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
     tutorados = AlumnoChoiceField( 
         queryset=Alumno.objects.none(),
         widget=forms.CheckboxSelectMultiple(attrs={'class': 'form-check-input'}),
-        label="Seleccionar Tutorados",
+        label="Seleccionar tutorados",
         required=True
     )
 
@@ -506,7 +506,7 @@ class ComunicacionMasivaForm(forms.Form):
     archivos = forms.FileField(
         required=False,
         widget=forms.FileInput(attrs={'class': 'form-control'}),
-        label="Adjuntar Archivos"
+        label="Adjuntar archivos"
     )
 
     def __init__(self, *args, **kwargs):

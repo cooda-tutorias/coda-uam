@@ -1,25 +1,26 @@
 {% extends "Usuarios/HeaderAndFooterFachada.html" %}
 
-{% block title %} Tutorias Coda {% endblock %}
+{% block title %}Tutorias Coda{% endblock %}
 
 {% block body %}
-<!--Ver Tutorias-->
-<section id="section" style="background-color: #eee;">
+  <!--Ver Tutorias-->
+  <section id="section" style="background-color: #eee;">
     <div class="container py-5 h-100">
       <div class="row d-flex justify-content-center align-items-center h-100">
         <div class="col-lg-8 col-xl-12">
-          <div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
+          <div class="card border-top border-bottom border-4"
+               style="border-color: #F08200 !important">
             <div class="card-body p-4">
               <div class="d-flex w-100 align-items-center justify-content-between">
                 <div class="d-flex mb-4 align-items-center w-100">
-                  <h3 class=" text-primary text-title-bold">Tutorías dadas por </h3>
-                  <h4 class="ms-3 text-title text-black"> 
+                  <h3 class="text-primary text-title-bold">Tutorías dadas por</h3>
+                  <h4 class="ms-3 text-title text-black">
                     {% if tutor.sexo == 'F' %}
                       Dra.
                     {% else %}
                       Dr.
                     {% endif %}
-                    {{ tutor.first_name }} {{ tutor.last_name }} 
+                    {{ tutor.first_name }} {{ tutor.last_name }}
                     {% if tutor.second_last_name %}
                       {{ tutor.second_last_name }}
                     {% endif %}
@@ -28,8 +29,8 @@
                 <div class="d-flex w-75 justify-content-evenly align-items-center">
                   <div class="d-flex w-100 justify-content-end">
                     <form action="{% url 'Reporte-tutorias' tutor.pk %}" method="get">
-                        <!-- <div class="row"> -->
-                            <!-- <div class="col-md-4 mb-3">
+                      <!-- <div class="row"> -->
+                      <!-- <div class="col-md-4 mb-3">
                                 <label for="fecha_inicio" class="form-label text-title">Fecha de inicio:</label>
                                 <input type="date" class="form-control text-title" id="fecha_inicio" name="fecha_inicio" />
                             </div>
@@ -37,51 +38,51 @@
                                 <label for="fecha_fin" class="form-label text-title">Fecha de fin:</label>
                                 <input type="date" class="form-control text-title" id="fecha_fin" name="fecha_fin" />
                             </div> -->
-                            <button class="mb-4 w-auto btn btn-primary btn-block">Generar reporte</button>
-                        <!-- </div> -->
+                      <button class="mb-4 w-auto btn btn-primary btn-block">Generar reporte</button>
+                      <!-- </div> -->
                     </form>
                   </div>
                 </div>
               </div>
 
-                  <!--Inicio de table-->
-                  <div class="table-responsive">
-                    <table class="table table-striped table-hover datatable">
-                        <thead>
-                          <tr class="text-title text-center h6">
-                                <th>Id</th>
-                                <th>Matricula</th>
-                                <th>Alumno</th>
-                                <th>Estado Guardado</th>
-                                <th>Estado Actual</th>
-                                <th>Fecha</th>
-                                <th>Hora</th>
-                                <th>Tema(s)</th>
-                                <th>¿Asistió?</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for tutoria in object_list %}
-                            <tr data-alumno="{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }} ">
-                                <td class="text-body" >{{tutoria.pk}}</td>
-                                <td class="text-body text-center" >{{tutoria.alumno.matricula}}</td>
-                                <td class="text-body " >{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}</td>
-                                <td class="text-body" >{{ tutoria.get_estado_alumno_historico_display }}</td>
-                                <td class="text-body" >{{ tutoria.alumno.get_estado_display }}</td>
-                                <td class="text-body" >{{ tutoria.fecha|date }}</td>
-                                <td class="text-body" >{{ tutoria.fecha|date:"h:m" }}</td>
-                                <td class="text-body" >{{ tutoria.get_tema_display|join:", " }}</td>
-                                <td class="text-body text-center" >
-                                  {% if tutoria.asistencia %}Sí{% else %} No {% endif %}
-                                  {% comment %} {{ tutoria.asistencia}} {% endcomment %}
-                                </td>                             
-                            </tr>
-                          
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            
+              <!--Inicio de table-->
+              <div class="table-responsive">
+                <table class="table table-striped table-hover datatable">
+                  <thead>
+                    <tr class="text-title text-center h6">
+                      <th>Id</th>
+                      <th>Matrícula</th>
+                      <th>Alumno</th>
+                      <th>Estado guardado</th>
+                      <th>Estado actual</th>
+                      <th>Fecha</th>
+                      <th>Hora</th>
+                      <th>Tema(s)</th>
+                      <th>¿Asistió?</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for tutoria in object_list %}
+                      <tr data-alumno="{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }} ">
+                        <td class="text-body">{{ tutoria.pk }}</td>
+                        <td class="text-body text-center">{{ tutoria.alumno.matricula }}</td>
+                        <td class="text-body">{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}</td>
+                        <td class="text-body">{{ tutoria.get_estado_alumno_historico_display }}</td>
+                        <td class="text-body">{{ tutoria.alumno.get_estado_display }}</td>
+                        <td class="text-body">{{ tutoria.fecha|date }}</td>
+                        <td class="text-body">{{ tutoria.fecha|date:"h:m" }}</td>
+                        <td class="text-body">{{ tutoria.get_tema_display|join:", " }}</td>
+                        <td class="text-body text-center">
+                          {% if tutoria.asistencia %}Sí{% else %} No {% endif %}
+                          {% comment %} {{ tutoria.asistencia}} {% endcomment %}
+                        </td>
+                      </tr>
+
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+
               <!--Fin de table-->
             </div>
           </div>
@@ -90,4 +91,3 @@
     </div>
   </section>
 {% endblock %}
-

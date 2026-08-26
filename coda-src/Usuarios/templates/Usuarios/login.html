@@ -6,7 +6,7 @@
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Inicio Sesión</title>
+    <title>Inicio de sesión</title>
     <link rel="icon"
           href="{% static 'Alumnos/img/icon.png' %}"
           sizes="32x32"
@@ -76,7 +76,8 @@
               <div class="card" style="border-radius: 1rem;">
                 <div class="row g-0">
                   <div class="col-md-6 col-lg-6 d-none d-md-block">
-                    <img src="https://pbs.twimg.com/media/C2QpZS1VEAATflv?format=jpg&name=4096x4096"
+                    <img src="{% static 'img/uamc_entrada.jpeg' %}"
+                         alt="Entrada de la UAM Cuajimalpa"
                          class="img-fluid w-100 h-100"
                          style="border-radius: 1rem 0 0 1rem" />
                   </div>
@@ -104,7 +105,7 @@
                           </div>
                         {% endif %}
 
-                        <h1 class="fw-normal mb-3 pb-3 text-title h-1">Bienvenido</h1>
+                        <h1 class="fw-normal mb-3 pb-3 text-title h-1">Sistema de tutorías de la DCNI</h1>
 
                         <div class="form-outline mb-4 text-body">
                           {% render_field form.username id="form2Example17" class="form-control form-control-lg" %}

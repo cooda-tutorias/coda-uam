@@ -1,65 +1,65 @@
-{% extends "Usuarios/HeaderAndFooterFachada.html"%}
+{% extends "Usuarios/HeaderAndFooterFachada.html" %}
 
-{% block title %} Lista de tutorados {% endblock %}
-
+{% block title %}Lista de tutorados{% endblock %}
 
 {% block body %}
-<section  id="section"  style="background-color: #eee;">
-  <div class="container py-5 h-100">
+  <section id="section"  style="background-color: #eee;">
+    <div class="container py-5 h-100">
       <div class="row d-flex justify-content-center align-items-center h-100">
-          <div class="col-lg-8 col-xl-10">
-              <div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
-                  <div class="card-body p-4">
-                      <div class="d-flex w-100 justify-content-start align-items-center mb-2 text-title">
-                        <h3 class="text-title-bold text-primary me-2">Tutorados de</h3>
-                        <h4 class="text-title ms-2">
-                          {% if tutor.sexo == 'F' %}
-                            Dra.
-                          {% else %}
-                            Dr.
-                          {% endif %}
-                          {{ tutor.first_name }} {{ tutor.last_name }} 
-                          {% if tutor.second_last_name %}
-                            {{ tutor.second_last_name }}
-                          {% endif %}
-                        </h4>
-                      </div>
-                      <!--Inicio de table-->
-                      <div class = "table-responsive text-body">
-                        <table class="table table-striped table-hover datatable">
-                          <thead>
-                            <tr>
-                              <th>Matrícula</th>
-                              <th>Nombre</th>
-                              <th>Correo</th>
-                              <th>Correo personal</th>
-                              <th>Carrera</th>
-                              <th>Estado</th>
-                              <th>Trimestre de Ingreso</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {% for alumno in object_list %}
-                            <tr>
-                              <td>{{ alumno.matricula }} </td>
-                              <td>{{ alumno.first_name }} {{ alumno.last_name }} {{ alumno.second_last_name }}</td>
-                              <td>{{ alumno.email}} </td>
-                              <td>{{ alumno.correo_personal|default_if_none:"No registrado" }}</td>
-                              <td>{{ alumno.get_carrera_display }}</td>
-                              <td>{{ alumno.get_estado_display }}</td>
-                              <td>{{ alumno.trimestre_ingreso }}</td>
-                              
-                            </tr>
-                            {% endfor %}
-                          </tbody>
-                        </table>
-                      </div>
-                      <!--Fin de table-->
-                  </div>
+        <div class="col-lg-8 col-xl-10">
+          <div class="card border-top border-bottom border-4"
+               style="border-color: #F08200 !important">
+            <div class="card-body p-4">
+              <div class="d-flex w-100 justify-content-start align-items-center mb-2 text-title">
+                <h3 class="text-title-bold text-primary me-2">Tutorados de</h3>
+                <h4 class="text-title ms-2">
+                  {% if tutor.sexo == 'F' %}
+                    Dra.
+                  {% else %}
+                    Dr.
+                  {% endif %}
+                  {{ tutor.first_name }} {{ tutor.last_name }}
+                  {% if tutor.second_last_name %}
+                    {{ tutor.second_last_name }}
+                  {% endif %}
+                </h4>
               </div>
+              <!--Inicio de table-->
+              <div class="table-responsive text-body">
+                <table class="table table-striped table-hover datatable">
+                  <thead>
+                    <tr>
+                      <th>Matrícula</th>
+                      <th>Nombre</th>
+                      <th>Correo</th>
+                      <th>Correo personal</th>
+                      <th>Licenciatura</th>
+                      <th>Estado</th>
+                      <th>Trimestre ingreso</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for alumno in object_list %}
+                      <tr>
+                        <td>{{ alumno.matricula }}</td>
+                        <td>{{ alumno.first_name }} {{ alumno.last_name }} {{ alumno.second_last_name }}</td>
+                        <td>{{ alumno.email }}</td>
+                        <td>{{ alumno.correo_personal|default_if_none:"No registrado" }}</td>
+                        <td>{{ alumno.get_carrera_display }}</td>
+                        <td>{{ alumno.get_estado_display }}</td>
+                        <td>{{ alumno.trimestre_ingreso }}</td>
+
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              <!--Fin de table-->
+            </div>
           </div>
+        </div>
       </div>
-  </div>
-</section>
+    </div>
+  </section>
 
 {% endblock %}

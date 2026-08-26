@@ -2,403 +2,555 @@
 {% load widget_tweaks %}
 
 {% with titulo_reporte="Reporte de Tutoría" %}
-{% block title %}{{ titulo_reporte }}{% endblock %}
+  {% block title %}{{ titulo_reporte }}{% endblock %}
 
-{% block body %}
-<section id="section" class="seguimiento-page py-3 py-md-4">
-    <button type="button" id="floating-back-btn" class="floating-back-btn" aria-label="Volver a la página anterior" title="Volver">
+  {% block body %}
+    <section id="section" class="seguimiento-page py-3 py-md-4">
+      <button type="button"
+              id="floating-back-btn"
+              class="floating-back-btn"
+              aria-label="Volver a la página anterior"
+              title="Volver">
         <span aria-hidden="true" class="floating-back-icon">←</span>
         <span class="floating-back-label">Atrás</span>
-    </button>
+      </button>
 
-    <div class="container-fluid px-2 px-md-4 px-xl-5">
+      <div class="container-fluid px-2 px-md-4 px-xl-5">
         <div class="row g-3 g-xl-4 align-items-start">
-            <div class="col-12 col-xl-4 order-1">
-                <div class="card border-0 shadow-sm mb-3">
-                    <div class="card-body p-3 p-md-4">
-                        <h4 class="text-title-bold mb-3">Ficha del alumno</h4>
-                        <dl class="row mb-0 small student-info-list">
-                            <dt class="col-5 text-muted">Nombre</dt>
-                            <dd class="col-7 mb-2">{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}</dd>
+          <div class="col-12 col-xl-4 order-1">
+            <div class="card border-0 shadow-sm mb-3">
+              <div class="card-body p-3 p-md-4">
+                <h4 class="text-title-bold mb-3">Ficha del alumno</h4>
+                <dl class="row mb-0 small student-info-list">
+                  <dt class="col-5 text-muted">Nombre</dt>
+                  <dd class="col-7 mb-2">
+                    {{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}
+                  </dd>
 
-                            <dt class="col-5 text-muted">Matrícula</dt>
-                            <dd class="col-7 mb-2">{{ tutoria.alumno.matricula }}</dd>
+                  <dt class="col-5 text-muted">Matrícula</dt>
+                  <dd class="col-7 mb-2">
+                    {{ tutoria.alumno.matricula }}
+                  </dd>
 
-                            <dt class="col-5 text-muted">Correo</dt>
-                            <dd class="col-7 mb-2 text-break student-email">{{ tutoria.alumno.email }}</dd>
+                  <dt class="col-5 text-muted">Correo</dt>
+                  <dd class="col-7 mb-2 text-break student-email">
+                    {{ tutoria.alumno.email }}
+                  </dd>
 
-                            <dt class="col-5 text-muted">Carrera</dt>
-                            <dd class="col-7 mb-2">{{ tutoria.alumno.get_carrera_display }}</dd>
+                  <dt class="col-5 text-muted">Licenciatura</dt>
+                  <dd class="col-7 mb-2">
+                    {{ tutoria.alumno.get_carrera_display }}
+                  </dd>
 
-                            <dt class="col-5 text-muted">Ingreso</dt>
-                            <dd class="col-7 mb-0">{{ tutoria.alumno.trimestre_ingreso|default:"Sin registro" }}</dd>
-                        </dl>
-                    </div>
-                </div>
-
-                <div class="card border-0 shadow-sm mb-3">
-                    <div class="card-body p-3 p-md-4">
-                        <h5 class="text-title-bold mb-3">Métricas rápidas</h5>
-                        <div class="row g-2">
-                            <div class="col-6">
-                                <div class="metric-box">
-                                    <p class="metric-label">Tutorías</p>
-                                    <p class="metric-value">{{ total_tutorias_alumno }}</p>
-                                </div>
-                            </div>
-                            <div class="col-6">
-                                <div class="metric-box">
-                                    <p class="metric-label">Asistidas</p>
-                                    <p class="metric-value">{{ total_tutorias_asistidas }}</p>
-                                </div>
-                            </div>
-                            <div class="col-12">
-                                <div class="metric-box">
-                                    <p class="metric-label">Promedio de impacto últimas 5</p>
-                                    <p class="metric-value">
-                                        {% if promedio_impacto %}
-                                            {{ promedio_impacto }}/5
-                                        {% else %}
-                                            Sin datos
-                                        {% endif %}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="card border-0 shadow-sm">
-                    <div class="card-body p-3 p-md-4">
-                        <h5 class="text-title-bold mb-3">Estado del alumno</h5>
-                        <div class="alert alert-info mb-0" role="alert">
-                            <p class="mb-2"><strong>Estado guardado:</strong> {{ tutoria.get_estado_alumno_historico_display }}</p>
-                            <p class="mb-0"><strong>Estado actual:</strong> {{ tutoria.alumno.get_estado_display }}</p>
-                        </div>
-                    </div>
-                </div>
+                  <dt class="col-5 text-muted">Ingreso</dt>
+                  <dd class="col-7 mb-0">
+                    {{ tutoria.alumno.trimestre_ingreso|default:"Sin registro" }}
+                  </dd>
+                </dl>
+              </div>
             </div>
 
-            <div class="col-12 col-xl-8 order-2">
-                <div class="card border-top border-bottom border-4 shadow-sm" style="border-color: #f08200 !important;">
-                    <div class="card-body p-3 p-md-4 p-xl-5 text-body">
-                        <div class="reporte-header mb-3">
-                            <div class="d-flex justify-content-between align-items-center gap-2 mb-2 flex-wrap">
-                                <h3 class="text-primary text-title-bold mb-0">{{ titulo_reporte }}</h3>
-                                <a href="{% url 'Tutorias-historial' %}" class="btn btn-outline-secondary btn-sm" id="header-back-link">Regresar</a>
-                            </div>
-                            <div class="reporte-header-meta">
-                                <p class="reporte-header-meta-title mb-2">Datos de la tutoría</p>
-                                <div class="reporte-header-meta-row">
-                                    <span class="reporte-header-meta-label">Fecha y hora programada en tutoría</span>
-                                    <span class="reporte-header-meta-value">{{ tutoria.fecha|date:'l d/m/Y H:i' }}</span>
-                                </div>
-                                <div class="reporte-header-meta-row">
-                                    <span class="reporte-header-meta-label">Tema(s) de la tutoría</span>
-                                    <span class="reporte-header-meta-value">{{ tutoria.get_tema_display|join:', ' }}</span>
-                                </div>
-                                <div class="reporte-header-meta-row">
-                                    <span class="reporte-header-meta-label">Estado de la tutoría</span>
-                                    <span class="reporte-header-meta-value">{{ tutoria.get_estado_display }}</span>
-                                </div>
-                                <div class="reporte-header-meta-row">
-                                    <span class="reporte-header-meta-label">Descripción inicial</span>
-                                    <span class="reporte-header-meta-value">{{ tutoria.descripcion|default:'Sin descripción registrada' }}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="accordion mb-4" id="historialAlumnoAccordion">
-                            <div class="accordion-item">
-                                <h2 class="accordion-header" id="headingTemaResumen">
-                                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTemaResumen" aria-expanded="true" aria-controls="collapseTemaResumen">
-                                        Resumen por tema de solicitudes
-                                    </button>
-                                </h2>
-                                <div id="collapseTemaResumen" class="accordion-collapse collapse show" aria-labelledby="headingTemaResumen" data-bs-parent="#historialAlumnoAccordion">
-                                    <div class="accordion-body">
-                                        {% if resumen_temas %}
-                                            <div class="d-flex flex-wrap gap-2">
-                                                {% for tema in resumen_temas %}
-                                                    <span class="badge rounded-pill tema-badge">{{ tema.etiqueta }}: {{ tema.total }}</span>
-                                                {% endfor %}
-                                            </div>
-                                        {% else %}
-                                            <p class="mb-0 text-muted">No hay temas registrados para este alumno.</p>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="accordion-item">
-                                <h2 class="accordion-header" id="headingTutoriasRecientes">
-                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseTutoriasRecientes" aria-expanded="false" aria-controls="collapseTutoriasRecientes">
-                                        Últimas tutorías del alumno
-                                    </button>
-                                </h2>
-                                <div id="collapseTutoriasRecientes" class="accordion-collapse collapse" aria-labelledby="headingTutoriasRecientes" data-bs-parent="#historialAlumnoAccordion">
-                                    <div class="accordion-body p-0">
-                                        {% if tutorias_recientes %}
-                                            <div class="table-responsive">
-                                                <table class="table table-sm table-hover mb-0 align-middle">
-                                                    <thead>
-                                                        <tr>
-                                                            <th>Fecha</th>
-                                                            <th>Tema</th>
-                                                            <th>Estado</th>
-                                                            <th>Asistencia</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {% for item in tutorias_recientes %}
-                                                            <tr>
-                                                                <td>{{ item.fecha|date:'d/m/Y' }}</td>
-                                                                <td>{{ item.get_tema_display|join:', ' }}</td>
-                                                                <td>{{ item.get_estado_display }}</td>
-                                                                <td>
-                                                                    {% if item.asistencia == True %}
-                                                                        Sí
-                                                                    {% elif item.asistencia == False %}
-                                                                        No
-                                                                    {% else %}
-                                                                        Sin dato
-                                                                    {% endif %}
-                                                                </td>
-                                                            </tr>
-                                                        {% endfor %}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        {% else %}
-                                            <p class="p-3 mb-0 text-muted">No hay tutorías previas para mostrar.</p>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="accordion-item">
-                                <h2 class="accordion-header" id="headingAsesorias">
-                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAsesorias" aria-expanded="false" aria-controls="collapseAsesorias">
-                                        Asesorías registradas
-                                    </button>
-                                </h2>
-                                <div id="collapseAsesorias" class="accordion-collapse collapse" aria-labelledby="headingAsesorias" data-bs-parent="#historialAlumnoAccordion">
-                                    <div class="accordion-body">
-                                        {% if asesorias_recientes %}
-                                            <ul class="list-group list-group-flush">
-                                                {% for asesoria in asesorias_recientes %}
-                                                    <li class="list-group-item px-0">
-                                                        <p class="mb-1"><strong>{{ asesoria.tema }}</strong></p>
-                                                        <p class="mb-0 small text-muted">{{ asesoria.fecha|date:'d/m/Y H:i' }} | {{ asesoria.tutor.first_name }} {{ asesoria.tutor.last_name }}</p>
-                                                    </li>
-                                                {% endfor %}
-                                            </ul>
-                                        {% else %}
-                                            <p class="mb-0 text-muted">No hay asesorías registradas.</p>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="accordion-item">
-                                <h2 class="accordion-header" id="headingBecas">
-                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseBecas" aria-expanded="false" aria-controls="collapseBecas">
-                                        Becas registradas en tutorías
-                                    </button>
-                                </h2>
-                                <div id="collapseBecas" class="accordion-collapse collapse" aria-labelledby="headingBecas" data-bs-parent="#historialAlumnoAccordion">
-                                    <div class="accordion-body">
-                                        {% if becas_registradas %}
-                                            <ul class="list-group list-group-flush">
-                                                {% for beca in becas_registradas %}
-                                                    <li class="list-group-item px-0">
-                                                        <p class="mb-1"><strong>{{ beca.beca_otorgada }}</strong></p>
-                                                        <p class="mb-0 small text-muted">{{ beca.fecha|date:'d/m/Y H:i' }} | {{ beca.get_estado_display }}</p>
-                                                    </li>
-                                                {% endfor %}
-                                            </ul>
-                                        {% else %}
-                                            <p class="mb-0 text-muted">No hay becas registradas en tutorías previas.</p>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="accordion-item">
-                                <h2 class="accordion-header" id="headingCambios">
-                                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCambios" aria-expanded="false" aria-controls="collapseCambios">
-                                        Auditoría de cambios de esta tutoría
-                                    </button>
-                                </h2>
-                                <div id="collapseCambios" class="accordion-collapse collapse" aria-labelledby="headingCambios" data-bs-parent="#historialAlumnoAccordion">
-                                    <div class="accordion-body">
-                                        {% if historial_cambios_actual %}
-                                            <ul class="list-group list-group-flush">
-                                                {% for cambio in historial_cambios_actual %}
-                                                    <li class="list-group-item px-0">
-                                                        <p class="mb-1">{{ cambio.cambios_realizados }}</p>
-                                                        <p class="mb-0 small text-muted">{{ cambio.fecha_cambio|date:'d/m/Y H:i' }} | {{ cambio.correo_editor }}</p>
-                                                    </li>
-                                                {% endfor %}
-                                            </ul>
-                                        {% else %}
-                                            <p class="mb-0 text-muted">No hay cambios registrados para esta tutoría.</p>
-                                        {% endif %}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <form method="POST" action="{% url 'save_seguimiento' tutoria.pk %}" id="seguimiento-form" novalidate>
-                            {% csrf_token %}
-                            <input type="hidden" name="edit_confirmed" id="edit-confirmed" value="false">
-
-                            <div class="row g-3 mb-3">
-                                <div class="col-12 col-md-6">
-                                    <label class="form-label">Alumno</label>
-                                    <input type="text" class="form-control" value="{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}" readonly>
-                                </div>
-                                <div class="col-12 col-md-6">
-                                    <label class="form-label">Temas</label>
-                                    <input type="text" class="form-control" value="{{ tutoria.get_tema_display|join:', ' }}" readonly>
-                                </div>
-                                <div class="col-12 col-md-6">
-                                    <label class="form-label" for="id_estado_alumno_actual">Estado actual del alumno</label>
-                                    {% render_field form.estado_alumno_actual class="form-select" %}
-                                </div>
-                            </div>
-
-                            <fieldset class="mb-3 section-box">
-                                <legend class="form-label mb-2">¿El alumno asistió a la tutoría?</legend>
-                                <div class="d-flex flex-wrap gap-3">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="asistencia" id="asistencia-si" value="True" {% if tutoria.asistencia != False %}checked{% endif %}>
-                                        <label class="form-check-label" for="asistencia-si">Sí</label>
-                                    </div>
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="radio" name="asistencia" id="asistencia-no" value="False" {% if tutoria.asistencia == False %}checked{% endif %}>
-                                        <label class="form-check-label" for="asistencia-no">No</label>
-                                    </div>
-                                </div>
-                            </fieldset>
-
-                            <div id="extra-fields">
-                                <div class="mb-3 section-box">
-                                    <label class="form-label" for="id_duracion">Duración de la tutoría</label>
-                                    {% render_field form.duracion class="form-select" %}
-                                </div>
-
-                                <fieldset class="mb-3 section-box">
-                                    <legend class="form-label mb-2">¿Se firmó algún formato de solicitud de beca?</legend>
-                                    <div class="d-flex flex-wrap gap-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="radio" name="firma_documentos_beca" id="firma-beca-si" value="True" {% if tutoria.firma_documentos_beca == True %}checked{% endif %} required>
-                                            <label class="form-check-label" for="firma-beca-si">Sí</label>
-                                        </div>
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="radio" name="firma_documentos_beca" id="firma-beca-no" value="False" {% if tutoria.firma_documentos_beca == False %}checked{% endif %} required>
-                                            <label class="form-check-label" for="firma-beca-no">No</label>
-                                        </div>
-                                    </div>
-                                </fieldset>
-
-                                <div class="mb-3 section-box" id="beca-field">
-                                    <label class="form-label" for="beca-otorgada-input">Nombre de la beca otorgada al alumno</label>
-                                    <input type="text" id="beca-otorgada-input" name="beca_otorgada" class="form-control" maxlength="255" value="{{ tutoria.beca_otorgada|default_if_none:'' }}">
-                                </div>
-
-                                <fieldset class="mb-3 section-box">
-                                    <legend class="form-label mb-2">¿Requirió asesoría especializada?</legend>
-                                    <div class="d-flex flex-wrap gap-3">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="radio" name="asesoria_especializada" id="asesoria-si" value="True" {% if tutoria.asesoria_especializada == True %}checked{% endif %} required>
-                                            <label class="form-check-label" for="asesoria-si">Sí</label>
-                                        </div>
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="radio" name="asesoria_especializada" id="asesoria-no" value="False" {% if tutoria.asesoria_especializada == False %}checked{% endif %} required>
-                                            <label class="form-check-label" for="asesoria-no">No</label>
-                                        </div>
-                                    </div>
-                                </fieldset>
-
-                                <div class="mb-3 section-box" id="aspectos-field">
-                                    <label class="form-label" for="observaciones-input">Aspectos tratados, acuerdos o canalizaciones</label>
-                                    <textarea id="observaciones-input" name="observaciones" class="form-control" maxlength="1000" rows="4">{{ tutoria.observaciones|default_if_none:'' }}</textarea>
-                                </div>
-
-                                <fieldset class="mb-3 section-box">
-                                    <legend class="form-label mb-2">Nivel de impacto en desempeño académico (1-5)</legend>
-                                    <div class="row row-cols-2 row-cols-sm-3 row-cols-md-5 g-2">
-                                        <div class="col">
-                                            <div class="impact-option">
-                                                <input class="form-check-input" type="radio" name="impacto_tutoria" value="1" id="impacto-1" {% if tutoria.impacto_tutoria == 1 %}checked{% endif %} required>
-                                                <label for="impacto-1">1</label>
-                                            </div>
-                                        </div>
-                                        <div class="col">
-                                            <div class="impact-option">
-                                                <input class="form-check-input" type="radio" name="impacto_tutoria" value="2" id="impacto-2" {% if tutoria.impacto_tutoria == 2 %}checked{% endif %} required>
-                                                <label for="impacto-2">2</label>
-                                            </div>
-                                        </div>
-                                        <div class="col">
-                                            <div class="impact-option">
-                                                <input class="form-check-input" type="radio" name="impacto_tutoria" value="3" id="impacto-3" {% if tutoria.impacto_tutoria == 3 %}checked{% endif %} required>
-                                                <label for="impacto-3">3</label>
-                                            </div>
-                                        </div>
-                                        <div class="col">
-                                            <div class="impact-option">
-                                                <input class="form-check-input" type="radio" name="impacto_tutoria" value="4" id="impacto-4" {% if tutoria.impacto_tutoria == 4 %}checked{% endif %} required>
-                                                <label for="impacto-4">4</label>
-                                            </div>
-                                        </div>
-                                        <div class="col">
-                                            <div class="impact-option">
-                                                <input class="form-check-input" type="radio" name="impacto_tutoria" value="5" id="impacto-5" {% if tutoria.impacto_tutoria == 5 %}checked{% endif %} required>
-                                                <label for="impacto-5">5</label>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </fieldset>
-
-                                <div class="mb-3 section-box">
-                                    <label class="form-label" for="resultados-input">Resultados de la tutoría</label>
-                                    <textarea id="resultados-input" name="resultados_tutoria" class="form-control" maxlength="1000" rows="4">{{ tutoria.resultados_tutoria|default_if_none:'' }}</textarea>
-                                </div>
-                            </div>
-
-                        </form>
-
-                        <div class="action-buttons pt-3" id="action-buttons">
-                            <button type="submit" form="seguimiento-form" class="btn btn-primary action-btn" id="guardar-btn" data-seguimiento-completado="{% if seguimiento_completado %}true{% else %}false{% endif %}">{% if seguimiento_completado %}Editar reporte{% else %}Guardar Reporte{% endif %}</button>
-
-                            <div id="cancel-form-wrapper">
-                                <form method="post" action="{% url 'cancelar-tutoria' tutoria.pk %}" id="cancelar-form" class="m-0">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-danger action-btn" id="cancel-btn" disabled>Cancelar tutoría</button>
-                                </form>
-                            </div>
-                        </div>
+            <div class="card border-0 shadow-sm mb-3">
+              <div class="card-body p-3 p-md-4">
+                <h5 class="text-title-bold mb-3">Métricas rápidas</h5>
+                <div class="row g-2">
+                  <div class="col-6">
+                    <div class="metric-box">
+                      <p class="metric-label">Tutorías</p>
+                      <p class="metric-value">{{ total_tutorias_alumno }}</p>
                     </div>
+                  </div>
+                  <div class="col-6">
+                    <div class="metric-box">
+                      <p class="metric-label">Asistidas</p>
+                      <p class="metric-value">{{ total_tutorias_asistidas }}</p>
+                    </div>
+                  </div>
+                  <div class="col-12">
+                    <div class="metric-box">
+                      <p class="metric-label">Promedio de impacto últimas 5</p>
+                      <p class="metric-value">
+                        {% if promedio_impacto %}
+                          {{ promedio_impacto }}/5
+                        {% else %}
+                          Sin datos
+                        {% endif %}
+                      </p>
+                    </div>
+                  </div>
                 </div>
+              </div>
             </div>
+
+            <div class="card border-0 shadow-sm">
+              <div class="card-body p-3 p-md-4">
+                <h5 class="text-title-bold mb-3">Estado del alumno</h5>
+                <div class="alert alert-info mb-0" role="alert">
+                  <p class="mb-2"><strong>Estado guardado:</strong> {{ tutoria.get_estado_alumno_historico_display }}</p>
+                  <p class="mb-0"><strong>Estado actual:</strong> {{ tutoria.alumno.get_estado_display }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-12 col-xl-8 order-2">
+            <div class="card border-top border-bottom border-4 shadow-sm"
+                 style="border-color: #f08200 !important">
+              <div class="card-body p-3 p-md-4 p-xl-5 text-body">
+                <div class="reporte-header mb-3">
+                  <div class="d-flex justify-content-between align-items-center gap-2 mb-2 flex-wrap">
+                    <h3 class="text-primary text-title-bold mb-0">{{ titulo_reporte }}</h3>
+                    <a href="{% url 'Tutorias-historial' %}"
+                       class="btn btn-outline-secondary btn-sm"
+                       id="header-back-link">Regresar</a>
+                  </div>
+                  <div class="reporte-header-meta">
+                    <p class="reporte-header-meta-title mb-2">Datos de la tutoría</p>
+                    <div class="reporte-header-meta-row">
+                      <span class="reporte-header-meta-label">Fecha y hora programada en tutoría</span>
+                      <span class="reporte-header-meta-value">{{ tutoria.fecha|date:'l d/m/Y H:i' }}</span>
+                    </div>
+                    <div class="reporte-header-meta-row">
+                      <span class="reporte-header-meta-label">Tema(s) de la tutoría</span>
+                      <span class="reporte-header-meta-value">{{ tutoria.get_tema_display|join:', ' }}</span>
+                    </div>
+                    <div class="reporte-header-meta-row">
+                      <span class="reporte-header-meta-label">Estado de la tutoría</span>
+                      <span class="reporte-header-meta-value">{{ tutoria.get_estado_display }}</span>
+                    </div>
+                    <div class="reporte-header-meta-row">
+                      <span class="reporte-header-meta-label">Descripción inicial</span>
+                      <span class="reporte-header-meta-value">{{ tutoria.descripcion|default:'Sin descripción registrada' }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="accordion mb-4" id="historialAlumnoAccordion">
+                  <div class="accordion-item">
+                    <h2 class="accordion-header" id="headingTemaResumen">
+                      <button class="accordion-button"
+                              type="button"
+                              data-bs-toggle="collapse"
+                              data-bs-target="#collapseTemaResumen"
+                              aria-expanded="true"
+                              aria-controls="collapseTemaResumen">Resumen por tema de solicitudes</button>
+                    </h2>
+                    <div id="collapseTemaResumen"
+                         class="accordion-collapse collapse show"
+                         aria-labelledby="headingTemaResumen"
+                         data-bs-parent="#historialAlumnoAccordion">
+                      <div class="accordion-body">
+                        {% if resumen_temas %}
+                          <div class="d-flex flex-wrap gap-2">
+                            {% for tema in resumen_temas %}
+                              <span class="badge rounded-pill tema-badge">{{ tema.etiqueta }}: {{ tema.total }}</span>
+                            {% endfor %}
+                          </div>
+                        {% else %}
+                          <p class="mb-0 text-muted">No hay temas registrados para este alumno.</p>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="accordion-item">
+                    <h2 class="accordion-header" id="headingTutoriasRecientes">
+                      <button class="accordion-button collapsed"
+                              type="button"
+                              data-bs-toggle="collapse"
+                              data-bs-target="#collapseTutoriasRecientes"
+                              aria-expanded="false"
+                              aria-controls="collapseTutoriasRecientes">Últimas tutorías del alumno</button>
+                    </h2>
+                    <div id="collapseTutoriasRecientes"
+                         class="accordion-collapse collapse"
+                         aria-labelledby="headingTutoriasRecientes"
+                         data-bs-parent="#historialAlumnoAccordion">
+                      <div class="accordion-body p-0">
+                        {% if tutorias_recientes %}
+                          <div class="table-responsive">
+                            <table class="table table-sm table-hover mb-0 align-middle">
+                              <thead>
+                                <tr>
+                                  <th>Fecha</th>
+                                  <th>Tema</th>
+                                  <th>Estado</th>
+                                  <th>Asistencia</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {% for item in tutorias_recientes %}
+                                  <tr>
+                                    <td>{{ item.fecha|date:'d/m/Y' }}</td>
+                                    <td>{{ item.get_tema_display|join:', ' }}</td>
+                                    <td>{{ item.get_estado_display }}</td>
+                                    <td>
+                                      {% if item.asistencia == True %}
+                                        Sí
+                                      {% elif item.asistencia == False %}
+                                        No
+                                      {% else %}
+                                        Sin dato
+                                      {% endif %}
+                                    </td>
+                                  </tr>
+                                {% endfor %}
+                              </tbody>
+                            </table>
+                          </div>
+                        {% else %}
+                          <p class="p-3 mb-0 text-muted">No hay tutorías previas para mostrar.</p>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="accordion-item">
+                    <h2 class="accordion-header" id="headingAsesorias">
+                      <button class="accordion-button collapsed"
+                              type="button"
+                              data-bs-toggle="collapse"
+                              data-bs-target="#collapseAsesorias"
+                              aria-expanded="false"
+                              aria-controls="collapseAsesorias">Asesorías registradas</button>
+                    </h2>
+                    <div id="collapseAsesorias"
+                         class="accordion-collapse collapse"
+                         aria-labelledby="headingAsesorias"
+                         data-bs-parent="#historialAlumnoAccordion">
+                      <div class="accordion-body">
+                        {% if asesorias_recientes %}
+                          <ul class="list-group list-group-flush">
+                            {% for asesoria in asesorias_recientes %}
+                              <li class="list-group-item px-0">
+                                <p class="mb-1"><strong>{{ asesoria.tema }}</strong></p>
+                                <p class="mb-0 small text-muted">{{ asesoria.fecha|date:'d/m/Y H:i' }} | {{ asesoria.tutor.first_name }} {{ asesoria.tutor.last_name }}</p>
+                              </li>
+                            {% endfor %}
+                          </ul>
+                        {% else %}
+                          <p class="mb-0 text-muted">No hay asesorías registradas.</p>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="accordion-item">
+                    <h2 class="accordion-header" id="headingBecas">
+                      <button class="accordion-button collapsed"
+                              type="button"
+                              data-bs-toggle="collapse"
+                              data-bs-target="#collapseBecas"
+                              aria-expanded="false"
+                              aria-controls="collapseBecas">Becas registradas en tutorías</button>
+                    </h2>
+                    <div id="collapseBecas"
+                         class="accordion-collapse collapse"
+                         aria-labelledby="headingBecas"
+                         data-bs-parent="#historialAlumnoAccordion">
+                      <div class="accordion-body">
+                        {% if becas_registradas %}
+                          <ul class="list-group list-group-flush">
+                            {% for beca in becas_registradas %}
+                              <li class="list-group-item px-0">
+                                <p class="mb-1"><strong>{{ beca.beca_otorgada }}</strong></p>
+                                <p class="mb-0 small text-muted">{{ beca.fecha|date:'d/m/Y H:i' }} | {{ beca.get_estado_display }}</p>
+                              </li>
+                            {% endfor %}
+                          </ul>
+                        {% else %}
+                          <p class="mb-0 text-muted">No hay becas registradas en tutorías previas.</p>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="accordion-item">
+                    <h2 class="accordion-header" id="headingCambios">
+                      <button class="accordion-button collapsed"
+                              type="button"
+                              data-bs-toggle="collapse"
+                              data-bs-target="#collapseCambios"
+                              aria-expanded="false"
+                              aria-controls="collapseCambios">Auditoría de cambios de esta tutoría</button>
+                    </h2>
+                    <div id="collapseCambios"
+                         class="accordion-collapse collapse"
+                         aria-labelledby="headingCambios"
+                         data-bs-parent="#historialAlumnoAccordion">
+                      <div class="accordion-body">
+                        {% if historial_cambios_actual %}
+                          <ul class="list-group list-group-flush">
+                            {% for cambio in historial_cambios_actual %}
+                              <li class="list-group-item px-0">
+                                <p class="mb-1">{{ cambio.cambios_realizados }}</p>
+                                <p class="mb-0 small text-muted">{{ cambio.fecha_cambio|date:'d/m/Y H:i' }} | {{ cambio.correo_editor }}</p>
+                              </li>
+                            {% endfor %}
+                          </ul>
+                        {% else %}
+                          <p class="mb-0 text-muted">No hay cambios registrados para esta tutoría.</p>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <form method="POST"
+                      action="{% url 'save_seguimiento' tutoria.pk %}"
+                      id="seguimiento-form"
+                      novalidate>
+                  {% csrf_token %}
+                  <input type="hidden" name="edit_confirmed" id="edit-confirmed" value="false">
+
+                  <div class="row g-3 mb-3">
+                    <div class="col-12 col-md-6">
+                      <label class="form-label">Alumno</label>
+                      <input type="text"
+                             class="form-control"
+                             value="{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}"
+                             readonly>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label">Temas</label>
+                      <input type="text"
+                             class="form-control"
+                             value="{{ tutoria.get_tema_display|join:', ' }}"
+                             readonly>
+                    </div>
+                    <div class="col-12 col-md-6">
+                      <label class="form-label" for="id_estado_alumno_actual">Estado actual del alumno</label>
+                      {% render_field form.estado_alumno_actual class="form-select" %}
+                    </div>
+                  </div>
+
+                  <fieldset class="mb-3 section-box">
+                    <legend class="form-label mb-2">¿El alumno asistió a la tutoría?</legend>
+                    <div class="d-flex flex-wrap gap-3">
+                      <div class="form-check">
+                        <input class="form-check-input"
+                               type="radio"
+                               name="asistencia"
+                               id="asistencia-si"
+                               value="True"
+                               {% if tutoria.asistencia != False %}checked{% endif %}>
+                        <label class="form-check-label" for="asistencia-si">Sí</label>
+                      </div>
+                      <div class="form-check">
+                        <input class="form-check-input"
+                               type="radio"
+                               name="asistencia"
+                               id="asistencia-no"
+                               value="False"
+                               {% if tutoria.asistencia == False %}checked{% endif %}>
+                        <label class="form-check-label" for="asistencia-no">No</label>
+                      </div>
+                    </div>
+                  </fieldset>
+
+                  <div id="extra-fields">
+                    <div class="mb-3 section-box">
+                      <label class="form-label" for="id_duracion">Duración de la tutoría</label>
+                      {% render_field form.duracion class="form-select" %}
+                    </div>
+
+                    <fieldset class="mb-3 section-box">
+                      <legend class="form-label mb-2">¿Se firmó algún formato de solicitud de beca?</legend>
+                      <div class="d-flex flex-wrap gap-3">
+                        <div class="form-check">
+                          <input class="form-check-input"
+                                 type="radio"
+                                 name="firma_documentos_beca"
+                                 id="firma-beca-si"
+                                 value="True"
+                                 {% if tutoria.firma_documentos_beca == True %}checked{% endif %}
+                                 required>
+                          <label class="form-check-label" for="firma-beca-si">Sí</label>
+                        </div>
+                        <div class="form-check">
+                          <input class="form-check-input"
+                                 type="radio"
+                                 name="firma_documentos_beca"
+                                 id="firma-beca-no"
+                                 value="False"
+                                 {% if tutoria.firma_documentos_beca == False %}checked{% endif %}
+                                 required>
+                          <label class="form-check-label" for="firma-beca-no">No</label>
+                        </div>
+                      </div>
+                    </fieldset>
+
+                    <div class="mb-3 section-box" id="beca-field">
+                      <label class="form-label" for="beca-otorgada-input">Nombre de la beca otorgada al alumno</label>
+                      <input type="text"
+                             id="beca-otorgada-input"
+                             name="beca_otorgada"
+                             class="form-control"
+                             maxlength="255"
+                             value="{{ tutoria.beca_otorgada|default_if_none:'' }}">
+                    </div>
+
+                    <fieldset class="mb-3 section-box">
+                      <legend class="form-label mb-2">¿Requirió asesoría especializada?</legend>
+                      <div class="d-flex flex-wrap gap-3">
+                        <div class="form-check">
+                          <input class="form-check-input"
+                                 type="radio"
+                                 name="asesoria_especializada"
+                                 id="asesoria-si"
+                                 value="True"
+                                 {% if tutoria.asesoria_especializada == True %}checked{% endif %}
+                                 required>
+                          <label class="form-check-label" for="asesoria-si">Sí</label>
+                        </div>
+                        <div class="form-check">
+                          <input class="form-check-input"
+                                 type="radio"
+                                 name="asesoria_especializada"
+                                 id="asesoria-no"
+                                 value="False"
+                                 {% if tutoria.asesoria_especializada == False %}checked{% endif %}
+                                 required>
+                          <label class="form-check-label" for="asesoria-no">No</label>
+                        </div>
+                      </div>
+                    </fieldset>
+
+                    <div class="mb-3 section-box" id="aspectos-field">
+                      <label class="form-label" for="observaciones-input">Aspectos tratados, acuerdos o canalizaciones</label>
+                      <textarea id="observaciones-input"
+                                name="observaciones"
+                                class="form-control"
+                                maxlength="1000"
+                                rows="4">{{ tutoria.observaciones|default_if_none:'' }}</textarea>
+                    </div>
+
+                    <fieldset class="mb-3 section-box">
+                      <legend class="form-label mb-2">Nivel de impacto en desempeño académico (1-5)</legend>
+                      <div class="row row-cols-2 row-cols-sm-3 row-cols-md-5 g-2">
+                        <div class="col">
+                          <div class="impact-option">
+                            <input class="form-check-input"
+                                   type="radio"
+                                   name="impacto_tutoria"
+                                   value="1"
+                                   id="impacto-1"
+                                   {% if tutoria.impacto_tutoria == 1 %}checked{% endif %}
+                                   required>
+                            <label for="impacto-1">1</label>
+                          </div>
+                        </div>
+                        <div class="col">
+                          <div class="impact-option">
+                            <input class="form-check-input"
+                                   type="radio"
+                                   name="impacto_tutoria"
+                                   value="2"
+                                   id="impacto-2"
+                                   {% if tutoria.impacto_tutoria == 2 %}checked{% endif %}
+                                   required>
+                            <label for="impacto-2">2</label>
+                          </div>
+                        </div>
+                        <div class="col">
+                          <div class="impact-option">
+                            <input class="form-check-input"
+                                   type="radio"
+                                   name="impacto_tutoria"
+                                   value="3"
+                                   id="impacto-3"
+                                   {% if tutoria.impacto_tutoria == 3 %}checked{% endif %}
+                                   required>
+                            <label for="impacto-3">3</label>
+                          </div>
+                        </div>
+                        <div class="col">
+                          <div class="impact-option">
+                            <input class="form-check-input"
+                                   type="radio"
+                                   name="impacto_tutoria"
+                                   value="4"
+                                   id="impacto-4"
+                                   {% if tutoria.impacto_tutoria == 4 %}checked{% endif %}
+                                   required>
+                            <label for="impacto-4">4</label>
+                          </div>
+                        </div>
+                        <div class="col">
+                          <div class="impact-option">
+                            <input class="form-check-input"
+                                   type="radio"
+                                   name="impacto_tutoria"
+                                   value="5"
+                                   id="impacto-5"
+                                   {% if tutoria.impacto_tutoria == 5 %}checked{% endif %}
+                                   required>
+                            <label for="impacto-5">5</label>
+                          </div>
+                        </div>
+                      </div>
+                    </fieldset>
+
+                    <div class="mb-3 section-box">
+                      <label class="form-label" for="resultados-input">Resultados de la tutoría</label>
+                      <textarea id="resultados-input"
+                                name="resultados_tutoria"
+                                class="form-control"
+                                maxlength="1000"
+                                rows="4">{{ tutoria.resultados_tutoria|default_if_none:'' }}</textarea>
+                    </div>
+                  </div>
+
+                </form>
+
+                <div class="action-buttons pt-3" id="action-buttons">
+                  <button type="submit"
+                          form="seguimiento-form"
+                          class="btn btn-primary action-btn"
+                          id="guardar-btn"
+                          data-seguimiento-completado="{% if seguimiento_completado %}true{% else %}false{% endif %}">{% if seguimiento_completado %}Editar reporte{% else %}Guardar Reporte{% endif %}</button>
+
+                  <div id="cancel-form-wrapper">
+                    <form method="post"
+                          action="{% url 'cancelar-tutoria' tutoria.pk %}"
+                          id="cancelar-form"
+                          class="m-0">
+                      {% csrf_token %}
+                      <button type="submit"
+                              class="btn btn-danger action-btn"
+                              id="cancel-btn"
+                              disabled>Cancelar tutoría</button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-    </div>
-</section>
+      </div>
+    </section>
 
-<div id="neutral-confirm-dialog" class="neutral-dialog" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="neutral-dialog-title">
-    <div class="neutral-dialog-panel" role="document">
+    <div id="neutral-confirm-dialog"
+         class="neutral-dialog"
+         aria-hidden="true"
+         role="dialog"
+         aria-modal="true"
+         aria-labelledby="neutral-dialog-title">
+      <div class="neutral-dialog-panel" role="document">
         <h5 id="neutral-dialog-title" class="neutral-dialog-title">Confirmar acción</h5>
         <p id="neutral-dialog-message" class="neutral-dialog-message">¿Deseas continuar?</p>
         <div class="neutral-dialog-actions">
-            <button type="button" id="neutral-dialog-cancel" class="neutral-dialog-btn neutral-dialog-btn-secondary">Cancelar</button>
-            <button type="button" id="neutral-dialog-confirm" class="neutral-dialog-btn neutral-dialog-btn-primary">Confirmar</button>
+          <button type="button"
+                  id="neutral-dialog-cancel"
+                  class="neutral-dialog-btn neutral-dialog-btn-secondary">Cancelar</button>
+          <button type="button"
+                  id="neutral-dialog-confirm"
+                  class="neutral-dialog-btn neutral-dialog-btn-primary">Confirmar</button>
         </div>
+      </div>
     </div>
-</div>
 
-<style>
+    <style>
     body.dialog-open {
         overflow: hidden;
     }
@@ -726,9 +878,9 @@
             padding: 1rem !important;
         }
     }
-</style>
+    </style>
 
-<script>
+    <script>
     document.addEventListener('DOMContentLoaded', function () {
         const asistenciaInputs = document.querySelectorAll("input[name='asistencia']");
         const firmaBecaInputs = document.querySelectorAll("input[name='firma_documentos_beca']");
@@ -1089,7 +1241,7 @@
         }
         toggleAsistencia();
     });
-</script>
+    </script>
 
-{% endblock %}
+  {% endblock %}
 {% endwith %}

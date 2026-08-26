@@ -8,8 +8,12 @@
       <form method="post" action="{% url 'proponer_fechas_tutoria' tutoria.pk %}">
         {% csrf_token %}
         <div class="modal-header">
-          <h5 class="modal-title" id="modalProponerLabel-{{ tutoria.pk }}">Proponer horario alternativo</h5>
-          <button type="button" class="btn-close" data-mdb-dismiss="modal" aria-label="Cerrar"></button>
+          <h5 class="modal-title text-primary"
+              id="modalProponerLabel-{{ tutoria.pk }}">Proponer fechas alternativas</h5>
+          <button type="button"
+                  class="btn-close"
+                  data-mdb-dismiss="modal"
+                  aria-label="Cerrar"></button>
         </div>
         <div class="modal-body">
           <p class="text-muted small">
@@ -26,7 +30,8 @@
                    required>
           </div>
           <div class="mb-3">
-            <label class="form-label fw-bold small text-muted" for="propuesta-2-{{ tutoria.pk }}">
+            <label class="form-label fw-bold small text-muted"
+                   for="propuesta-2-{{ tutoria.pk }}">
               Opción 2 <span class="fw-normal">(opcional)</span>
             </label>
             <input type="datetime-local"
@@ -36,7 +41,9 @@
           </div>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary btn-sm" data-mdb-dismiss="modal">Cancelar</button>
+          <button type="button"
+                  class="btn btn-secondary btn-sm"
+                  data-mdb-dismiss="modal">Cancelar</button>
           <button type="submit" class="btn btn-primary btn-sm">Enviar propuesta</button>
         </div>
       </form>

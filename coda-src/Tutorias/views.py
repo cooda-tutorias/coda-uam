@@ -397,7 +397,7 @@ def generar_pdf(request):
 
     # Encabezado del PDF
     header_style = ParagraphStyle(name='HeaderStyle', fontSize=12)
-    header_text = 'Historial tutorias'
+    header_text = 'Historial de tutorías'
     header_paragraph = Paragraph(header_text, header_style)
     elements.append(header_paragraph)
 
@@ -493,7 +493,7 @@ def generar_archivo_txt(request,pk):
         # Si no se han proporcionado fechas, obtener todas las tutorías del tutor
         tutorias = Tutoria.objects.filter(tutor=tutor)
     
-    contenido = "Tutorias \n"
+    contenido = "Tutorías \n"
     for tutoria in tutorias:
         contenido += f"Alumno: {tutoria.alumno.first_name} {tutoria.alumno.last_name} {tutoria.alumno.second_last_name}\n"
         contenido += f"Tutor: {tutoria.tutor.first_name} {tutoria.tutor.last_name} {tutoria.tutor.second_last_name}\n"
@@ -538,7 +538,7 @@ class AceptarTutoriaView(View):
         tutoria.estado = ACEPTADO
         tutoria.save(update_fields=["estado"])
 
-        messages.success(request, f"Haz aceptado la solicitud de tutoría de {tutoria.alumno.nombre_completo}.")
+        messages.success(request, f"Has aceptado la solicitud de tutoría de {tutoria.alumno.nombre_completo}.")
 
         tutoria_notification_requested.send(
             sender=self.__class__,
@@ -836,35 +836,35 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
             recipient = Tutor.objects.none()
 
         # TODO: ajustar el manejador del canal de correo porque el evento ahora se llama diferente.
-        tutoria_notification_requested.send(
-            sender=self.__class__,
-            event="tutoria_modificada",
-            tutoria=self.object,
-            actor=actor,
-            recipient=recipient,
-            verb="Tutoria Modificada",
-        )
+        # tutoria_notification_requested.send(
+        #     sender=self.__class__,
+        #     event="tutoria_modificada",
+        #     tutoria=self.object,
+        #     actor=actor,
+        #     recipient=recipient,
+        #     verb="Tutoria Modificada",
+        # )
         response = super().form_valid(form)
 
         # TODO: esta llamada ya no es necesaria porque el tutor no puede cambiar la info de
         # la tutoría (temas y descripción).
-        if fecha_changed_by_tutor:
-            tutoria_notification_requested.send(
-                sender=self.__class__,
-                event="cita_programada",
-                tutoria=self.object,
-                actor=actor,
-            )
+        # if fecha_changed_by_tutor:
+        #     tutoria_notification_requested.send(
+        #         sender=self.__class__,
+        #         event="cita_programada",
+        #         tutoria=self.object,
+        #         actor=actor,
+        #     )
 
         # TODO: esta llamada ya no es necesaria porque el tutor no puede cambiar la info de
         # la tutoría (temas y descripción).
-        if estado_changed_by_tutor and estado_notification_event:
-            tutoria_notification_requested.send(
-                sender=self.__class__,
-                event=estado_notification_event,
-                tutoria=self.object,
-                actor=actor,
-            )
+        # if estado_changed_by_tutor and estado_notification_event:
+        #     tutoria_notification_requested.send(
+        #         sender=self.__class__,
+        #         event=estado_notification_event,
+        #         tutoria=self.object,
+        #         actor=actor,
+        #     )
 
         HistorialCambioTutoria.objects.create(
             tutoria=self.object,
@@ -1150,13 +1150,13 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
             texto_boton = "Agendar tutoría"
             alerta_texto = "Estás por agendar una tutoría dentro de los horarios definidos por tu tutor."
             alerta_tipo = "success"
-            subtitulo_modal = "Tu tutor(a) definió horarios de atención. Selecciona un día y un horario disponible."
+            subtitulo_modal = "Tu persona tutora definió horarios de atención. Selecciona un día y un horario disponible."
         else:
             titulo = "Solicitar tutoría"
             texto_boton = "Solicitar tutoría"
             alerta_texto = "Estás por solicitar una tutoría. Debes sugerir una fecha y hora."
             alerta_tipo = "warning"
-            subtitulo_modal = "Tu tutor(a) aún no registra horarios de atención para tutorías. Pero puedes sugerirle una fecha para visitarlo."
+            subtitulo_modal = "Tu persona tutora aún no registra horarios de atención para tutorías, pero puedes sugerirle una fecha para visitarle."
 
         info_adicional = "Información adicional sobre la tutoría."
 
@@ -2460,13 +2460,13 @@ class QuickCreateTutoriaView(AlumnoViewMixin, CreateView):
         try:
             alumno = Alumno.objects.get(pk=self.request.user.pk)
         except Alumno.DoesNotExist:
-            raise PermissionDenied("Sólo los alumnos pueden registrar tutorias con QR")
+            raise PermissionDenied("Sólo los alumnos pueden registrar tutorías mediante QR")
         self.initial["alumno"] = alumno
         self.initial["tutor"] = alumno.tutor_asignado
         self.initial["tema"] = alumno.tutor_asignado.tema_tutorias
         print(f'Fecha: {datetime.now().strftime("%Y-%m-%d %H:%M")}')
         self.initial["fecha"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-        self.initial["descripcion"] = "Tutoria registrada con QR"
+        self.initial["descripcion"] = "Tutoría registrada mediante QR"
         return self.initial 
       
     
@@ -2577,7 +2577,7 @@ class TutoriaInSituCreateView(LoginRequiredMixin, ContextConRolesMixin, Template
             nueva.save()
 
             # Agregar mensaje de confirmación
-            messages.success(request, "Tutoría In Situ registrada con éxito.")
+            messages.success(request, "Tutoría in situ registrada con éxito.")
 
             # El alumno registra tutoría por QR, el tutor debe recibir notificación.
             tutoria_notification_requested.send(
@@ -2979,11 +2979,11 @@ class ExportarTutoriasAceptadasExcelView(CodaViewMixin, View):
             
             data.append({
                 "Id":tutoria.pk,
-                "Matricula": tutoria.alumno.matricula,
+                "Matrícula": tutoria.alumno.matricula,
                 "Alumno:":nombre_alumno,
                 "Correo Alumno": tutoria.alumno.email,
                 "Tutor": nombre_tutor,
-                "Numero Economico Tutor": tutoria.tutor.matricula,
+                "Numero económico del tutor": tutoria.tutor.matricula,
                 "Fecha": tutoria.fecha.strftime("%d/%m/%Y"),
                 "Hora": tutoria.fecha.strftime("%H:%M"),
                 "Tema(s)": temas,
@@ -3002,19 +3002,10 @@ class ExportarTutoriasAceptadasExcelView(CodaViewMixin, View):
         return response
 
 
-class ComunicacionMasivaTutoriasView(FormView):
-
-    #print("Inicializando vista de comunicación masiva")
-
+class ComunicacionMasivaTutoriasView(TutorViewMixin, FormView):
     template_name = 'Tutorias/comunicacionMasiva.html'
     form_class = ComunicacionMasivaForm
     success_url = reverse_lazy('tutorias-comunicacion-masiva')
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx['header_footer'] = "Usuarios/base.html"
-        print("Contexto:", ctx)
-        return ctx
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -3065,6 +3056,6 @@ class ComunicacionMasivaTutoriasView(FormView):
                 messages.error(self.request, f'Ocurrió un error al enviar el correo: {str(e)}')
                 return super().form_invalid(form)
         else:
-            messages.warning(self.request, 'No alumnos con correo válido.')
+            messages.warning(self.request, 'No hay alumnos con un correo válido.')
 
         return super().form_valid(form)
