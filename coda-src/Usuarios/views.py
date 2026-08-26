@@ -431,7 +431,7 @@ class ChangePasswordView(BaseAccessMixin, PasswordChangeView):
         return super().get_context_data(**kwargs)
 
 
-class PasswordChangeDoneView(TemplateView):
+class PasswordChangeDoneView(BaseAccessMixin, TemplateView):
     template_name = 'Usuarios/password_change_done.html'
 
 
