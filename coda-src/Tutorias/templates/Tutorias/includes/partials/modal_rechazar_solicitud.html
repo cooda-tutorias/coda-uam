@@ -1,0 +1,55 @@
+<div class="modal fade"
+     id="modalRechazar-{{ tutoria.pk }}"
+     tabindex="-1"
+     aria-labelledby="modalRechazarLabel-{{ tutoria.pk }}"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{% url 'rechazar_tutoria' tutoria.pk %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalRechazarLabel-{{ tutoria.pk }}">Rechazar solicitud</h5>
+          <button type="button" class="btn-close" data-mdb-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small">Selecciona la razón del rechazo.</p>
+          <div class="form-check mb-2">
+            <input class="form-check-input motivo-rechazo" type="radio" name="motivo_rechazo"
+                   id="sin-disponibilidad-{{ tutoria.pk }}" value="SIN_DISPONIBILIDAD_FECHAS" required>
+            <label class="form-check-label" for="sin-disponibilidad-{{ tutoria.pk }}">
+              No tengo disponibilidad y no puedo proponer otro horario.
+            </label>
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input motivo-rechazo" type="radio" name="motivo_rechazo"
+                   id="fuera-ambito-{{ tutoria.pk }}" value="FUERA_AMBITO">
+            <label class="form-check-label" for="fuera-ambito-{{ tutoria.pk }}">
+              El tema está fuera de mi ámbito de atención.
+            </label>
+          </div>
+          <div class="form-check mb-2">
+            <input class="form-check-input motivo-rechazo" type="radio" name="motivo_rechazo"
+                   id="canalizacion-{{ tutoria.pk }}" value="REQUIERE_CANALIZACION">
+            <label class="form-check-label" for="canalizacion-{{ tutoria.pk }}">
+              El tema requiere canalización especializada.
+            </label>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input motivo-rechazo" type="radio" name="motivo_rechazo"
+                   id="otro-{{ tutoria.pk }}" value="otro" data-textarea-id="otro-motivo-{{ tutoria.pk }}">
+            <label class="form-check-label" for="otro-{{ tutoria.pk }}">Otro</label>
+          </div>
+          <div id="otro-motivo-{{ tutoria.pk }}" class="d-none">
+            <label class="form-label" for="motivo-personalizado-{{ tutoria.pk }}">Escribe la razón</label>
+            <textarea id="motivo-personalizado-{{ tutoria.pk }}" name="motivo_rechazo_otro"
+                      class="form-control" rows="3" maxlength="500"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary btn-sm" data-mdb-dismiss="modal">Cancelar</button>
+          <button type="submit" class="btn btn-danger btn-sm">Rechazar solicitud</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

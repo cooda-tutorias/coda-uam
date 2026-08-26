@@ -1,0 +1,90 @@
+{% extends "Usuarios/HeaderAndFooterFachada.html" %}
+
+{% block title %} Tutorías Próximas {% endblock %}
+
+{% block body %}
+<section id="section" style="background-color: #eee;">
+  <div class="container py-5">
+    <div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
+      <div class="card-body p-4">
+        <h3 class="text-primary text-title-bold mb-4">Tutorías próximas</h3>
+
+        <div class="table-responsive">
+          <table class="table table-striped table-hover datatable align-middle">
+            <thead class="text-title text-center">
+              <tr>
+                <th>Id</th>
+                <th>Matrícula</th>
+                <th>Alumno</th>
+                <th>Fecha</th>
+                <th>Hora</th>
+                <th>Tema</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+
+            <tbody class="text-body">
+              {% for tutoria in object_list %}
+              <tr>
+                <td>{{ tutoria.pk }}</td>
+                <td>{{ tutoria.alumno.matricula }}</td>
+                <td>{{ tutoria.alumno.nombre_completo }}</td>
+
+                <td>{{ tutoria.fecha|date }}</td>
+                <td>{{ tutoria.fecha|date:"P" }}
+                    <div class="dropdown d-inline-block ms-2">
+                        <a href="#" role="button" id="dropdownMenuLink{{ tutoria.pk }}" data-bs-toggle="dropdown" aria-expanded="false" class="text-secondary text-decoration-none">
+                            <i class="bi bi-calendar-plus hover-primary" title="Agregar al calendario"></i>
+                        </a>
+
+                        <ul class="dropdown-menu shadow" aria-labelledby="dropdownMenuLink{{ tutoria.pk }}">
+                            <li>
+                                <a class="dropdown-item" href="{{ tutoria.google_calendar_url }}" target="_blank">
+                                    <i class="bi bi-google text-danger me-2"></i> Google Calendar
+                                </a>
+                            </li>
+                                
+                            <li>
+                                <a class="dropdown-item" href="{% url 'descargar_ics' tutoria.pk %}">
+                                    <i class="bi bi-apple text-dark me-2"></i> Apple Calendar
+                                </a>
+                              </li>
+                        </ul>
+                    </div>
+
+                    <!-- <a href="{{ tutoria.google_calendar_url }}" target="_blank" class="text-secondary ms-2" title="Agregar a Google Calendar">
+                      <i class="bi bi-calendar-plus hover-primary"></i>
+                    </a> -->
+                </td>
+
+                <td>{{ tutoria.get_tema_display|join:", " }}</td>
+
+                <td>
+                  {% if tutoria.estado == "ACE" %}
+                    <span class="badge bg-success">Aceptada</span>
+
+                  {% elif tutoria.estado == "PEN" %}
+                    <span class="badge bg-warning text-dark">Pendiente</span>
+
+                  {% elif tutoria.estado == "REJ" %}
+                    <span class="badge bg-danger text-dark">Rechazada</span>
+
+                  {% elif tutoria.estado == "CAN" %}
+                    <span class="badge bg-secondary text-dark">Cancelada</span>
+
+                  {% else %}
+                    <span class="badge bg-info text-dark">Desconocido</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+
+          </table>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

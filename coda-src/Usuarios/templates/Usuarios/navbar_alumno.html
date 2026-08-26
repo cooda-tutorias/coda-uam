@@ -1,13 +1,39 @@
 {% extends "Usuarios/base.html" %}
-
 {% block navbar %}
+  <li class="nav-item">
+    <a class="nav-link text-primary"
+       href="{% url 'Tutorias-create' %}"
+       data-bs-toggle="tooltip"
+       data-bs-placement="bottom"
+       title="Solicita o agenda una nueva tutoría.">
+      <i class="bi bi-send-plus"></i> Solicitar tutoria
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link text-primary"
+       href="{% url 'Tutorias-alumno' %}"
+       data-bs-toggle="tooltip"
+       data-bs-placement="bottom"
+       title="Consulta tu panel de tutorías.">
+      <i class="bi bi-clipboard-data"></i> Panel de tutorías
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link text-primary"
+       href="{% url 'perfil-tutor-alumno' %}"
+       data-bs-toggle="tooltip"
+       data-bs-placement="bottom"
+       title="Ver la información de tu tutor(a).">
+      <i class="bi bi-person-badge"></i> Mi tutor
+    </a>
+  </li>
 
-<li class="nav-item">
-    <a class="nav-link text-primary" href="{% url 'Tutorias-create' %}" >Solicitar tutoria</a>
-</li>
-<li class="nav-item">
-    <a class="nav-link text-primary" href="{% url 'Tutorias-alumno' %}">Tutorias</a>
-</li>
+  <script>
+    // Esto busca todos los elementos que tengan tooltip y los activa
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+      return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+  </script>
 
 {% endblock %}
-

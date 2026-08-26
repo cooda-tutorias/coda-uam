@@ -37,6 +37,208 @@ import pandas as pd
 from .models import Documento
 from .forms import DocumentoForm
 
+# Bibliotecas para generar códigos QR
+import qrcode
+import base64
+from io import BytesIO
+from django.views import View
+from django.http import Http404
+from PIL import Image, ImageDraw, ImageFont
+
+from .models import HorarioTutor
+from .forms import HorarioTutorForm
+from django.db import transaction
+
+
+class HorariosTutorView(BaseAccessMixin, View):
+    """Vista para manejar la creación y actualización de horarios de tutor."""
+
+    def get(self, request):
+        if not request.user.is_tutor:
+            raise Http404()
+
+        horarios = HorarioTutor.objects.filter(tutor=request.user)
+        form = HorarioTutorForm()
+
+        # Lista de hararios que se mostrarán
+        horas = [
+            f"{h:02d}:{m:02d}"
+            for h in range(8, 17)      # Desde las 08:00 hasta las 16:30
+            for m in (0, 30)           # Intervalos de 30 minutos
+        ]
+
+        return render(
+            request,
+            "Usuarios/horarios_tutor.html",
+            {
+                "form": form,
+                "horarios": horarios,
+                "horas": horas,
+                "dias_semana": HorarioTutor.DiaSemana.choices,
+                "header_footer": "Usuarios/navbar_tutor.html",
+            }
+        )
+
+    def post(self, request):
+        if not request.user.is_tutor:
+            raise Http404()
+
+        tutor = request.user
+
+        # Transacción atómica: si algo falla a la mitad, revierte el borrado
+        with transaction.atomic():
+
+            # 1. Eliminar todos los horarios anteriores
+            HorarioTutor.objects.filter(tutor=tutor).delete()
+
+            # 2. Reconstruirlos iterando sobre las claves de DiaSemana (0, 1, 2, 3, 4)
+            for dia_int, _ in HorarioTutor.DiaSemana.choices:
+                inicios = request.POST.getlist(f"inicio_{dia_int}[]")
+                fines = request.POST.getlist(f"fin_{dia_int}[]")
+
+                for inicio, fin in zip(inicios, fines):
+                    if inicio and fin:
+                        HorarioTutor.objects.create(
+                            tutor=tutor,
+                            dia_semana=dia_int,
+                            hora_inicio=inicio,
+                            hora_fin=fin,
+                        )
+
+        messages.success(request, "Tus horarios fueron actualizados con éxito.")
+
+        return redirect("tutor_horarios")
+
+
+class EliminarHorarioTutorView(BaseAccessMixin, View):
+    def post(self, request, pk):
+        horario = get_object_or_404(HorarioTutor, pk=pk, tutor=request.user)
+        horario.delete()
+        return redirect("tutor_horarios")
+
+
+class ListaHorariosTutorView(BaseAccessMixin, ListView):
+    model = HorarioTutor
+    template_name = "Usuarios/tutor_horarios.html"
+
+    def get_queryset(self):
+        return HorarioTutor.objects.filter(tutor=self.request.user)
+
+
+# Esta es la vista que genera el código QR para los tutores, incluyendo 
+# el diseño institucional y la información del tutor.
+# El código QR sirve para solicitar tutorías in situ, y la 
+# URL codificada en el QR redirige a la vista de tutorías in situ.
+class VerQRView(BaseAccessMixin, View):
+
+    def get(self, request):
+        user = request.user
+
+        if not user.is_tutor:
+            raise Http404("Solo los tutores pueden ver su QR.")
+
+        # URL destino del QR
+        url_qr = request.build_absolute_uri(
+            reverse("tutoria_insitu", kwargs={"tutor_pk": user.pk}) ##reverse("tutoria_insitu", args=[tutor_pk])
+        )
+
+        # Generar QR
+        qr = qrcode.QRCode(box_size=20, border=4)
+        qr.add_data(url_qr)
+        qr.make(fit=True)
+        qr_img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
+
+        qr_width, qr_height = qr_img.size
+
+        #  DISEÑO INSTITUCIONAL 
+
+        # Barra institucional
+        banner_height = 120
+        total_height = banner_height + qr_height + 50  # espacio extra abajo
+
+        final_img = Image.new("RGB", (qr_width, total_height), "white")
+        draw = ImageDraw.Draw(final_img)
+
+        # Barra superior
+        draw.rectangle([(0, 0), (qr_width, banner_height)], fill="#F08200")
+
+        # Cargar fuente Montserrat
+        font_path = os.path.join(
+            settings.BASE_DIR,
+            "Usuarios/static/fonts/Montserrat-Regular.ttf"
+        )
+
+        # ========================================
+        # Calcular ancho necesario para texto
+        # ========================================
+
+        # ========================================
+        # Texto en dos líneas
+        # ========================================
+
+        line1 = "Tutorías DCNI"
+        line2 = f"{user.first_name} {user.last_name}"
+
+        # Cargar fuente
+        try:
+            font = ImageFont.truetype(font_path, 52)
+        except:
+            font = ImageFont.load_default()
+
+        # Medir líneas
+        line1_w, line1_h = draw.textsize(line1, font=font)
+        line2_w, line2_h = draw.textsize(line2, font=font)
+
+        side_margin = 80
+
+        # Nuevo ancho: lo suficiente para el texto más largo
+        final_width = max(qr_width, line1_w + side_margin, line2_w + side_margin)
+
+        # Alturas
+        banner_height = line1_h + line2_h + 50
+        spacing_between_lines = 10  # espacio vertical entre línea 1 y línea 2
+
+        total_height = banner_height + qr_height + 50
+
+        # Crear imagen final
+        final_img = Image.new("RGB", (final_width, total_height), "white")
+        draw = ImageDraw.Draw(final_img)
+
+        # Barra superior
+        draw.rectangle([(0, 0), (final_width, banner_height)], fill="#F08200")
+
+        # Posiciones centradas
+        line1_x = (final_width - line1_w) // 2
+        line2_x = (final_width - line2_w) // 2
+
+        # Punto vertical de inicio
+        start_y = 20
+
+        # Dibujar texto centrado
+        draw.text((line1_x, start_y), line1, fill="white", font=font)
+        draw.text((line2_x, start_y + line1_h + spacing_between_lines), line2, fill="white", font=font)
+
+        # Centrar QR
+        qr_x = (final_width - qr_width) // 2
+        final_img.paste(qr_img, (qr_x, banner_height + 20))
+
+        # Exportar imagen como base64
+        buffer = BytesIO()
+        final_img.save(buffer, format="PNG")
+        buffer.seek(0)
+        img_base64 = base64.b64encode(buffer.getvalue()).decode()
+
+        return render(
+            request,
+            "Usuarios/ver_qr.html",
+            {
+                "qr_base64": f"data:image/png;base64,{img_base64}",
+                "url_qr": url_qr,
+                "header_footer": "Usuarios/navbar_tutor.html",
+            },
+        )
+
+    
 # Test Views (Remove for production)
 def login_view_test(request):
     return render(request, 'Usuarios/login.html')
@@ -58,12 +260,30 @@ class PerfilAlumnoView(BaseAccessMixin, DetailView):
 
 
 class PerfilTutorView(BaseAccessMixin, DetailView):
+    """Muestra el perfil público o detallado de un tutor.
+
+    Permite a los alumnos y coordinadores visualizar los datos del tutor.
+    Agrega al contexto el flag `user_es_tutor` para mostrar u ocultar campos
+    sensibles (como el número económico) en la plantilla.
+    """
+    
     model = Usuario
     template_name = 'Usuarios/perfil_tutor.html'
 
     def get_queryset(self) -> QuerySet[Any]:
         return Usuario.objects.filter(rol__contains=["TUT"])  # Filter for Tutors
 
+    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+
+        # 1. Verificar si el usuario que está VISUALIZANDO la página (request.user)
+        #    tiene el rol de Tutor.
+        user_es_tutor = self.request.user.has_role("TUT")
+
+        # 2. Pasar el resultado booleano al contexto
+        context['user_es_tutor'] = user_es_tutor
+
+        return context
 
 class PerfilCodaView(BaseAccessMixin, DetailView):
     model = Usuario
@@ -80,6 +300,38 @@ class PerfilCordinadorView(BaseAccessMixin, DetailView):
     def get_queryset(self) -> QuerySet[Any]:
         return Usuario.objects.filter(rol__contains=["COR"])  # Filter for Coordinadores
 
+
+# Antonio LJ
+@login_required
+def redirect_perfil_tutor(request):
+    """
+    Obtiene el tutor del alumno autenticado y lo redirige a la vista PerfilTutorView.
+    """
+    try:
+        # 1. Obtener la instancia de Alumno asociada al usuario actual
+        # Asumimos que Alumno hereda de Usuario o tiene un campo relacionado con request.user
+        alumno = Alumno.objects.get(pk=request.user.pk)
+
+        # 2. Obtener la instancia del Tutor asignado
+        # Asumimos que el modelo Alumno tiene un campo llamado 'tutor_asignado'
+        tutor_pk = alumno.tutor_asignado.pk # Asumiendo que Tutor está relacionado con User
+
+        # Si el tutor está relacionado directamente con el modelo Tutor y este a su vez
+        # con el modelo Usuario, se debe obtener la PK del Usuario del Tutor
+        # Si el Tutor hereda de Usuario, simplemente usamos:
+        # tutor_pk = alumno.tutor_asignado.pk
+
+        tutor_pk = alumno.tutor_asignado.pk # Asumiendo que Tutor hereda de Usuario
+
+    except Alumno.DoesNotExist:
+        messages.error(request, "El usuario actual no es un alumno o no está registrado como tal.")
+        return redirect('perfil-alumno') # Redireccionar a una página segura
+    except AttributeError: # Si 'tutor_asignado' es None
+        messages.warning(request, "Aún no tienes un tutor asignado.")
+        return redirect('perfil-alumno') # Redireccionar a una página segura
+
+    # 3. Redirigir a la vista del perfil del tutor, usando su PK
+    return redirect('perfil-tutor', pk=tutor_pk)
 
 ### Role-Based Profile Redirection
 @login_required
@@ -156,6 +408,12 @@ class UsuarioLoginView(LoginView):
             login(self.request, user)
             self.request.session["role"] = selected_role
             self.request.session.modified = True  # Ensure session updates
+
+            # Revisa si una alumno escaneó el QR de su tutor y fue redirigido a login, 
+            # para redirigirlo a la URL para registrar la tutoría in situ después de iniciar sesión.
+            next_url = self.request.POST.get("next") or self.request.GET.get("next")
+            if next_url:
+                return redirect(next_url)
 
             # Redirect to the appropriate profile page
             return redirect(reverse_lazy(f"perfil-{selected_role}", kwargs={"pk": user.pk}))

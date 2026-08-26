@@ -1,44 +1,65 @@
+from django import forms
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_POST
+
 import qrcode
+from django.contrib.auth.mixins import LoginRequiredMixin
+# Importa tu mixin de roles
+from Usuarios.mixins import ContextConRolesMixin
+from django.views.generic import TemplateView
+
 from collections import Counter
 from typing import Any, Dict
 from django.shortcuts import get_object_or_404, redirect
 from django.db.models.query import QuerySet
 from django.forms.models import BaseModelForm
 from django.shortcuts import render, redirect
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, HttpResponseForbidden, JsonResponse
 from django.views.generic.detail import DetailView
 from django.views.generic.list import ListView
 from django.views.generic.edit import CreateView, UpdateView
 from django.views.generic import View, FormView
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.utils.text import slugify
 from django.core.exceptions import PermissionDenied
 from django.core.mail import send_mail, EmailMessage
 from django.contrib import messages
 from datetime import datetime, timedelta
 import pandas as pd
+from urllib3 import request
 from .constants import TEMAS
 
 from .models import Tutoria, HistorialCambioTutoria, Asesoria
 from .forms import (
     FormTutorias,
+    FormEditarTutoriaModal,
     FormSeguimiento,
     FormReporte,
     FormCartasDeAsignacion,
     FormReporteDeTutorias,
+    FormTutoriasInSitu,
     ComunicacionMasivaForm,
     FormVerTutorias,
     FormReporteTutoriasMasivo,
 )
 from .signals import tutoria_notification_requested
 # from .forms import FormSeguimiento # de nuevo, no estoy seguro, FormReporte
-from .constants import PENDIENTE, ACEPTADO, RECHAZADO, DURACION_ASESORIA, CANCELADO, ESTADO # de nuevo, no estoy seguro
+
+# De esta manera se incluyen todas la constantes.
+# TODO: Usar el estándar PEP8 para importar constantes:
+# from . import constants
+# Pero se tendría que cambiar el código que usa las constantes, por ejemplo:
+# constants.TEMAS o constants.PENDIENTE, etc. Esto es más limpio y evita conflictos de nombres.
+from .constants import *
+
 from Usuarios.constants import TUTOR, ALUMNO, COORDINADOR, TEMPLATES, ESTADOS_ALUMNO
 from Usuarios.views import BaseAccessMixin, CodaViewMixin, TutorViewMixin, AlumnoViewMixin, CordinadorViewMixin
-from Usuarios.models import Tutor, Alumno, Cordinador, Coda
+from Usuarios.models import Tutor, Alumno, Cordinador, Coda, HorarioTutor
 from Usuarios.models import Documento
 from django.http import FileResponse
 from django.utils import timezone
+from django.utils.safestring import mark_safe
 from reportlab.pdfgen import canvas
 from io import BytesIO
 from reportlab.lib import colors
@@ -53,6 +74,176 @@ from .services.docx_reportes import generar_docx_reporte_tutorias_brindadas
 
 from django.views.generic import TemplateView, FormView
 from django.conf import settings
+from django.http import (
+    FileResponse, Http404, HttpRequest, HttpResponse, HttpResponseForbidden,
+    JsonResponse,
+)
+
+
+from icalendar import Calendar, Event
+
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.mixins import LoginRequiredMixin
+
+# Función para convertir una fecha en formato string a un objeto datetime con zona horaria.
+def convertir_fecha_local(valor):
+    fecha_sin_zona = datetime.strptime(
+        valor,
+        "%Y-%m-%dT%H:%M",
+    )
+
+    return timezone.make_aware(
+        fecha_sin_zona,
+        timezone.get_current_timezone(),
+    )
+
+
+def resolver_franja_tutor(slot, valor_franja):
+    """Valida y convierte una franja de 30 minutos perteneciente a un horario."""
+    try:
+        fecha_sin_zona = datetime.fromisoformat(valor_franja)
+    except (TypeError, ValueError):
+        raise ValueError("La franja seleccionada no tiene un formato válido.")
+
+    hora = fecha_sin_zona.time()
+    inicio = datetime.combine(fecha_sin_zona.date(), slot.hora_inicio)
+    final = datetime.combine(fecha_sin_zona.date(), slot.hora_fin)
+    seleccion = datetime.combine(fecha_sin_zona.date(), hora)
+
+    if (
+        fecha_sin_zona.date().weekday() != slot.dia_semana
+        or seleccion < inicio
+        or seleccion + timedelta(minutes=30) > final
+        or (seleccion - inicio).total_seconds() % (30 * 60) != 0
+    ):
+        raise ValueError("La franja seleccionada no pertenece al horario del tutor.")
+
+    return timezone.make_aware(
+        seleccion,
+        timezone.get_current_timezone(),
+    )
+
+# Función para que el tutor pueda proponer fechas alternativas para la tutoría. 
+# Se llama desde la vista de detalle de la tutoría.
+@login_required
+def proponer_fechas_tutoria(request, pk):
+    tutoria = get_object_or_404(Tutoria, pk=pk)
+
+    if tutoria.tutor_id != request.user.pk:
+        raise PermissionDenied
+    
+    if request.method == 'POST':
+        propuesta_1_raw = request.POST.get('propuesta_1')
+        propuesta_2_raw = request.POST.get('propuesta_2')
+        es_reagendacion = request.POST.get('es_reagendacion') == '1'
+
+        if es_reagendacion and tutoria.estado_efectivo != ACEPTADO:
+            messages.error(request, "Solo se pueden reagendar tutorías agendadas.")
+            return redirect("Panel-tutorias-tutor")
+
+        # Verificar que efectivamente haya al menos una propuesta de fecha.
+        if propuesta_1_raw:
+            try:
+                propuesta_1 = convertir_fecha_local(propuesta_1_raw)
+                propuesta_2 = convertir_fecha_local(propuesta_2_raw) if propuesta_2_raw else None
+            except ValueError:
+                messages.error(
+                    request,
+                    "Alguna de las fechas proporcionadas no es válida.",
+                )
+                return redirect("Panel-tutorias-tutor")
+                                   
+            # Si hay dos propuestas, se envían al alumno para que elija. Si solo hay una, se acepta directamente.
+            if propuesta_2_raw:
+                # CASO A: Dos fechas -> El alumno debe elegir en su vista
+                tutoria.fecha_propuesta_1 = propuesta_1
+                tutoria.fecha_propuesta_2 = propuesta_2
+                tutoria.estado = PROPUESTA
+                tutoria.reagendacion_pendiente = es_reagendacion
+                if es_reagendacion:
+                    messages.success(request, "Se enviaron al alumno las opciones para reagendar la tutoría.")
+                else:
+                    messages.success(request, "Se han enviado las alternativas de horario al alumno.")
+            else:
+                # CASO B: Una sola fecha -> Se reasigna la fecha y se ACEPTA directamente
+                tutoria.fecha = propuesta_1
+                tutoria.fecha_propuesta_1 = None
+                tutoria.fecha_propuesta_2 = None
+                tutoria.estado = ACEPTADO
+                tutoria.reagendacion_pendiente = False
+                messages.success(request, "Se ha actualizado y aceptado la tutoría con la nueva fecha.")
+            
+            tutoria.save()
+        else:
+            messages.error(request, "Debes ingresar al menos la Opción 1.")
+
+    return redirect('Panel-tutorias-tutor')
+
+# Función para que el alumno pueda seleccionar una de las fechas propuestas por el tutor.
+@login_required
+def seleccionar_propuesta_tutoria(request, pk):
+    tutoria = get_object_or_404(Tutoria, pk=pk)
+    
+    if request.method == 'POST':
+        opcion_elegida = request.POST.get('opcion_elegida') # '1' o '2'
+
+        if opcion_elegida == '1' and tutoria.fecha_propuesta_1:
+            tutoria.fecha = tutoria.fecha_propuesta_1
+        elif opcion_elegida == '2' and tutoria.fecha_propuesta_2:
+            tutoria.fecha = tutoria.fecha_propuesta_2
+        else:
+            messages.error(request, "Selección inválida.")
+            return redirect('Tutorias-alumno')
+
+        # Se confirma el horario y se resetean las propuestas
+        tutoria.estado = ACEPTADO
+        tutoria.fecha_propuesta_1 = None
+        tutoria.fecha_propuesta_2 = None
+        tutoria.reagendacion_pendiente = False
+        tutoria.save()
+
+        messages.success(request, "Tu solicitud ha sido agendada con éxito. No faltes a la cita en el día y horario que elegiste 📅.")
+
+    return redirect('Tutorias-alumno')
+
+# Esta función se usa para crear el archivo .ics con información de la 
+# fecha de la tutoria para que se pueda agregar el evento a 
+# Calendarios de Apple o Outlook.
+# Para Google Calendar se usa otro procedimiento.
+def descargar_ics_tutoria(request, tutoria_id):
+    # 1. Obtener la tutoria
+    tutoria = get_object_or_404(Tutoria, pk=tutoria_id)
+    
+    # 2. Crear el objeto calendario
+    cal = Calendar()
+    cal.add('prodid', '-//UAM Cuajimalpa//Sistema Tutorias//MX')
+    cal.add('version', '2.0')
+    
+    # 3. Crear el evento
+    event = Event()
+    event.add('summary', f"Tutoría con {tutoria.alumno.nombre_completo}")
+    
+    # Manejar los tiempos
+    start_time = tutoria.fecha
+    end_time = start_time + timedelta(hours=1)
+    
+    event.add('dtstart', start_time)
+    event.add('dtend', end_time)
+    
+    # Descripción y ubicación (Opcional)
+    # Como tu tema es una lista, usamos tu lógica de join si es necesario
+    temas_str = ", ".join(tutoria.get_tema_display())
+    event.add('description', f"Tema(s): {temas_str}")
+    
+    # 4. Agregar evento al calendario
+    cal.add_component(event)
+    
+    # 5. Dejar listo el archivo para descarga
+    response = HttpResponse(cal.to_ical(), content_type="text/calendar")
+    response['Content-Disposition'] = f'attachment; filename="cita_{tutoria.id}.ics"'
+
+    return response
+
 
 #Funcion para descargar pdf
 def carta_tutorados_pdf(request):
@@ -304,18 +495,26 @@ class AceptarTutoriaView(View):
             raise PermissionDenied("No tienes permiso para modificar esta tutoría")
 
         if tutoria.estado == ACEPTADO:
-            return redirect('Tutorias-tutor')
+            return redirect(
+                f"{reverse('Panel-tutorias-tutor')}?tab=agendadas"
+            )
 
         tutoria.estado = ACEPTADO
         tutoria.save(update_fields=["estado"])
+
+        messages.success(request, f"Haz aceptado la solicitud de tutoría de {tutoria.alumno.nombre_completo}.")
+
         tutoria_notification_requested.send(
             sender=self.__class__,
             event="aceptada",
             tutoria=tutoria,
             actor=request.user,
         )
-        return redirect('Tutorias-tutor')  
+        return redirect(
+            f"{reverse('Panel-tutorias-tutor')}?tab=agendadas"
+        )
 
+  
 class RechazarTutoriaView(View):
     def post(self, request, pk):
         tutoria = get_object_or_404(Tutoria, pk=pk)
@@ -323,25 +522,145 @@ class RechazarTutoriaView(View):
             raise PermissionDenied("No tienes permiso para modificar esta tutoría")
 
         if tutoria.estado == RECHAZADO:
-            return redirect('Tutorias-tutor')
+            return redirect('Panel-tutorias-tutor')
 
+        motivo = request.POST.get("motivo_rechazo", "").strip()
+        if motivo == "otro":
+            motivo = request.POST.get("motivo_rechazo_otro", "", ).strip()
+
+        if not motivo:
+            messages.error(
+                request,
+                "Debes seleccionar o escribir una razón para el rechazo.",
+            )
+            return redirect("Panel-tutorias-tutor")
+        
         tutoria.estado = RECHAZADO
-        tutoria.save(update_fields=["estado"])
+        tutoria.motivo_rechazo = motivo
+        tutoria.save(update_fields=["estado", "motivo_rechazo"])
         tutoria_notification_requested.send(
             sender=self.__class__,
             event="rechazada",
             tutoria=tutoria,
             actor=request.user,
         )
-        return redirect('Tutorias-tutor')
+
+        messages.info(
+            request,
+            (
+                "El rechazo se registró correctamente y el alumno será notificado. "
+                "No es necesario realizar ninguna acción adicional."
+            ),
+        )
+
+        return redirect('Panel-tutorias-tutor')
 
 class CancelarTutoriaView(View):
     def post(self, request, pk):
         tutoria = get_object_or_404(Tutoria, pk=pk)
+
+        es_tutor_propietario = (
+            request.user.has_role("TUT")
+            and tutoria.tutor_id == request.user.pk
+        )
+        es_alumno_propietario = (
+            request.user.has_role("ALU")
+            and tutoria.alumno_id == request.user.pk
+        )
+
+        if not es_tutor_propietario and not es_alumno_propietario:
+            raise PermissionDenied("No tienes permiso para cancelar esta tutoría")
+
+        if es_alumno_propietario:
+            if tutoria.estado_efectivo not in [PENDIENTE, VENCIDA, ACEPTADO]:
+                messages.error(
+                    request,
+                    "Esta tutoría ya no se encuentra disponible para cancelación.",
+                )
+                return redirect('Tutorias-alumno')
+
+            motivo = request.POST.get("motivo_cancelacion", "").strip()
+            motivos_validos = dict(MOTIVOS_CANCELACION_ALUMNO)
+            detalle_motivo = request.POST.get(
+                "detalle_motivo_cancelacion", ""
+            ).strip()
+
+            if motivo not in motivos_validos:
+                messages.error(request, "Debes seleccionar un motivo de cancelación válido.")
+                return redirect('Tutorias-alumno')
+
+            if motivo == "ALU_OTRO" and not detalle_motivo:
+                messages.error(request, "Debes escribir el detalle del motivo de cancelación.")
+                return redirect('Tutorias-alumno')
+
+            tutoria.estado = CANCELADO
+            tutoria.motivo_cancelacion = motivo
+            tutoria.detalle_motivo_cancelacion = (
+                detalle_motivo if motivo == "ALU_OTRO" else None
+            )
+            tutoria.cancelado_por = request.user
+            tutoria.origen_cancelacion = "ALUMNO"
+            tutoria.fecha_propuesta_1 = None
+            tutoria.fecha_propuesta_2 = None
+            tutoria.reagendacion_pendiente = False
+            tutoria.save(update_fields=[
+                "estado",
+                "motivo_cancelacion",
+                "detalle_motivo_cancelacion",
+                "cancelado_por",
+                "origen_cancelacion",
+                "fecha_propuesta_1",
+                "fecha_propuesta_2",
+                "reagendacion_pendiente",
+            ])
+            messages.success(request, "La tutoría se canceló correctamente.")
+            return redirect('Tutorias-alumno')
+
+        if tutoria.estado_efectivo != ACEPTADO:
+            messages.error(
+                request,
+                "Esta tutoría ya no se encuentra disponible para cancelación.",
+            )
+            return redirect('Panel-tutorias-tutor')
+
+        motivo = request.POST.get("motivo_cancelacion", "").strip()
+        motivos_validos = dict(MOTIVOS_CANCELACION_TUTOR)
+        detalle_motivo = request.POST.get(
+            "detalle_motivo_cancelacion", ""
+        ).strip()
+
+        if motivo not in motivos_validos:
+            messages.error(request, "Debes seleccionar un motivo de cancelación válido.")
+            return redirect(
+                f"{reverse('Panel-tutorias-tutor')}?tab=agendadas"
+            )
+
+        if motivo == "TUT_OTRO" and not detalle_motivo:
+            messages.error(request, "Debes escribir el detalle del motivo de cancelación.")
+            return redirect(
+                f"{reverse('Panel-tutorias-tutor')}?tab=agendadas"
+            )
+
         tutoria.estado = CANCELADO
-        tutoria.save()
-        return redirect('Tutorias-tutor')
-    
+        tutoria.motivo_cancelacion = motivo
+        tutoria.detalle_motivo_cancelacion = (
+            detalle_motivo if motivo == "TUT_OTRO" else None
+        )
+        tutoria.cancelado_por = request.user
+        tutoria.origen_cancelacion = "TUTOR"
+        tutoria.save(update_fields=[
+            "estado",
+            "motivo_cancelacion",
+            "detalle_motivo_cancelacion",
+            "cancelado_por",
+            "origen_cancelacion",
+        ])
+        messages.success(request, "La tutoría agendada se canceló correctamente.")
+        return redirect(
+            f"{reverse('Panel-tutorias-tutor')}?tab=historial"
+        )
+   
+
 class TutoriaUpdateView(BaseAccessMixin, UpdateView):
     model = Tutoria
     form_class = FormTutorias  # ← Usa tu formulario personalizado
@@ -497,28 +816,378 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
 
         return render(request, 'tutoria/editar_tutoria.html', {'form': form})
     
+
+class TutoriaModalUpdateView(TutoriaUpdateView):
+    """
+    Vista para editar los temas y la descripción de una tutoría usando una ventana modal.
+    """
+    form_class = FormEditarTutoriaModal
+    template_name = "Tutorias/includes/_modal_editar_tutoria.html"
+
+    def form_valid(self, form):
+        # Reutiliza guardado, historial y notificaciones de la vista original.
+        super().form_valid(form)
+
+        return JsonResponse({
+            "ok": True,
+            "message": "La tutoría se actualizó correctamente.",
+        })
+
+    def form_invalid(self, form):
+        response = self.render_to_response(
+            self.get_context_data(form=form)
+        )
+        response.status_code = 422
+        return response
+
     
 # Solicitud Tutorias
+# API para devolver los slots de un tutor
+@login_required
+@require_GET
+def api_slots_tutor(request, tutor_id):
+    slots = HorarioTutor.objects.filter(tutor_id=tutor_id, activo=True)
+    print(slots)  # en consola del servidor
+
+    data = {
+        "slots": [
+            {
+                "id": slot.id,
+                "dia_semana_num": slot.dia_semana,  # Tiene los días así (0=Lunes..6=Domingo)
+                "dia_semana": slot.get_dia_semana_display(),
+                "hora_inicio": slot.hora_inicio.strftime("%H:%M:%S"),
+                "hora_fin": slot.hora_fin.strftime("%H:%M:%S"),
+                "nombre": f"{slot.get_dia_semana_display()} {slot.hora_inicio.strftime('%H:%M')}–{slot.hora_fin.strftime('%H:%M')}"
+            }
+            for slot in slots
+        ]
+    }
+    return JsonResponse(data)
+
+
+
+# API para devolver las fechas futuras disponibles de un slot
+@login_required
+@require_GET
+def api_fechas_slot(request, slot_id):
+    try:
+        slot = HorarioTutor.objects.get(id=slot_id, activo=True)
+    except HorarioTutor.DoesNotExist:
+        return JsonResponse({"fechas": []})
+
+    hoy = timezone.localdate()
+    fechas = []
+
+    dias_semana = [
+        "Lunes", "Martes", "Miércoles", "Jueves", "Viernes",
+        "Sábado", "Domingo"
+    ]
+    meses = [
+        "enero", "febrero", "marzo", "abril", "mayo", "junio",
+        "julio", "agosto", "septiembre", "octubre", "noviembre",
+        "diciembre"
+    ]
+
+    for i in range(28):
+        dia = hoy + timedelta(days=i)
+
+        if dia.weekday() == slot.dia_semana:
+            fecha_legible = f"{dias_semana[dia.weekday()]}, {dia.day} de {meses[dia.month - 1]}"
+
+            fechas.append({
+                "fecha_iso": dia.isoformat(),
+                "fecha_legible": fecha_legible
+            })
+
+    return JsonResponse({"fechas": fechas})
+
+
+
+def obtener_franjas_disponibles_api(request, tutor_id):
+    """
+    Retorna las franjas disponibles de 30 minutos para una fecha dada (?fecha=YYYY-MM-DD).
+    """
+    fecha_str = request.GET.get('fecha')
+    if not fecha_str:
+        return JsonResponse({'error': 'Parámetro fecha requerido'}, status=400)
+    
+    fecha_dt = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+    dia_semana_py = fecha_dt.weekday() # 0=Lunes, 1=Martes...
+
+    # Mapeo según cómo tengas guardado el día de la semana en HorarioTutor
+    horarios_tutor = HorarioTutor.objects.filter(
+        tutor_id=tutor_id,
+        dia_semana=dia_semana_py,
+        activo=True
+    )
+
+    # Tutorías agendadas en ese día para evitar colisiones
+    tutorias_existentes = Tutoria.objects.filter(
+        tutor_id=tutor_id,
+        fecha__date=fecha_dt,
+        estado__in=[PENDIENTE, ACEPTADO],
+    )
+    horas_ocupadas = [t.fecha.strftime("%H:%M") for t in tutorias_existentes if t.fecha]
+
+    franjas = []
+    duracion = timedelta(minutes=30)
+
+    for h in horarios_tutor:
+        actual = datetime.combine(fecha_dt, h.hora_inicio)
+        limite = datetime.combine(fecha_dt, h.hora_fin)
+
+        while actual + duracion <= limite:
+            hora_inicio_str = actual.strftime("%H:%M")
+            if hora_inicio_str not in horas_ocupadas:
+                franjas.append({
+                    'slot_id': h.id,
+                    'hora_inicio': hora_inicio_str,
+                    'hora_fin': (actual + duracion).strftime("%H:%M"),
+                    'datetime_iso': actual.isoformat()
+                })
+            actual += duracion
+
+    return JsonResponse({'franjas': franjas})
+
+
+@login_required
+@require_POST
+def solicitar_cambio_fecha_tutoria(request, pk):
+    """Permite al alumno cambiar una solicitud o pedir reagendar una cita."""
+    tutoria = get_object_or_404(Tutoria, pk=pk)
+
+    if tutoria.alumno_id != request.user.pk or not request.user.has_role("ALU"):
+        raise PermissionDenied("No tienes permiso para modificar esta tutoría")
+
+    if tutoria.estado_efectivo not in (PENDIENTE, ACEPTADO):
+        messages.error(request, "Esta tutoría ya no permite solicitar un cambio de fecha.")
+        return redirect("Tutorias-alumno")
+
+    horario_id = request.POST.get("horario_tutor", "").strip()
+    franja_seleccionada = request.POST.get("franja_seleccionada", "").strip()
+    fecha_sugerida = request.POST.get("fecha_sugerida", "").strip()
+
+    try:
+        if horario_id:
+            slot = HorarioTutor.objects.get(pk=horario_id, tutor=tutoria.tutor, activo=True)
+            nueva_fecha = resolver_franja_tutor(slot, franja_seleccionada)
+            nuevo_estado = ACEPTADO
+        else:
+            nueva_fecha = convertir_fecha_local(fecha_sugerida)
+            nuevo_estado = PENDIENTE
+    except (HorarioTutor.DoesNotExist, TypeError, ValueError):
+        messages.error(request, "La fecha u horario seleccionado no es válido.")
+        return redirect("Tutorias-alumno")
+
+    if nueva_fecha <= timezone.now():
+        messages.error(request, "La nueva fecha debe ser posterior a la fecha actual.")
+        return redirect("Tutorias-alumno")
+
+    if horario_id and Tutoria.objects.filter(
+        tutor=tutoria.tutor,
+        fecha=nueva_fecha,
+        estado__in=[PENDIENTE, ACEPTADO],
+    ).exclude(pk=tutoria.pk).exists():
+        messages.error(request, "Ese horario acaba de ocuparse. Selecciona otro.")
+        return redirect("Tutorias-alumno")
+
+    fecha_anterior = timezone.localtime(tutoria.fecha)
+    tutoria.fecha = nueva_fecha
+    tutoria.estado = nuevo_estado
+    tutoria.fecha_propuesta_1 = None
+    tutoria.fecha_propuesta_2 = None
+    tutoria.reagendacion_pendiente = False
+    tutoria.save(update_fields=[
+        "fecha", "estado", "fecha_propuesta_1", "fecha_propuesta_2",
+        "reagendacion_pendiente",
+    ])
+
+    HistorialCambioTutoria.objects.create(
+        tutoria=tutoria,
+        correo_editor=request.user.email,
+        cambios_realizados=(
+            f"Solicitud de cambio de fecha: '{fecha_anterior:%d/%m/%Y %H:%M}' "
+            f"-> '{timezone.localtime(nueva_fecha):%d/%m/%Y %H:%M}'"
+        ),
+    )
+    tutoria_notification_requested.send(
+        sender=solicitar_cambio_fecha_tutoria,
+        event="tutoria_modificada",
+        tutoria=tutoria,
+        actor=request.user,
+        recipient=Tutor.objects.filter(pk=tutoria.tutor_id),
+        verb="Solicitud de cambio de fecha",
+    )
+
+    if nuevo_estado == ACEPTADO:
+        messages.success(request, "La tutoría se reagendó en un horario disponible del tutor.")
+    else:
+        messages.success(request, "La nueva fecha se envió al tutor para su confirmación.")
+    return redirect("Tutorias-alumno")
+
+    
+# Vista para que el ALUMNO solicite tutorias, ya sea:
+# a) eligiendo uno de los horarios predefinidos por su tutor, o si no ha definido,
+# a) sugiriendo una fecha a su tutor para la cita que debe ser aceptado o rechazado.
+
+# El método form_valid se encarga de notificar al tutor por estos medios:
+# a) notificación del sistema web.
+# b) correo con la información de la cita.
+# c) notificación web push si la tiene habilitada en su navegador.
+
 class TutoriaCreateView(AlumnoViewMixin, CreateView):
-
+    model = Tutoria
     form_class = FormTutorias
-
     template_name = 'Tutorias/solicitudTutoria.html'
-
     success_url = reverse_lazy('Tutorias-alumno')
 
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+
+        context = super().get_context_data(**kwargs)
+
+        alumno = getattr(self.request.user, "alumno", None)
+        tutor = getattr(alumno, "tutor_asignado", None)
+
+        context["tutor"] = tutor
+
+        # Validar si el tutor tiene horarios de atención activos registrados
+        tiene_horarios = False
+        if tutor:
+            tiene_horarios = HorarioTutor.objects.filter(tutor=tutor, activo=True).exists()
+
+        if tiene_horarios:
+            titulo = "Agendar tutoría"
+            texto_boton = "Agendar tutoría"
+            alerta_texto = "Estás por agendar una tutoría dentro de los horarios definidos por tu tutor."
+            alerta_tipo = "success"
+            subtitulo_modal = "Tu tutor(a) definió horarios de atención. Selecciona un día y un horario disponible."
+        else:
+            titulo = "Solicitar tutoría"
+            texto_boton = "Solicitar tutoría"
+            alerta_texto = "Estás por solicitar una tutoría. Debes sugerir una fecha y hora."
+            alerta_tipo = "warning"
+            subtitulo_modal = "Tu tutor(a) aún no registra horarios de atención para tutorías. Pero puedes sugerirle una fecha para visitarlo."
+
+        info_adicional = "Información adicional sobre la tutoría."
+
+        # Colocar todas las variantes de clave que usamos en plantillas anteriores
+        context["tiene_horarios"] = tiene_horarios
+        context["titulo_formulario"] = titulo
+        context["titulo_form"] = titulo              # compatibilidad
+        context["texto_boton"] = texto_boton
+        context["boton_texto"] = texto_boton         # compatibilidad
+        context["info_adicional"] = info_adicional
+        context["alerta_texto"] = alerta_texto
+        context["alerta_tipo"] = alerta_tipo
+        context["subtitulo_modal"] = subtitulo_modal
+
+        # Si ya se eligió fecha mediante el modal
+        fecha_cita = self.request.session.get("fecha_cita", None)
+        context["fecha_cita"] = fecha_cita
+
+        return context
+
+    
     def form_valid(self, form: FormTutorias) -> HttpResponse:
         alumno = get_object_or_404(Alumno, pk=self.request.user)
+        tutor = alumno.tutor_asignado
+
+        # ====================================================
+        # 1) Validar que el alumno tenga un tutor asignado y asignar los objetos a la tutoría
+        # ====================================================
+        if not tutor:
+            form.add_error(None, "No tienes un tutor asignado.")
+            return self.form_invalid(form)
+
         form.instance.alumno = alumno
-        form.instance.tutor = alumno.tutor_asignado
+        form.instance.tutor = tutor
 
         # Snapshot del estado del alumno al momento de crear la tutoría
         if not form.instance.estado_alumno_historico:
             form.instance.estado_alumno_historico = alumno.estado
 
-        # rol = self.request.user.has_role("ALU")
-        if self.request.user.has_role("ALU"):
-            recipient = Tutor.objects.get(pk=alumno.tutor_asignado)
+
+        # ====================================================
+        # 2) Leer valores ocultos enviados por el modal
+        # ====================================================
+        request = self.request
+        horario_id = request.POST.get("horario_tutor")
+        franja_seleccionada = request.POST.get("franja_seleccionada")
+        fecha_final = request.POST.get("fecha_sugerida")
+
+        if not horario_id and not fecha_final:
+            form.add_error(None, "Debes elegir un horario o sugerir una fecha.")
+            return self.form_invalid(form)
+
+        # ====================================================
+        # 3) Guardar temas correctamente (el modelo requiere lista)
+        # ====================================================
+        form.instance.tema = form.cleaned_data["tema"]  # es lista, y es válido para ArrayField
+
+
+        # ====================================================
+        # 4) Asignación de fecha
+        # ====================================================
+
+        # Caso donde el alumno elige un horario de los disponibles del tutor (Agenda cita).
+        if horario_id:
+            alumno_sugirio = False
+
+            slot = HorarioTutor.objects.filter(pk=horario_id, tutor=tutor).first()
+            if not slot:
+                form.add_error(None, "El horario seleccionado ya no está disponible.")
+                return self.form_invalid(form)
+
+            if not franja_seleccionada:
+                form.add_error(None, "Debes elegir una franja para el horario.")
+                return self.form_invalid(form)
+
+            try:
+                fecha_final_dt = resolver_franja_tutor(slot, franja_seleccionada)
+            except ValueError as error:
+                form.add_error(None, str(error))
+                return self.form_invalid(form)
+
+            if Tutoria.objects.filter(
+                tutor=tutor,
+                fecha=fecha_final_dt,
+                estado__in=[PENDIENTE, ACEPTADO],
+            ).exists():
+                form.add_error(None, "Ese horario acaba de ocuparse. Selecciona otro.")
+                return self.form_invalid(form)
+
+            form.instance.fecha = fecha_final_dt
+
+            # Como eligió un horarios disponible del tutor, se considera ya ACEPTADA la cita.
+            form.instance.estado = "ACE"
+            messages.success(request, "Tu solicitud ha sido agendada con éxito. No faltes a la cita en el día y horario que elegiste 📅.")
+        else:
+            # Caso donde el tutor no tenía horarios registrados y
+            # el alumno sugirió una fecha para la cita (Solicita cita).
+            alumno_sugirio = True
+
+            # fecha_final ya tiene el formato '2025-11-24T10:00'
+            try:
+                form.instance.fecha = datetime.fromisoformat(fecha_final)
+
+                # Como el alumno sugirió una fecha, queda PENDIENTE hasta que el
+                # tutor acepte la tutoría en esa fecha.
+                form.instance.estado = "PEN"
+                messages.warning(request, "Tu solicitud de tutoría ha sido enviada. Espera la respuesta de tu tutor ⏳.")
+            except(ValueError, TypeError):
+                form.add_error(None, "No enviaste una fecha válida.")
+                return self.form_invalid(form)
+
+        # Mensaje corto para saber si es tutoría agendada o solicitada.
+        resumen_notificacion="Nueva solicitud de tutoría"
+        if not alumno_sugirio:
+            resumen_notificacion="Nueva tutoría agendada"
 
         # Eliminar corchetes de la lista
         tutoria_notification_requested.send(
@@ -526,8 +1195,8 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
             event="solicitud_creada",
             tutoria=form.instance,
             actor=alumno,
-            recipient=recipient,
-            verb='Nueva solicitud de tutoria',
+            recipient=tutor,
+            verb=resumen_notificacion,
             description=f'{", ".join(form.instance.get_tema_display())}',
         )
         
@@ -539,9 +1208,8 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
             #recipient_list=[recipient.email],
             #fail_silently=False
     
-        
-
         return super().form_valid(form)
+    
 
     def get_initial(self) -> dict[str, Any]:
         return super().get_initial()
@@ -1300,24 +1968,35 @@ class TutoriasDetailView(BaseAccessMixin, DetailView):
         return queryset
     
 class HistorialTutoriasListView(BaseAccessMixin, ListView):
-     
+    """
+    Vista para mostrar el historial de tutorías de un usuario, ya sea para un tutor o un alumno. 
+    La vista filtra las tutorías según el rol del usuario y la fecha de realización.
+    """ 
     model = Tutoria
     template_name='Tutorias/historialtutoria.html'
+    context_object_name = "tutorias"
 
     def get_queryset(self) -> QuerySet[Any]:
-        
-        if Tutor.objects.filter(pk=self.request.user.pk).exists():
-            # Tutorias correspondientes al tutor
-            queryset = super().get_queryset().filter(tutor=self.request.user.pk)
-        else: 
-            # Tutorias correspondientes al alumno
-            queryset = super().get_queryset().filter(alumno=self.request.user)
-        
-        if self.request.user.is_superuser == 1: 
-            # Muestra todas las tutorias para el primer usuario creado (generalmente el primer superuser)
-            queryset = super().get_queryset().all()
-        
-        return queryset
+        ahora = timezone.now()
+        user = self.request.user
+
+        # Tutor: solamente tutorías ya realizadas
+        if user.has_role("TUT"):
+            return Tutoria.objects.filter(
+                tutor=user,
+                fecha__lt=ahora
+            ).order_by("-fecha")
+
+
+        # Alumno: sus tutorías
+        if user.has_role("ALU"):
+            return Tutoria.objects.filter(
+                alumno=user
+            ).order_by("-fecha")
+
+        # Cualquier otro rol: no mostrar tutorías
+        return Tutoria.objects.none()
+ 
 
 class HistorialTutoriasGenerateView(BaseAccessMixin, ListView):
     model = Tutoria
@@ -1453,7 +2132,14 @@ class VerTutoradosCoordinadorListView(CordinadorViewMixin, ListView):
         context["tutor"] = tutor
         return context
 
+
 class VerTutoriasTutorListView(TutorViewMixin, FormView):
+    """
+    Vista para mostrar solamente las tutorías pendientes de aprobación para un tutor.
+    Permite filtrar las tutorías por estado del alumno.
+    Adicionalmente, verifica si el tutor tiene horarios de atención definidos para
+    motivar al tutor a configurarlos si no los tiene, mostrando un mensaje de advertencia.
+    """
      
     model = Tutoria
     template_name='Tutorias/verTutorias_tutor.html'
@@ -1462,7 +2148,11 @@ class VerTutoriasTutorListView(TutorViewMixin, FormView):
     def form_valid(self, form):
         estado = form.cleaned_data.get("estado")
 
-        tutorias = Tutoria.objects.filter(tutor=self.request.user)
+        # Obtiene las tutorías del tutor actual que requieren aprobación o están pendientes
+        tutorias = Tutoria.objects.filter(
+            tutor=self.request.user,
+            estado__in=[PENDIENTE, PROPUESTA],
+        ).order_by("fecha")
 
         if estado:
             tutorias = tutorias.filter(alumno__estado=estado)
@@ -1472,32 +2162,162 @@ class VerTutoriasTutorListView(TutorViewMixin, FormView):
 
     def get(self, request, *args, **kwargs):
         form = self.get_form()
-        tutorias = Tutoria.objects.filter(tutor=request.user)
-        return self.render_to_response(self.get_context_data(form=form, object_list=tutorias))
+
+        tutorias = Tutoria.objects.filter(
+            tutor=request.user,
+            estado__in=[PENDIENTE, PROPUESTA],
+        ).order_by("fecha")
+
+        return self.render_to_response(
+            self.get_context_data(
+                form=form, 
+                object_list=tutorias
+            )
+        )
     
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
         tutorados = Alumno.objects.filter(tutor_asignado=self.request.user)
-        context["tutorados"] = [alumno for alumno in tutorados]
-        return context
+        context["tutorados"] = tutorados
 
+        context.update({
+            "estado_propuesta": PROPUESTA,
+            "estado_pendiente": PENDIENTE,
+            "estado_aceptado": ACEPTADO,
+            "estado_rechazado": RECHAZADO,
+            "estado_cancelado": CANCELADO,
+        })
 
-class VerTutoriasAlumnoListView(AlumnoViewMixin, ListView):
-     
+        return context 
+
+class TutorProximasListView(TutorViewMixin, ListView):
+    """
+    Vista para mostrar las tutorías próximas de un tutor.
+    Filtra las tutorías que están aceptadas, cuya fecha es mayor o igual a la fecha actual.
+    """
     model = Tutoria
-    template_name='Tutorias/verTutorias_alumno.html'
+    template_name = "Tutorias/tutorias_proximas.html"
+    context_object_name = "tutorias_proximas"
+
+    def get_queryset(self):
+        user = self.request.user
+
+        # Obtener el tutor real (objeto Tutor)
+        try:
+            tutor = user.tutor
+        except Tutor.DoesNotExist:
+            return Tutoria.objects.none()
+
+        hoy = timezone.localdate()
+
+        # Tutorías próximas:
+        # estado = ACE (Aceptadas)
+        # fecha >= hoy
+        return (
+            Tutoria.objects.filter(
+                tutor=tutor,
+                estado="ACE",
+                fecha__date__gte=hoy
+            ).order_by("fecha")
+        )
+
+class VerTutoriasTutorTabView(TutorViewMixin, ListView):
+    """
+        Organiza las tutorías del tutor por su estado efectivo para
+        presentar 3 listas:
+        1. Tutorías solicitadas.
+        2. Tutorías agendadas.
+        3. Historial de tutorías.
+    """
+
+    model = Tutoria
+    template_name = 'Tutorias/panel_tutorias_tutor.html'
+    context_object_name = 'tutorias'
 
     def get_queryset(self) -> QuerySet[Any]:
+        return (
+            super()
+            .get_queryset()
+            .filter(tutor_id=self.request.user.pk)
+            .select_related('alumno')
+        )
+
+    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        context['motivos_cancelacion'] = MOTIVOS_CANCELACION_TUTOR
+        tutorias = list(context['tutorias'])
+
+        # 1. Solicitadas: ordenadas por fecha de solicitud (las más recientes primero)
+        solicitadas = [t for t in tutorias if t.estado_efectivo in [PENDIENTE, PROPUESTA, VENCIDA]]
+        context['tutorias_solicitadas'] = sorted(
+            solicitadas, key=lambda t: t.fecha_solicitud, reverse=True
+        )
+
+        # 2. Agendadas: ordenadas por fecha de la cita (las más próximas primero)
+        agendadas = [t for t in tutorias if t.estado_efectivo == ACEPTADO]       
+        context['tutorias_agendadas'] = sorted(
+            agendadas, key=lambda t: t.fecha
+        )
+
+        # 3. Historial: ordenadas por fecha de la cita (las más recientes primero)
+        historial = [t for t in tutorias if t.estado_efectivo in [REALIZADA, REPORTADA, RECHAZADO, CANCELADO]]
+        context['tutorias_historial'] = sorted(
+            historial, key=lambda t: t.fecha, reverse=True
+        )
+
+        return context
+
+class VerTutoriasAlumnoListView(LoginRequiredMixin, ListView):
+    """
+        Organiza las tutorías del alumno por su estado efectivo para
+        presentar 3 listas:
+        1. Tutorías solicitadas.
+        2. Tutorías agendadas.
+        3. Historial de tutorías.
+    """
+
+    model = Tutoria
+    template_name = 'Tutorias/panel_tutorias_alumno.html'
+    context_object_name = 'tutorias'
+
+    def get_queryset(self) -> QuerySet[Any]:
+        return (
+            super()
+            .get_queryset()
+            .filter(alumno_id=self.request.user.pk)
+            .select_related('tutor')
+        )
+
+    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        context['motivos_cancelacion'] = MOTIVOS_CANCELACION_ALUMNO
+        tutorias = list(context['tutorias'])
+
+        # HeaderAndFooterFachada.html extiende esta plantilla dinámicamente.
+        # Esta vista usa LoginRequiredMixin directamente, por lo que debe
+        # proporcionar el valor que antes agregaba AlumnoViewMixin.
+        context['header_footer'] = TEMPLATES[ALUMNO]
+
+       # 1. Solicitadas: ordenadas por fecha de solicitud (las más recientes primero)
+        solicitadas = [t for t in tutorias if t.estado_efectivo in [PENDIENTE, PROPUESTA, VENCIDA]]
+        context['tutorias_solicitadas'] = sorted(
+            solicitadas, key=lambda t: t.fecha_solicitud, reverse=True
+        )
+
+        # 2. Agendadas: ordenadas por fecha de la cita (las más próximas primero)
+        agendadas = [t for t in tutorias if t.estado_efectivo == ACEPTADO]       
+        context['tutorias_agendadas'] = sorted(
+            agendadas, key=lambda t: t.fecha
+        )
+
+        # 3. Historial: ordenadas por fecha de la cita (las más recientes primero)
+        historial = [t for t in tutorias if t.estado_efectivo in [REALIZADA, REPORTADA, RECHAZADO, CANCELADO]]
+        context['tutorias_historial'] = sorted(
+            historial, key=lambda t: t.fecha, reverse=True
+        )
         
-        # Tutorias correspondientes al alumno
-        
-        queryset = super().get_queryset().filter(alumno=self.request.user)
-        #if self.request.user.is_superuser == 1: 
-            # Muestra todas las tutorias para el primer usuario creado (generalmente el primer superuser)
-            #queryset = super().get_queryset().all()
-        
-        return queryset
-    
+        return context
+
 
 # TODO Eliminar para prod
 # class DebugTutoriasView(LoginRequiredMixin, ListView):
@@ -1604,6 +2424,85 @@ class QRCodeView(View):
         return response
 
 
+# ALJ: Esta vista es para solicitar tutorías In Situ, es decir,
+# cuando el alumno escanea un QR directamente en la oficina del tutor.
+# Para ver cómo se genera el QR, revisar VerQRView de Usuarios/views.py
+# El QR está personalizado para cada tutor, de manera que solamente sus tutorados
+# pueden solicitarle tutorías In Situ.
+# TODO: agregar a los alumnos un campo de "tutor_sustituto" que normalmente será
+# el coordinador para que también esa persona pueda atenderlo.
+
+class TutoriaInSituCreateView(LoginRequiredMixin, ContextConRolesMixin, TemplateView):
+
+    template_name = "Tutorias/tutoria_insitu_form.html"
+
+    def get(self, request, tutor_pk):
+
+        usuario = request.user
+
+        # 1) Validar que sea alumno
+        if not usuario.is_alumno:
+            return HttpResponseForbidden("Solo los alumnos pueden registrar tutorías in-situ.")
+
+        alumno = Alumno.objects.get(pk=request.user.pk)
+
+        # 2) Validar tutor
+        tutor = get_object_or_404(Tutor, pk=tutor_pk)
+
+        # 3) Validar que el alumno pertenece a ese tutor
+        if alumno.tutor_asignado.pk != tutor.pk:   # Ajusta nombre del campo
+            return HttpResponseForbidden(f"{tutor.nombre_completo} no es tu tutor asignado.")
+
+        # 4) Mostrar formulario
+        form = FormTutoriasInSitu()
+
+        # Construir contexto con roles
+        context = self.get_context_data(
+            form=form,
+            tutor=tutor,
+        )
+
+        return render(request, self.template_name, context)
+
+    def post(self, request, tutor_pk):
+
+        usuario = request.user
+
+        if not usuario.is_alumno:
+            return HttpResponseForbidden("Solo los alumnos pueden registrar tutorías in-situ.")
+
+        alumno = Alumno.objects.get(pk=request.user.pk)
+
+        tutor = get_object_or_404(Tutor, pk=tutor_pk)
+
+        if alumno.tutor_asignado.pk != tutor.pk:  # Ajusta si tu campo se llama diferente
+            return HttpResponseForbidden(f"{tutor.nombre_completo} no es tu tutor asignado.")
+
+        form = FormTutoriasInSitu(request.POST)
+
+        if form.is_valid():
+            nueva = form.save(commit=False)
+            nueva.alumno = alumno
+            nueva.tutor = tutor
+            #nueva.modalidad = "INS"
+            nueva.estado = "ACE"  # aceptada directamente, para el tutor pasa directamente a historial tutorías.
+            nueva.fecha = timezone.now()
+            nueva.save()
+
+            # Agregar mensaje de confirmación
+            messages.success(request, "Tutoría In Situ registrada con éxito.")
+
+            return redirect("Tutorias-alumno")
+
+        # Si el formulario es inválido, regenerar el contexto completo
+        context = self.get_context_data(
+            form=form,
+            tutor=tutor,
+        )
+
+        return render(request, self.template_name, context)
+
+
 class CrearTutoriaPorAlumnoView(TutorViewMixin, CreateView):
     model = Tutoria
     form_class = FormTutorias
@@ -1649,23 +2548,37 @@ class RealizarSeguimientoView(TutorViewMixin, UpdateView):
         'resultados_tutoria',
     ]
 
-    def _has_existing_report(self, tutoria: Tutoria) -> bool:
-        # Evita falsos positivos por defaults del modelo (False/0/"" en tutorias nuevas).
-        if tutoria.asistencia is not True:
-            return False
+    def _is_modal_request(self) -> bool:
+        return self.request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
-        has_duracion = tutoria.duracion not in (None, 0)
-        has_impacto = tutoria.impacto_tutoria not in (None, 0)
-        has_text_details = any(
-            bool((value or '').strip())
-            for value in [tutoria.beca_otorgada, tutoria.observaciones, tutoria.resultados_tutoria]
+    def get_queryset(self):
+        # Un tutor solamente puede consultar o modificar sus propias tutorías.
+        return (
+            super()
+            .get_queryset()
+            .filter(tutor_id=self.request.user.pk)
+            .select_related('alumno', 'tutor', 'alumno__tutor_asignado')
+            .prefetch_related('historial_cambios')
         )
-        has_positive_flags = any([
-            tutoria.firma_documentos_beca is True,
-            tutoria.asesoria_especializada is True,
-        ])
 
-        return (has_duracion and has_impacto) or (has_duracion and (has_text_details or has_positive_flags))
+    def get_template_names(self):
+        if self._is_modal_request():
+            return ['Tutorias/includes/partials/modal_seguimiento_tutoria.html']
+        return [self.template_name]
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        if self._is_modal_request() and self.request.method == 'POST':
+            # El modal muestra únicamente los siete campos solicitados. Este
+            # campo pertenece al formulario completo y debe conservarse para
+            # no borrar información previa al editar desde el panel.
+            data = kwargs['data'].copy()
+            data['beca_otorgada'] = self.get_object().beca_otorgada or ''
+            kwargs['data'] = data
+        return kwargs
+
+    def _has_existing_report(self, tutoria: Tutoria) -> bool:
+        return tutoria.fecha_reporte is not None
 
     def _format_bool(self, value: Any) -> str:
         if value is True:
@@ -1724,14 +2637,6 @@ class RealizarSeguimientoView(TutorViewMixin, UpdateView):
                 changes.append(f"{label}: '{old_value}' -> '{new_value}'")
 
         return ' | '.join(changes) if changes else 'Se editó el reporte sin cambios detectables.'
-
-    def get_queryset(self):
-        return (
-            super()
-            .get_queryset()
-            .select_related('alumno', 'tutor', 'alumno__tutor_asignado')
-            .prefetch_related('historial_cambios')
-        )
 
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
@@ -1822,6 +2727,10 @@ class RealizarSeguimientoView(TutorViewMixin, UpdateView):
             alumno.estado = estado_actual_nuevo
             alumno.save(update_fields=['estado'])
 
+        # Registrar la fecha del primer llenado del reporte.
+        if form.instance.fecha_reporte is None:
+            form.instance.fecha_reporte = timezone.now()
+
         response = super().form_valid(form)
 
         if has_edit_changes:
@@ -1843,7 +2752,17 @@ class RealizarSeguimientoView(TutorViewMixin, UpdateView):
             tutoria=self.object,
             actor=tutor,
         )
+        if self._is_modal_request():
+            return JsonResponse({'ok': True})
         return response
+
+    def form_invalid(self, form: BaseModelForm) -> HttpResponse:
+        if self._is_modal_request():
+            return self.render_to_response(
+                self.get_context_data(form=form),
+                status=422,
+            )
+        return super().form_invalid(form)
 
 
 class EditarEstadoAlumnoHistoricoView(BaseAccessMixin, View):

@@ -1,0 +1,55 @@
+<div class="modal fade"
+     id="modalCancelarAlumno-{{ tutoria.pk }}"
+     tabindex="-1"
+     aria-labelledby="modalCancelarAlumnoLabel-{{ tutoria.pk }}"
+     aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <form method="post" action="{% url 'cancelar-tutoria' tutoria.pk %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="modalCancelarAlumnoLabel-{{ tutoria.pk }}">Cancelar tutoría</h5>
+          <button type="button"
+                  class="btn-close"
+                  data-mdb-dismiss="modal"
+                  aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body text-start">
+          <p class="text-muted small">Selecciona el motivo de la cancelación.</p>
+
+          {% for codigo, texto in motivos_cancelacion %}
+            <div class="form-check mb-2">
+              <input class="form-check-input motivo-cancelacion-alumno"
+                     type="radio"
+                     name="motivo_cancelacion"
+                     id="motivo-{{ codigo }}-{{ tutoria.pk }}"
+                     value="{{ codigo }}"
+                     data-requiere-detalle="{% if codigo == 'ALU_OTRO' %}true{% else %}false{% endif %}"
+                     {% if forloop.first %}checked{% endif %}>
+              <label class="form-check-label" for="motivo-{{ codigo }}-{{ tutoria.pk }}">
+                {{ texto }}
+              </label>
+            </div>
+          {% endfor %}
+
+          <div class="otro-motivo-cancelacion-alumno d-none">
+            <label class="form-label" for="motivo-cancelacion-alumno-otro-{{ tutoria.pk }}">
+              Escribe el motivo
+            </label>
+            <textarea id="motivo-cancelacion-alumno-otro-{{ tutoria.pk }}"
+                      name="detalle_motivo_cancelacion"
+                      class="form-control"
+                      rows="3"
+                      maxlength="144"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button"
+                  class="btn btn-secondary btn-sm"
+                  data-mdb-dismiss="modal">Conservar tutoría</button>
+          <button type="submit" class="btn btn-danger btn-sm">Cancelar tutoría</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

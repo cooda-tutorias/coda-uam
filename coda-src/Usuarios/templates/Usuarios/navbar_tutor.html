@@ -1,22 +1,101 @@
 {% extends "Usuarios/base.html" %}
 
 {% block navbar %}
+  {% comment %} 
+  <li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle text-primary {% if request.resolver_match.url_name in 'Tutorias-tutor Tutorias-proximas Tutorias-historial' %} active {% endif %}"
+       href="#"
+       id="menuTutorias"
+       role="button"
+       data-bs-toggle="dropdown"
+       aria-expanded="false">
+      <i class="bi bi-calendar-week"></i> Tutorías
+    </a>
 
+    <ul class="dropdown-menu" aria-labelledby="menuTutorias">
+
+      <li>
+        <a class="dropdown-item {% if request.resolver_match.url_name == 'Tutorias-tutor' %}active{% endif %}"
+           href="{% url 'Tutorias-tutor' %}"
+           data-bs-toggle="tooltip"
+           data-bs-placement="right"
+           title="Consultar solicitudes que necesitan tu autorización.">
+          <i class="bi bi-envelope-paper"></i>
+          Tutorías solicitadas
+        </a>
+      </li>
+
+      <li>
+        <a class="dropdown-item {% if request.resolver_match.url_name == 'Tutorias-proximas' %}active{% endif %}"
+           href="{% url 'Tutorias-proximas' %}"
+           data-bs-toggle="tooltip"
+           data-bs-placement="right"
+           title="Consultar agenda de tutorías próximas.">
+          <i class="bi bi-clock-history"></i>
+          Tutorías próximas
+        </a>
+      </li>
+
+      <li>
+        <a class="dropdown-item {% if request.resolver_match.url_name == 'Tutorias-historial' %}active{% endif %}"
+           href="{% url 'Tutorias-historial' %}"
+           data-bs-toggle="tooltip"
+           data-bs-placement="right"
+           title="Tutorías realizadas pendientes de reporte.">
+          <i class="bi bi-archive"></i>
+          Tutorías realizadas
+        </a>
+      </li>
+
+    </ul>
+  </li>
+  {% endcomment %}
+
+  {% comment %} 
 <li class="nav-item">
-    <a class="nav-link text-primary" href="{% url 'Tutorias-tutor' %}">Tutorías asignadas</a>
-</li>
-<li class="nav-item">
-    <a class="nav-link text-primary" href="{% url 'Tutorias-historial' %}" >Historial de tutorías</a>
-</li>
-{% comment %} <li class="nav-item">
     <a class="nav-link text-primary" href="{% url 'Tutorias-historial-generar' %}" >Generar historial tutoría</a>
-</li> {% endcomment %}
-<li class="nav-item">
-    <a class="nav-link text-primary" href="{% url 'Tutorados-tutor' %}">Lista de tutorados</a>
-</li>
-<li>
-    <a class="nav-link text-primary" href="{% url 'tutorias-comunicacion-masiva' %}">Comunicación masiva</a>
-</li>
+</li> 
+  {% endcomment %}
+
+  <li class="nav-item">
+    <a class="nav-link text-primary {% if request.resolver_match.url_name == 'Panel-tutorias-tutor' %}active{% endif %}"
+       href="{% url 'Panel-tutorias-tutor' %}"
+       data-bs-toggle="tooltip"
+       data-bs-placement="bottom"
+       title="Consulta tu panel de tutorías.">
+      <i class="bi bi-clipboard-data-fill"></i>
+      Panel de tutorías
+    </a>
+  </li>
+
+  <li class="nav-item">
+    <a class="nav-link text-primary {% if request.resolver_match.url_name == 'Tutorados-tutor' %}active{% endif %}"
+       href="{% url 'Tutorados-tutor' %}"
+       data-bs-toggle="tooltip"
+       data-bs-placement="bottom"
+       title="Consultar la lista de todos tus tutorados.">
+      <i class="bi bi-people"></i>
+      Lista de tutorados
+    </a>
+  </li>
+
+  <li class="nav-item">
+    <a class="nav-link text-primary {% if request.resolver_match.url_name == 'tutorias-comunicacion-masiva' %}active{% endif %}"
+       href="{% url 'tutorias-comunicacion-masiva' %}"
+       data-bs-toggle="tooltip"
+       data-bs-placement="bottom"
+       title="Enviar correo a tus tutorados.">
+      <i class="bi bi-envelope-arrow-up"></i>
+      Comunicación masiva
+    </a>
+  </li>
+
+  <script>
+    // Esto busca todos los elementos que tengan tooltip y los activa
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+      return new bootstrap.Tooltip(tooltipTriggerEl)
+    })
+  </script>
 
 {% endblock %}
-

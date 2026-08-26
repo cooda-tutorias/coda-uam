@@ -9,6 +9,7 @@ urlpatterns = [
     path('', views.UsuarioLoginView.as_view(), name='login'),
     #path('perfil-test/', views.perfil_view_test, name='perfil-test'),
     path('perfil-alumno/<int:pk>/', views.PerfilAlumnoView.as_view(), name='perfil-alumno'),
+    path('mi-tutor/', views.redirect_perfil_tutor, name='perfil-tutor-alumno'),
     path('perfil-tutor/<int:pk>/', views.PerfilTutorView.as_view(), name='perfil-tutor'),
     path('perfil-coordinador/<int:pk>/', views.PerfilCordinadorView.as_view(), name='perfil-coordinador'),
     path('perfil-coda/<int:pk>/', views.PerfilCodaView.as_view(), name='perfil-coda'),
@@ -32,6 +33,10 @@ urlpatterns = [
     path('ajustes/', views.ajustes.as_view(), name='ajustes'),
     path('cargar_plantilla/', views.CargarPlantilla.as_view(), name='cargar_plantilla'),
     path('eliminar-documento/<int:pk>/', views.eliminar_documento, name='eliminar_documento'),
-    path('ver_plantilla/<int:documento_id>/', views.VerPlantilla.as_view(), name='ver_plantilla')
-    # ... (other existing URL patterns)
+    path('ver_plantilla/<int:documento_id>/', views.VerPlantilla.as_view(), name='ver_plantilla'),
+
+    # Agregado por Antonio LJ para tutorías in-situ.
+    path("mi-qr/", views.VerQRView.as_view(), name="ver_qr_tutor"),
+    path("mis-horarios/", views.HorariosTutorView.as_view(), name="tutor_horarios"),
+    path("mis-horarios/eliminar/<int:pk>/", views.EliminarHorarioTutorView.as_view(), name="tutor_horario_eliminar"),
 ]

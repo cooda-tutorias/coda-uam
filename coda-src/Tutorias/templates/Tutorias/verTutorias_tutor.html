@@ -3,6 +3,62 @@
 {% block title %} Tutorias Tutor {% endblock %}
 
 {% block body %}
+
+
+<style>
+.action-group {
+  overflow: hidden;
+  border: 1px solid #d6d6d6;
+  border-radius: 0.5rem;
+  background-color: #fff;
+}
+
+.action-neutral {
+  display: inline-flex;
+  width: 36px;
+  height: 34px;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+  color: #555;
+  background-color: #fff;
+  border: 0;
+  border-right: 1px solid #e2e2e2;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.action-group > :last-child {
+  border-right: 0;
+}
+
+.action-accept:hover,
+.action-accept:focus {
+  color: #fff;
+  background-color: var(--bs-green);
+}
+
+.action-reschedule:hover,
+.action-reschedule:focus {
+  color: #fff;
+  background-color: var(--bs-primary);
+}
+
+.action-reject:hover,
+.action-reject:focus {
+  color: #fff;
+  background-color: var(--bs-red);
+}
+
+.badge-espera-alumno {
+  color: #212529 !important;
+  background-color: var(--bs-yellow) !important;
+  border: 1px solid #d39e00;
+}
+</style>
+
+
+
 <!--Ver Tutorias-->
 <section id="section" style="background-color: #eee;">
   <div class="container py-5 h-100">
@@ -10,7 +66,7 @@
       <div class="col-lg-8 col-xl-10">
         <div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
           <div class="card-body p-4">
-            <h3 class=" mb-4 text-primary text-title-bold">Lista de Tutorias</h3>
+            <h3 class=" mb-4 text-primary text-title-bold">Lista de tutorías solicitadas</h3>
 
             <!--Inicio de Filtro-->
             <!-- <div class="filter-bar my-4 text-body">
@@ -47,53 +103,98 @@
               <table class="table table-striped table-hover datatable">
                 <thead class="text-title text-center">
                   <tr>
-                    <th>Id</th>
-                    <th>Matricula</th>
-                    <th>Alumno</th>
-                    <th>Estado Guardado</th>
-                    <th>Estado Actual</th>
-                    <th>Fecha</th>
-                    <th>Hora</th>
+                    <th>Matrícula</th>
+                    <th>Estudiante</th>
+                    <!--<th>Estado Guardado</th>-->
+                    <th>Estado académico</th>
+                    <th>Tutoría solicitada para</th>
                     <th>Tema</th>
                     <th class="w-25">Descripción</th>
-                    <th>Acciones</th>
-                    <th>Estado</th>
+                    <th>Acción</th>
                   </tr>
                 </thead>
                 <tbody id="data" class="text-body">
                   {% for tutoria in object_list %}
                   <tr data-alumno="{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}">
-                    <td>{{ tutoria.pk }}</td>
                     <td>{{ tutoria.alumno.matricula }}</td>
                     <td>{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}</td>
-                    <td>{{ tutoria.get_estado_alumno_historico_display }}</td>
+                    <!--<td>{{ tutoria.get_estado_alumno_historico_display }}</td>-->
                     <td>{{ tutoria.alumno.get_estado_display }}</td>
-                    <td>{{ tutoria.fecha|date }}</td>
-                    <td>{{ tutoria.fecha|date:"P" }}</td>
-                    <td>{{ tutoria.get_tema_display|join:", " }}</td>
-                    <td class="w-25">{{ tutoria.descripcion|default:"-" }}</td>
-                    <td class="text-body-bold">
-                      <a href="{% url 'Tutorias-update' pk=tutoria.pk %}">Editar</a>
-                    </td>
+                    <td class="text-nowrap">
+                      <span class="d-block fw-semibold">
+                        {{ tutoria.fecha|date:"j M Y" }}
+                      </span>
+                      <small class="text-muted">
+                        <i class="bi bi-clock me-1"></i>
+                        {{ tutoria.fecha|date:"P" }}
+                      </small>
+                    </td>       
                     <td>
-                      {% if tutoria.get_estado_display == 'Aceptada' and not tutoria.asistencia %}
-                        <span class="badge bg-success">Aceptada</span>
-                      {% elif tutoria.get_estado_display == 'Aceptada' and tutoria.asistencia %}
-                        <span class="badge badge-success text-dark">Completada</span>
-                      {% elif tutoria.get_estado_display == 'Rechazada' %}
-                        <span class="badge badge-warning text-dark">Rechazada</span>
-                      {% elif tutoria.get_estado_display == 'Cancelada' %}
-                        <span class="badge badge-danger text-dark">Cancelada</span>
-                      {% else %}
-                        <div class="d-flex align-items-center">
-                          <form method="post" action="{% url 'aceptar_tutoria' tutoria.pk%}"> {% csrf_token %}
-                            <button type="submit" class="btn btn-sm btn-success me-2">Aceptar</button>
-                          </form>
-                          <form method="post" action="{% url 'rechazar_tutoria' tutoria.pk%}"> {% csrf_token %}
-                            <button type="submit" class="btn btn-sm btn-danger">Rechazar</button>
-                          </form>
+                        <!-- Dejo la opción de Editar tutoría como referencia para otros casos, pero cuando una tutoría está
+                             PENDIENTE no es necesario que el tutor la edite. Al final hay que QUITAR la opción de edición para el
+                             TUTOR -->
+                        {{ tutoria.get_tema_display|join:", " }} 
+                        <a href="{% url 'Tutorias-update' pk=tutoria.pk %}" 
+                           class="text-secondary ms-2" title="Editar tutoría">
+                          <i class="bi bi-pencil-square hover-primary"></i>
+                        </a>
+                    </td>                    
+                    <td class="w-25">{{ tutoria.descripcion|default:"-" }}</td>
+
+                    <td>
+
+                      {% if tutoria.estado == estado_propuesta %}
+                        <span class="badge badge-espera-alumno"
+                              data-mdb-toggle="tooltip"
+                              title="Se agendará cuando el alumno elija una fecha.">
+                          En espera de selección del alumno
+                        </span>
+                      {% elif tutoria.estado == estado_pendiente %}
+                        <div class="btn-group btn-group-sm action-group"
+                            role="group"
+                            aria-label="Acciones de tutoría">
+                          
+                            <!-- 1. ACEPTAR (Envío directo) -->
+                            <form method="post" action="{% url 'aceptar_tutoria' tutoria.pk %}" class="d-flex">
+                                {% csrf_token %}
+                                <button type="submit" class="btn action-neutral action-accept" title="Aceptar solicitud">
+                                    <i class="bi bi-check-lg"></i>
+                                </button>
+                            </form>
+
+                            <!-- 2. PROPONER (Abre Modal, NO envía form directo) -->
+                            <button type="button" 
+                                    class="btn action-neutral action-reschedule" 
+                                    title="Proponer otra fecha" 
+                                    data-mdb-toggle="modal" 
+                                    data-mdb-target="#modalProponer-{{ tutoria.pk }}">
+                                <i class="bi bi-calendar-range"></i>
+                            </button>
+
+                            <!-- 3. RECHAZAR (Abre Modal, NO envía form directo) -->
+                            <button type="button"
+                                    class="btn action-neutral action-reject"
+                                    title="Rechazar solicitud"
+                                    data-mdb-toggle="modal"
+                                    data-mdb-target="#modalRechazar-{{ tutoria.pk }}">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+
                         </div>
-                      {% endif %}
+
+                        {% elif tutoria.estado == estado_aceptado and not tutoria.asistencia %}
+                          <span class="badge bg-success">Aceptada</span>
+
+                        {% elif tutoria.estado == estado_aceptado and tutoria.asistencia %}
+                          <span class="badge badge-success text-dark">Completada</span>
+
+                        {% elif tutoria.estado == estado_rechazado %}
+                          <span class="badge badge-warning text-dark">Rechazada</span>
+
+                        {% elif tutoria.estado == estado_cancelado %}
+                          <span class="badge badge-danger text-dark">Cancelada</span>
+                        {% endif %}
+
                     </td>
                   </tr>
                   {% endfor %}
@@ -101,6 +202,184 @@
               </table>
             </div>
             <!--Fin de table-->
+
+            <!-- La ventana modal para proponer fechas alternativas -->     
+            {% for tutoria in object_list %}
+            <div class="modal fade" id="modalProponer-{{ tutoria.pk }}" tabindex="-1" aria-hidden="true">
+              <div class="modal-dialog">
+                <div class="modal-content">
+                  
+                  <form method="post" action="{% url 'proponer_fechas_tutoria' tutoria.pk %}">
+                    {% csrf_token %}
+                    
+                    <div class="modal-header">
+                      <h5 class="modal-title">Proponer horario alternativo</h5>
+                      <button type="button" class="btn-close" data-mdb-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    
+                    <div class="modal-body">
+                      <p class="text-muted small">
+                        Selecciona al menos una opción de fecha y hora. Puedes agregar una segunda opción para darle flexibilidad al alumno.
+                      </p>
+                      
+                      <div class="mb-3">
+                        <label class="form-label fw-bold small">
+                          Opción 1 <span class="text-danger">*</span>
+                        </label>
+                        <input type="datetime-local" 
+                              name="propuesta_1" 
+                              class="form-control form-control-sm input-propuesta-fecha" 
+                              required>
+                      </div>
+                      
+                      <div class="mb-3">
+                        <label class="form-label fw-bold small text-muted">
+                          Opción 2 <span class="fw-normal">(Opcional)</span>
+                        </label>
+                        <input type="datetime-local" 
+                              name="propuesta_2" 
+                              class="form-control form-control-sm input-propuesta-fecha">
+                      </div>
+                    </div>
+                    
+                    <div class="modal-footer">
+                      <button type="button" class="btn btn-secondary btn-sm" data-mdb-dismiss="modal">Cancelar</button>
+                      <button type="submit" class="btn btn-primary btn-sm">Enviar propuesta</button>
+                    </div>
+                    
+                  </form>
+
+                </div>
+              </div>
+            </div>
+
+            <!-- La ventana modal para elegir el motivo del rechazo -->     
+            <div
+              class="modal fade"
+              id="modalRechazar-{{ tutoria.pk }}"
+              tabindex="-1"
+              aria-labelledby="modalRechazarLabel-{{ tutoria.pk }}"
+              aria-hidden="true">
+              <div class="modal-dialog">
+                <div class="modal-content">
+
+                  <form method="post" action="{% url 'rechazar_tutoria' tutoria.pk %}">
+                    {% csrf_token %}
+
+                    <div class="modal-header">
+                      <h5
+                        class="modal-title"
+                        id="modalRechazarLabel-{{ tutoria.pk }}">
+                        Rechazar solicitud
+                      </h5>
+
+                      <button
+                        type="button"
+                        class="btn-close"
+                        data-mdb-dismiss="modal"
+                        aria-label="Cerrar">
+                      </button>
+                    </div>
+
+                    <div class="modal-body">
+                      <p class="text-muted small">
+                        Selecciona la razón del rechazo.
+                      </p>
+
+                      <div class="form-check mb-2">
+                        <input
+                          class="form-check-input motivo-rechazo"
+                          type="radio"
+                          name="motivo_rechazo"
+                          id="fuera-oficina-{{ tutoria.pk }}"
+                          value="SIN_DISPONIBILIDAD_FECHAS"
+                          required>
+                        <label
+                          class="form-check-label"
+                          for="fuera-oficina-{{ tutoria.pk }}">
+                          No estaré disponible en las fechas solicitadas y no me es posible proponer otro horario.
+                        </label>
+                      </div>
+
+                      <div class="form-check mb-2">
+                        <input
+                          class="form-check-input motivo-rechazo"
+                          type="radio"
+                          name="motivo_rechazo"
+                          id="fuera-ambito-{{ tutoria.pk }}"
+                          value="FUERA_AMBITO">
+                        <label
+                          class="form-check-label"
+                          for="fuera-ambito-{{ tutoria.pk }}">
+                          El tema solicitado se encuentra fuera de mi ámbito de atención o conocimiento.
+                        </label>
+                      </div>
+
+                      <div class="form-check mb-2">
+                        <input
+                          class="form-check-input motivo-rechazo"
+                          type="radio"
+                          name="motivo_rechazo"
+                          id="requiere-canalizacion-{{ tutoria.pk }}"
+                          value="REQUIERE_CANALIZACION">
+                        <label
+                          class="form-check-label"
+                          for="requiere-canalizacion-{{ tutoria.pk }}">
+                          El tema requiere atención de otra persona o instancia especializada.
+                        </label>
+                      </div>
+
+                      <div class="form-check mb-3">
+                        <input
+                          class="form-check-input motivo-rechazo"
+                          type="radio"
+                          name="motivo_rechazo"
+                          id="otro-{{ tutoria.pk }}"
+                          value="otro"
+                          data-textarea-id="otro-motivo-{{ tutoria.pk }}">
+                        <label
+                          class="form-check-label"
+                          for="otro-{{ tutoria.pk }}">
+                          Otro
+                        </label>
+                      </div>
+
+                      <div id="otro-motivo-{{ tutoria.pk }}" class="d-none">
+                        <label
+                          class="form-label"
+                          for="motivo-personalizado-{{ tutoria.pk }}">
+                          Escribe la razón
+                        </label>
+
+                        <textarea
+                          id="motivo-personalizado-{{ tutoria.pk }}"
+                          name="motivo_rechazo_otro"
+                          class="form-control"
+                          rows="3"
+                          maxlength="500">
+                        </textarea>
+                      </div>
+                    </div>
+
+                    <div class="modal-footer">
+                      <button
+                        type="button"
+                        class="btn btn-secondary btn-sm"
+                        data-mdb-dismiss="modal">
+                        Cancelar
+                      </button>
+
+                      <button type="submit" class="btn btn-danger btn-sm">
+                        Rechazar solicitud
+                      </button>
+                    </div>
+                  </form>
+
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+
           </div>
         </div>
       </div>
@@ -108,6 +387,8 @@
   </div>
 </section>
 
+
+<!-- Script para filtrar por nombre de alumno -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
   $(document).ready(function () {
@@ -120,6 +401,78 @@
         $('#data tr').hide();
         $('#data tr[data-alumno="' + selectedAlumno + '"]').show();
       }
+    });
+  });
+</script>
+
+<!-- Script para configurar las fechas de propuesta -->
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    function obtenerSiguienteDiaHabil() {
+      let fecha = new Date();
+      fecha.setDate(fecha.getDate() + 1); // Avanzar a mañana
+
+      // Si es Sábado (6), sumar 2 días para ir a Lunes
+      if (fecha.getDay() === 6) {
+        fecha.setDate(fecha.getDate() + 2);
+      } 
+      // Si es Domingo (0), sumar 1 día para ir a Lunes
+      else if (fecha.getDay() === 0) {
+        fecha.setDate(fecha.getDate() + 1);
+      }
+
+      const yyyy = fecha.getFullYear();
+      const mm = String(fecha.getMonth() + 1).padStart(2, '0');
+      const dd = String(fecha.getDate()).padStart(2, '0');
+
+      // Formato requerido por HTML5 datetime-local: YYYY-MM-DDTHH:mm
+      return `${yyyy}-${mm}-${dd}T10:00`;
+    }
+
+    const fechaDefecto = obtenerSiguienteDiaHabil();
+
+    // 1. Configurar la Opción 1 (Obligatoria: valor inicial a las 10:00 a.m.)
+    const inputsOp1 = document.querySelectorAll('input[name="propuesta_1"]');
+    inputsOp1.forEach(input => {
+      input.min = fechaDefecto;
+      input.value = fechaDefecto;
+    });
+
+    // 2. Configurar la Opción 2 (Opcional: vacía, pero asigna 10:00 a.m. al hacer clic)
+    const inputsOp2 = document.querySelectorAll('input[name="propuesta_2"]');
+    inputsOp2.forEach(input => {
+      input.min = fechaDefecto;
+      
+      // En cuanto reciba el foco/clic, si está vacío, asigna la fecha a las 10:00 a.m.
+      input.addEventListener('focus', function () {
+        if (!this.value) {
+          this.value = fechaDefecto;
+        }
+      });
+    });
+  });
+</script>
+
+<!-- Script para manejar la lógica de los motivos de rechazo -->
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.motivo-rechazo').forEach(function (radio) {
+      radio.addEventListener('change', function () {
+        const form = this.closest('form');
+        const otroRadio = form.querySelector('input[value="otro"]');
+        const otroContainer = document.getElementById(
+          otroRadio.dataset.textareaId
+        );
+        const textarea = otroContainer.querySelector('textarea');
+        const esOtro = otroRadio.checked;
+
+        otroContainer.classList.toggle('d-none', !esOtro);
+        textarea.required = esOtro;
+
+        if (!esOtro) {
+          textarea.value = '';
+        }
+      });
     });
   });
 </script>
