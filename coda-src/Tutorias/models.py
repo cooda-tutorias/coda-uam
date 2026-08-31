@@ -6,7 +6,8 @@ from Usuarios.models import Alumno, Tutor, Usuario
 from Usuarios.constants import ESTADOS_ALUMNO
 from .constants import ( 
     TEMAS, SERVICIO, ESTADO, DURACION_ASESORIA, ORIGEN_CANCELACION, 
-    DIAS_TOLERANCIA_TUTOR, MOTIVOS_CANCELACION
+    DIAS_TOLERANCIA_TUTOR, MOTIVOS_CANCELACION, MOTIVOS_RECHAZO_TUTOR,
+    MOTIVO_RECHAZO_OTRO,
 )
 from django.utils import timezone
 
@@ -56,6 +57,13 @@ class Tutoria(models.Model):
 
     # Atributo para registrar el motivo de rechazo de la tutoría.
     motivo_rechazo = models.CharField(
+        max_length=32,
+        choices=MOTIVOS_RECHAZO_TUTOR,
+        blank=True,
+        null=True,
+    )
+
+    detalle_motivo_rechazo = models.CharField(
         max_length=500,
         blank=True,
         null=True,
@@ -221,6 +229,24 @@ class Tutoria(models.Model):
         choices = dict(TEMAS)
         # return choices
         return [choices.get(t, "Unknown") for t in self.tema]
+
+    @property
+    def motivo_rechazo_legible(self):
+        """Devuelve la etiqueta del motivo o el detalle escrito por el tutor."""
+        if self.motivo_rechazo == MOTIVO_RECHAZO_OTRO:
+            return self.detalle_motivo_rechazo or "Otro motivo"
+        return self.get_motivo_rechazo_display() if self.motivo_rechazo else ""
+
+    @property
+    def motivo_cancelacion_legible(self):
+        """Devuelve la etiqueta del motivo o el detalle escrito al cancelar."""
+        if self.motivo_cancelacion in {"ALU_OTRO", "TUT_OTRO"}:
+            return self.detalle_motivo_cancelacion or "Otro motivo"
+        return (
+            self.get_motivo_cancelacion_display()
+            if self.motivo_cancelacion
+            else ""
+        )
     
     def get_duracion_display(self):
         choices = dict(DURACION_ASESORIA)
@@ -233,26 +259,43 @@ class Tutoria(models.Model):
         choices_dict = dict(ESTADOS_ALUMNO)
         return choices_dict.get(self.estado_alumno_historico, "Sin registro")
 
-    @property
-    def google_calendar_url(self):
+    def calendar_summary_for(self, recipient_role):
+        """Construye el título del evento desde la perspectiva del destinatario."""
+        counterpart = self.tutor if recipient_role == "alumno" else self.alumno
+        return f"Tutoría con {counterpart.nombre_completo}"
+
+    def google_calendar_url_for(self, recipient_role):
+        """Construye la URL de Google Calendar para el alumno o el tutor."""
         # 1. Configurar fechas
-        start_time = self.fecha
+        start_time = timezone.localtime(self.fecha)
         end_time = start_time + timedelta(hours=1) # Asumimos 1 hora de duración
 
         # 2. Formato que pide Google: YYYYMMDDTHHMMSSZ (o sin Z para hora local)
         fmt = "%Y%m%dT%H%M%S"
 
         # 3. Construir parámetros
-        temas_texto = ",".join(self.get_tema_display())
+        temas_texto = ", ".join(self.get_tema_display())
         params = {
             'action': 'TEMPLATE',
-            'text': f"Tutoría con {self.alumno.nombre_completo}",
-            'details': f"Temas: {temas_texto}.",
+            'text': self.calendar_summary_for(recipient_role),
+            "details": (
+                f"Temas: {temas_texto}\n"
+                f"Descripción: {self.descripcion or 'sin descripción'}"
+            ),
             'dates': f"{start_time.strftime(fmt)}/{end_time.strftime(fmt)}",
             'ctz': 'America/Mexico_City' # Fuerza la zona horaria de CDMX
         }   
 
         return f"https://calendar.google.com/calendar/render?{urlencode(params)}"
+
+    @property
+    def google_calendar_url_tutor(self):
+        return self.google_calendar_url_for("tutor")
+
+    @property
+    def google_calendar_url_alumno(self):
+        return self.google_calendar_url_for("alumno")
+
 
 class HistorialCambioTutoria(models.Model):
     tutoria = models.ForeignKey(Tutoria, on_delete=models.CASCADE, related_name='historial_cambios')

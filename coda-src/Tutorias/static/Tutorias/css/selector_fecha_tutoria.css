@@ -1,0 +1,75 @@
+/* Encabezado del calendario de selección de tutorías. */
+.selector-fecha-tutoria .flatpickr-calendar .flatpickr-months,
+.selector-fecha-tutoria .flatpickr-calendar .flatpickr-weekdays,
+.selector-fecha-tutoria .flatpickr-calendar .flatpickr-month,
+.selector-fecha-tutoria span.flatpickr-weekday {
+    color: #fff !important;
+    background-color: #857f7a !important;
+}
+
+.selector-fecha-tutoria
+.flatpickr-current-month
+.flatpickr-monthDropdown-months {
+    color: #fff !important;
+    background-color: transparent !important;
+}
+
+.selector-fecha-tutoria
+.flatpickr-current-month
+.flatpickr-monthDropdown-months:hover {
+    background-color: transparent !important;
+}
+
+.selector-fecha-tutoria
+.flatpickr-current-month
+.flatpickr-monthDropdown-months option,
+.selector-fecha-tutoria .flatpickr-monthDropdown-month {
+    color: #3d3028 !important;
+    background-color: #fff !important;
+}
+
+.selector-fecha-tutoria
+.flatpickr-calendar
+.flatpickr-months
+.flatpickr-prev-month,
+.selector-fecha-tutoria
+.flatpickr-calendar
+.flatpickr-months
+.flatpickr-next-month {
+    color: #fff !important;
+    fill: #fff !important;
+}
+
+.selector-fecha-tutoria .flatpickr-day.selected,
+.selector-fecha-tutoria .flatpickr-day.selected:hover {
+    color: #fff !important;
+    background-color: #f08200 !important;
+    border-color: #f08200 !important;
+}
+
+/* Franjas horarias disponibles. */
+.selector-fecha-tutoria .btn-horario-slot {
+    color: #3d3028 !important;
+    background-color: #fff !important;
+    border: 1.5px solid #3d3028 !important;
+    font-weight: 600;
+    transition:
+        color 0.2s ease-in-out,
+        background-color 0.2s ease-in-out,
+        border-color 0.2s ease-in-out,
+        box-shadow 0.2s ease-in-out;
+}
+
+.selector-fecha-tutoria .btn-horario-slot:hover {
+    color: #fff !important;
+    background-color: #3d3028 !important;
+}
+
+.selector-fecha-tutoria
+.btn-check:checked
++ .btn-horario-slot {
+    color: #fff !important;
+    background-color: #f08200 !important;
+    border-color: #f08200 !important;
+    box-shadow: 0 2px 6px rgba(240, 130, 0, 0.35) !important;
+}

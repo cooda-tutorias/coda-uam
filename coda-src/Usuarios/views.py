@@ -1,5 +1,7 @@
 import os
 import json
+import logging
+from uuid import UUID
 from django.conf import settings  # ✅ Asegurar que está importado
 from typing import Any, Dict
 from django.shortcuts import get_object_or_404
@@ -32,8 +34,8 @@ from django.http import JsonResponse
 from .forms import ImportAlumnosForm
 from .models import Alumno, Usuario, Tutor
 from .constants import CARRERAS, ESTADOS_ALUMNO, SEXOS, ALUMNO, CODA, COORDINADOR, TUTOR
-from django.contrib.auth.hashers import make_password
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 import io
 import pandas as pd
 from .models import Documento
@@ -47,94 +49,297 @@ from django.views import View
 from django.http import Http404
 from PIL import Image, ImageDraw, ImageFont
 
-from .models import HorarioTutor
+from .models import HorarioTutor, PushDevice
 from .forms import HorarioTutorForm
 from django.db import transaction
+from .services.importacion_alumnos import (
+    ErrorImportacionAlumnos,
+    importar_alumnos_validados,
+    validar_archivo_alumnos,
+)
+from .services.plantilla_importacion_alumnos import (
+    generar_plantilla_importacion_alumnos,
+)
 
 from webpush.models import PushInformation, SubscriptionInfo
 
+logger = logging.getLogger(__name__)
+
 class SettingsTutorView(BaseAccessMixin, TemplateView):
-    template_name = "Usuarios/configuraciones.html"  
+    template_name = "Usuarios/configuraciones.html"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Pasamos el usuario al contexto para que funcione {{ usuario.first_name }}
-        context['usuario'] = self.request.user 
-        
-             
-        # Aquí se pasa la llave pública VAPID de WebPush
-        context['vapid_public_key'] = settings.WEBPUSH_SETTINGS['VAPID_PUBLIC_KEY']
-
-        # Verificamos si el usuario ya existe en la BD de Push
-        # Esto devuelve True o False
-        context['is_push_active'] = PushInformation.objects.filter(user=self.request.user).exists() 
-               
+        context["usuario"] = self.request.user
+        context["vapid_public_key"] = settings.WEBPUSH_SETTINGS["VAPID_PUBLIC_KEY"]
+        context["push_enabled"] = self.request.user.notificaciones_habilitadas
         return context
+
+
+def _json_body(request):
+    try:
+        return json.loads(request.body or "{}")
+    except (TypeError, ValueError):
+        return None
+
+
+def _serialize_push_device(device, current_device_id=None):
+    return {
+        "id": device.pk,
+        "browser": device.browser or "Navegador",
+        "operating_system": device.operating_system or "Sistema no identificado",
+        "device_name": device.device_name or "Dispositivo",
+        "status": device.status,
+        "is_current": device.pk == current_device_id,
+        "created_at": device.created_at.isoformat(),
+        "last_seen_at": device.last_seen_at.isoformat(),
+    }
+
+
+@require_POST
+@login_required
+def push_notification_state(request):
+    data = _json_body(request)
+    if data is None:
+        return JsonResponse({"error": "Solicitud JSON inválida."}, status=400)
+
+    endpoint = data.get("endpoint")
+    try:
+        installation_id = UUID(str(data.get("installation_id")))
+    except (TypeError, ValueError, AttributeError):
+        installation_id = None
+    devices = list(
+        PushDevice.objects.filter(user=request.user).select_related("subscription")
+    )
+    current_by_endpoint = next(
+        (device for device in devices if endpoint and device.subscription.endpoint == endpoint),
+        None,
+    )
+    if current_by_endpoint and installation_id and not current_by_endpoint.installation_id:
+        installation_owner = PushDevice.objects.filter(
+            installation_id=installation_id,
+        ).first()
+        if installation_owner is None:
+            current_by_endpoint.installation_id = installation_id
+            current_by_endpoint.save(update_fields=["installation_id", "last_seen_at"])
+    current = current_by_endpoint or next(
+        (
+            device for device in devices
+            if installation_id and device.installation_id == installation_id
+        ),
+        None,
+    )
+    if current:
+        current.save(update_fields=["last_seen_at"])
+    return JsonResponse({
+        "enabled": request.user.notificaciones_habilitadas,
+        "current_device": _serialize_push_device(current, current.pk) if current else None,
+        "current_endpoint_matches": bool(current_by_endpoint),
+        "other_devices": [
+            _serialize_push_device(device, current.pk if current else None)
+            for device in devices
+            if current is None or device.pk != current.pk
+        ],
+    })
+
+
+@require_POST
+@login_required
+def set_push_preference(request):
+    data = _json_body(request)
+    if data is None or not isinstance(data.get("enabled"), bool):
+        return JsonResponse({"error": "Indica una preferencia válida."}, status=400)
+
+    request.user.notificaciones_habilitadas = data["enabled"]
+    request.user.save(update_fields=["notificaciones_habilitadas"])
+    return JsonResponse({"enabled": request.user.notificaciones_habilitadas})
+
+
+def _register_push_device(request, data):
+    sub_data = data.get("subscription") or {}
+    keys = sub_data.get("keys") or {}
+    endpoint = sub_data.get("endpoint")
+    auth_key = keys.get("auth")
+    p256dh_key = keys.get("p256dh")
+    try:
+        installation_id = UUID(str(data.get("installation_id")))
+    except (TypeError, ValueError, AttributeError):
+        installation_id = None
+    if not all((endpoint, auth_key, p256dh_key, installation_id)):
+        return None, JsonResponse(
+            {"error": "La suscripción del navegador está incompleta."},
+            status=400,
+        )
+
+    with transaction.atomic():
+        installed_device = PushDevice.objects.select_for_update().filter(
+            installation_id=installation_id,
+        ).select_related("subscription").first()
+        subscriptions = list(
+            SubscriptionInfo.objects.select_for_update().filter(endpoint=endpoint).order_by("pk")
+        )
+        subscription = subscriptions[0] if subscriptions else SubscriptionInfo(endpoint=endpoint)
+        subscription.auth = auth_key
+        subscription.p256dh = p256dh_key
+        subscription.browser = (data.get("browser") or "Navegador")[:100]
+        subscription.user_agent = request.META.get("HTTP_USER_AGENT", "")[:500]
+        subscription.save()
+
+        old_subscription = None
+        if installed_device and installed_device.subscription_id != subscription.pk:
+            old_subscription = installed_device.subscription
+
+        # El endpoint identifica al navegador. Al activarlo desde otra cuenta se
+        # transfiere a la cuenta actual para evitar entregas cruzadas.
+        PushInformation.objects.filter(
+            subscription__endpoint=endpoint,
+        ).delete()
+        if old_subscription:
+            PushInformation.objects.filter(subscription=old_subscription).delete()
+        for duplicate in subscriptions[1:]:
+            duplicate.delete()
+
+        PushInformation.objects.create(
+            user=request.user,
+            subscription=subscription,
+            group=None,
+        )
+        device_defaults = {
+            "user": request.user,
+            "status": PushDevice.Status.ACTIVE,
+            "browser": (data.get("browser") or "Navegador")[:100],
+            "operating_system": (data.get("operating_system") or "")[:100],
+            "device_name": (data.get("device_name") or "Dispositivo actual")[:150],
+            "installation_id": installation_id,
+        }
+        if installed_device:
+            preserve_custom_name = installed_device.user_id == request.user.pk
+            PushDevice.objects.filter(subscription=subscription).exclude(
+                pk=installed_device.pk,
+            ).delete()
+            installed_device.subscription = subscription
+            for field, value in device_defaults.items():
+                if field == "device_name" and preserve_custom_name and installed_device.device_name:
+                    continue
+                setattr(installed_device, field, value)
+            installed_device.save()
+            device = installed_device
+        else:
+            device, _ = PushDevice.objects.update_or_create(
+                subscription=subscription,
+                defaults=device_defaults,
+            )
+
+        if old_subscription:
+            old_subscription.delete()
+        if not request.user.notificaciones_habilitadas:
+            request.user.notificaciones_habilitadas = True
+            request.user.save(update_fields=["notificaciones_habilitadas"])
+
+    return device, None
 
 
 @require_POST
 @login_required
 def save_information(request):
-    try:
-        data = json.loads(request.body)
-        status_type = data.get('status_type')
-        
-        sub_data = data.get('subscription', {})
-        endpoint = sub_data.get('endpoint')
-        keys = sub_data.get('keys', {})
-        auth_key = keys.get('auth')
-        p256dh_key = keys.get('p256dh')
-        browser = data.get('browser', 'Chrome')
+    data = _json_body(request)
+    if data is None:
+        return JsonResponse({"error": "Solicitud JSON inválida."}, status=400)
 
-        if not endpoint:
-            return JsonResponse({'error': 'No endpoint provided'}, status=400)
+    if data.get("status_type") == "unsubscribe":
+        endpoint = (data.get("subscription") or {}).get("endpoint")
+        device = PushDevice.objects.filter(
+            user=request.user,
+            subscription__endpoint=endpoint,
+        ).select_related("subscription").first()
+        if device:
+            device.subscription.delete()
+        return JsonResponse({"deleted": bool(device)})
 
-        # CASO 1: DESUSCRIBIR
-        if status_type == 'unsubscribe':
-            count, _ = PushInformation.objects.filter(
-                user=request.user,
-                subscription__endpoint=endpoint
-            ).delete()
-            
-            # Opcional: Limpiar huérfanos
-            SubscriptionInfo.objects.filter(endpoint=endpoint).delete()
-            
-            print(f"✅ Suscripción eliminada para: {request.user}")
-            return HttpResponse(status=200)
+    if data.get("status_type") not in (None, "subscribe"):
+        return JsonResponse({"error": "Operación no válida."}, status=400)
 
-        # CASO 2: SUSCRIBIR
-        elif status_type == 'subscribe':
-            # Paso A: Guardamos los datos técnicos (Aquí SÍ va el browser)
-            subscription_obj, created = SubscriptionInfo.objects.update_or_create(
-                endpoint=endpoint,
-                defaults={
-                    'auth': auth_key,
-                    'p256dh': p256dh_key,
-                    'browser': browser 
-                }
-            )
+    device, error_response = _register_push_device(request, data)
+    if error_response:
+        return error_response
+    return JsonResponse(
+        {"device": _serialize_push_device(device, device.pk), "enabled": True},
+        status=201,
+    )
 
-            # Paso B: Vinculamos al usuario (Aquí NO va el browser)
-            # PushInformation solo necesita User y Subscription
-            PushInformation.objects.get_or_create(
-                user=request.user,
-                subscription=subscription_obj,
-                defaults={
-                    'group': None 
-                }
-            )
-            
-            print(f"✅ Suscripción guardada correctamente para: {request.user}")
-            return HttpResponse(status=201)
 
-        else:
-            return JsonResponse({'error': 'Invalid status_type'}, status=400)
+@require_POST
+@login_required
+def set_push_device_status(request, device_id):
+    data = _json_body(request)
+    status = data.get("status") if data else None
+    if status not in PushDevice.Status.values:
+        return JsonResponse({"error": "Estado de dispositivo no válido."}, status=400)
 
-    except Exception as e:
-        print(f"💥 Error en save_information: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return HttpResponse(status=500)
+    device = get_object_or_404(PushDevice, pk=device_id, user=request.user)
+    device.status = status
+    device.save(update_fields=["status", "updated_at", "last_seen_at"])
+    return JsonResponse({"device": _serialize_push_device(device, device.pk)})
+
+
+@require_POST
+@login_required
+def rename_push_device(request, device_id):
+    data = _json_body(request)
+    name = data.get("device_name") if data else None
+    if not isinstance(name, str) or not name.strip():
+        return JsonResponse({"error": "Escribe un nombre para el dispositivo."}, status=400)
+
+    name = name.strip()
+    if len(name) > PushDevice._meta.get_field("device_name").max_length:
+        return JsonResponse(
+            {"error": "El nombre puede tener como máximo 150 caracteres."},
+            status=400,
+        )
+
+    device = get_object_or_404(PushDevice, pk=device_id, user=request.user)
+    device.device_name = name
+    device.save(update_fields=["device_name", "updated_at", "last_seen_at"])
+    return JsonResponse({"device": _serialize_push_device(device, device.pk)})
+
+
+@require_POST
+@login_required
+def delete_push_device(request, device_id):
+    device = get_object_or_404(
+        PushDevice.objects.select_related("subscription"),
+        pk=device_id,
+        user=request.user,
+    )
+    device.subscription.delete()
+    return JsonResponse({"deleted": True})
+
+
+@require_POST
+@login_required
+def test_push_device(request, device_id):
+    if not request.user.notificaciones_habilitadas:
+        return JsonResponse(
+            {"message": "Activa primero la preferencia general de notificaciones."},
+            status=409,
+        )
+    device = get_object_or_404(
+        PushDevice.objects.select_related("subscription"),
+        pk=device_id,
+        user=request.user,
+        status=PushDevice.Status.ACTIVE,
+    )
+    data = _json_body(request)
+    endpoint = data.get("endpoint") if data else None
+    if not endpoint or endpoint != device.subscription.endpoint:
+        return JsonResponse(
+            {"message": "La prueba sólo puede enviarse al dispositivo actual."},
+            status=400,
+        )
+    from Tutorias.signals.handle_push_notifications import send_test_push
+
+    sent, message = send_test_push(device)
+    return JsonResponse({"sent": sent, "message": message}, status=200 if sent else 502)
 
 
 class HorariosTutorView(BaseAccessMixin, View):
@@ -467,47 +672,69 @@ class UsuarioLoginView(LoginView):
     template_name = "Usuarios/login.html"
 
     def form_valid(self, form):
-        # Authenticate the user
         user = form.get_user()
-        selected_role = self.request.POST.get("role")  # Get role from form input
+        role_config = {
+            ALUMNO: ("alumno", Alumno),
+            TUTOR: ("tutor", Tutor),
+            COORDINADOR: ("coordinador", Cordinador),
+            CODA: ("coda", Coda),
+        }
+        user_roles = user.get_roles() or []
 
-        if user is not None:
-            # Fetch user's roles from the database
-            user_roles = user.get_roles()
+        # Cada cuenta representa un solo perfil. No elegimos silenciosamente
+        # entre varios roles porque el segundo rol también concedería permisos.
+        if len(user_roles) != 1 or user_roles[0] not in role_config:
+            logger.warning(
+                "Inicio de sesión rechazado por configuración de roles inválida: "
+                "usuario_id=%s roles=%r",
+                user.pk,
+                user_roles,
+            )
+            messages.error(
+                self.request,
+                "Esta cuenta tiene una configuración de roles inválida. "
+                "Contacta al administrador para corregirla.",
+            )
+            return redirect("login")
 
-            # Check if the selected role exists in the user's roles
-            if selected_role == "coordinador" and COORDINADOR in user_roles:
-                user = Cordinador.objects.get(pk=user.pk)
-            elif selected_role == "tutor" and TUTOR in user_roles:
-                # Ensure we log in as Tutor only if Coordinador is NOT the selected role
-                if not (COORDINADOR in user_roles and selected_role == "tutor"):
-                    user = Tutor.objects.get(pk=user.pk)
-            elif selected_role == "alumno" and ALUMNO in user_roles:
-                user = Alumno.objects.get(pk=user.pk)
-            elif selected_role == "coda" and CODA in user_roles:
-                user = Coda.objects.get(pk=user.pk)
-            else:
-                # If the selected role is invalid, show an error
-                messages.error(self.request, "Rol no válido para este usuario.")
-                return redirect("login")
+        selected_role, role_model = role_config[user_roles[0]]
+        try:
+            role_user = role_model.objects.get(pk=user.pk)
+        except role_model.DoesNotExist:
+            logger.warning(
+                "Inicio de sesión rechazado porque falta el perfil asociado: "
+                "usuario_id=%s rol=%s modelo=%s",
+                user.pk,
+                user_roles[0],
+                role_model.__name__,
+            )
+            messages.error(
+                self.request,
+                "Esta cuenta no tiene un perfil válido. "
+                "Contacta al administrador para corregirla.",
+            )
+            return redirect("login")
 
-            # Log in user with the correct role
-            login(self.request, user)
-            self.request.session["role"] = selected_role
-            self.request.session.modified = True  # Ensure session updates
+        login(self.request, role_user)
+        # Se conserva para que ContextConRolesMixin seleccione el navbar.
+        self.request.session["role"] = selected_role
+        self.request.session.modified = True
 
-            # Revisa si una alumno escaneó el QR de su tutor y fue redirigido a login, 
-            # para redirigirlo a la URL para registrar la tutoría in situ después de iniciar sesión.
-            next_url = self.request.POST.get("next") or self.request.GET.get("next")
-            if next_url:
-                return redirect(next_url)
+        # Permite continuar hacia una tutoría in situ después del login.
+        next_url = self.request.POST.get("next") or self.request.GET.get("next")
+        if next_url:
+            return redirect(next_url)
 
-            # Redirect to the appropriate profile page
-            return redirect(reverse_lazy(f"perfil-{selected_role}", kwargs={"pk": user.pk}))
+        tutoring_panels = {
+            "alumno": "Tutorias-alumno",
+            "tutor": "Panel-tutorias-tutor",
+        }
+        if selected_role in tutoring_panels:
+            return redirect(tutoring_panels[selected_role])
 
-        # If the user does not exist, show an error
-        messages.error(self.request, "El usuario no existe. Verifique sus credenciales.")
-        return redirect("login")
+        return redirect(
+            reverse_lazy(f"perfil-{selected_role}", kwargs={"pk": role_user.pk})
+        )
 
 
 class ChangePasswordView(BaseAccessMixin, PasswordChangeView):
@@ -582,129 +809,65 @@ class ImportAlumnosView(CodaViewMixin, FormView):
     form_class = userForms.ImportAlumnosForm
     success_url = reverse_lazy('Tutores-Coda')
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            "catalogo_carreras": CARRERAS,
+            "catalogo_estados": ESTADOS_ALUMNO,
+            "catalogo_sexos": SEXOS,
+        })
+        return context
+
     def form_valid(self, form):
-        uploaded_file = self.request.FILES.get('archivo')
-
-        # Get default context (ensures user roles are included)
+        uploaded_file = form.cleaned_data['archivo']
         context = self.get_context_data(form=form)
-
-        if not uploaded_file:
-            context["error"] = "No file uploaded."
-            return render(self.request, self.template_name, context)
-
-        warnings = []  # Stores students that couldn't be created
-        success_count = 0  # Tracks successful imports
-
         try:
-            file_extension = uploaded_file.name.split(".")[-1]
-            if file_extension in ["xls", "xlsx"]:
-                df = pd.read_excel(uploaded_file)
-            elif file_extension == "csv":
-                df = pd.read_csv(uploaded_file)
-            else:
-                context["error"] = "Invalid file format."
-                return render(self.request, self.template_name, context)
-
-            # Check for required columns
-            required_columns = ["Plan de estudios", "Matrícula", "Correo institucional", "Correo", "Apellido 1", "Apellido 2", "Nombres", "No. Económico de Tutor", "Estado", "Sexo", "rfc", "Trimestre Ingreso"]
-            missing_columns = [col for col in required_columns if col not in df.columns]
-            if missing_columns:
-                context["error"] = f"Missing columns: {', '.join(missing_columns)}"
-                return render(self.request, self.template_name, context)
-
-            # Process data row by row
-            for _, row in df.iterrows():
+            resultado = validar_archivo_alumnos(uploaded_file)
+        except (ValueError, OSError, pd.errors.ParserError) as error:
+            context["error"] = f"No se pudo leer el archivo: {error}"
+        else:
+            context.update({
+                "errores_validacion": resultado.errores,
+                "advertencias_validacion": resultado.advertencias,
+                "total_filas": resultado.total_filas,
+                "encabezados_previsualizacion": resultado.encabezados_previsualizacion,
+                "filas_previsualizacion": resultado.filas_previsualizacion,
+            })
+            if resultado.es_valido:
                 try:
-                    matricula = str(row["Matrícula"]).strip()
-                    email = row["Correo institucional"].strip()
-                    correo_personal = row["Correo"].strip()
-                    last_name = row["Apellido 1"].strip()
-                    second_last_name = row["Apellido 2"].strip()
-                    first_name = row["Nombres"].strip()
-                    rfc = row["rfc"].strip()
-                    # carrera = CARRERAS[row["Plan de estudios"].strip()]
-                    carrera = next((key for key, value in CARRERAS if value == row["Plan de estudios"].strip()), None)
-                    estado = row["Estado"]
-                    # estado = next((key for key, value in ESTADOS_ALUMNO if value == row["Estado"]), None)
-                    sexo = next((key for key, value in SEXOS if value == row["Sexo"].strip()), None)
-                    tutor_id = row["No. Económico de Tutor"]
-                    trimestre_ingreso = row["Trimestre Ingreso"].strip()
-
-                    # Ensure required fields are valid
-                    if not (matricula and email and first_name and last_name and carrera and estado and sexo and tutor_id):
-                        print("matricula :",matricula)
-                        print("email :",email)
-                        print("correo_personal :",correo_personal)
-                        print("last_name :",last_name)
-                        print("second_last_name :",second_last_name)
-                        print("first_name :",first_name)
-                        print("rfc :",rfc)
-                        print("carrera :",carrera)
-                        print("estado :",estado)
-                        print("sexo :",sexo)
-                        print("tutor_id :",tutor_id)
-                        print("trimestre_ingreso :",trimestre_ingreso)
-                        warnings.append(f"Alumno {matricula}: faltan datos obligatorios. Asegúrese de que todos los campos obligatorios de información estén presentes.")
-                        continue  # Skip to the next student
-
-                    # Find assigned tutor
-                    tutor_asignado = Tutor.objects.filter(matricula=tutor_id).first()
-                    if not tutor_asignado:
-                        warnings.append(f"Alumno {matricula}: Tutor con número económico {tutor_id} no encontrado. Asegúrese de que el tutor esté registrado en el sistema.")
-                        continue
-
-                    # Generate password (increment each digit of matricula by 1)
-                    password = matricula
-                    hashed_password = make_password(password)
-
-                    # Create Usuario
-                    usuario, created = Usuario.objects.get_or_create(
-                        matricula=matricula,
-                        defaults={
-                            "email": email,
-                            "correo_personal": correo_personal,
-                            "first_name": first_name,
-                            "last_name": last_name,
-                            "second_last_name": second_last_name,
-                            "password": hashed_password,
-                            "rol": [ALUMNO],
-                            "sexo":sexo
-                        },
+                    total_importados = importar_alumnos_validados(
+                        resultado.filas_validas,
                     )
+                except ErrorImportacionAlumnos as error:
+                    context["error"] = (
+                        f"No se importó ningún alumno: {error}"
+                    )
+                except Exception:
+                    logger.exception("Falló la importación transaccional de alumnos")
+                    context["error"] = (
+                        "Ocurrió un error al crear los alumnos. "
+                        "La operación fue revertida y no se guardó ningún alumno."
+                    )
+                else:
+                    context["importacion_exitosa"] = True
+                    context["total_importados"] = total_importados
+        return render(self.request, self.template_name, context)
 
-                    # Check if already an Alumno
-                    if not Alumno.objects.filter(id=usuario.id).exists():
-                        alumno = Alumno(
-                            id=usuario.id,
-                            carrera=carrera,
-                            estado=estado,
-                            tutor_asignado=tutor_asignado,
-                            trimestre_ingreso=trimestre_ingreso,
-                            rfc=rfc
-                        )
-                        alumno.__dict__.update(usuario.__dict__)  # Copy fields
-                        alumno.save()
 
-                    success_count += 1  # Increment success counter
-
-                except Exception as e:
-                    warnings.append(f"Alumno {matricula}: {str(e)}")
-                    continue  # Skip to next student
-
-            # Update context
-            context.update({
-                "warnings": warnings if warnings else None,
-                "success": f"{success_count} alumnos importados exitosamente." if success_count > 0 else None,
-            })
-
-            return render(self.request, self.template_name, context)
-
-        except Exception as e:
-            context.update({
-                "error": str(e),
-                "warnings": warnings if warnings else None,  # Ensure warnings are included
-            })
-            return render(self.request, self.template_name, context)
+class DescargarPlantillaAlumnosView(CodaViewMixin, View):
+    def get(self, request):
+        contenido = generar_plantilla_importacion_alumnos()
+        response = HttpResponse(
+            contenido,
+            content_type=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+        )
+        response["Content-Disposition"] = (
+            'attachment; filename="plantilla_importacion_alumnos.xlsx"'
+        )
+        return response
 
 #PermissionRequiredMixin
 class ajustes(CodaViewMixin, TemplateView):
@@ -727,13 +890,14 @@ class CargarPlantilla(CodaViewMixin, CreateView):
     def form_valid(self, form):
         return super().form_valid(form)
     
+@login_required
+@require_POST
 def eliminar_documento(request, pk):
+    if not request.user.has_role(CODA):
+        raise PermissionDenied("Solo el personal CODDAA puede eliminar documentos.")
+
     documento = get_object_or_404(Documento, pk=pk)
-    archivo_path = os.path.join(settings.MEDIA_ROOT, str(documento.archivo))
-
-    if os.path.exists(archivo_path):
-        os.remove(archivo_path) 
-
+    documento.archivo.delete(save=False)
     documento.delete()
     return redirect('ajustes')
 
@@ -754,7 +918,7 @@ class VerPlantilla(CodaViewMixin, UpdateView):
         context['archivo_url'] = self.object.archivo.url if self.object.archivo else None
         return context
 
-class VerAlumnosCODDAAView(FormView):
+class VerAlumnosCODDAAView(CodaViewMixin, FormView):
     template_name = "Usuarios/ver_alumnos_coda.html"
     form_class = FormVerAlumnos
 

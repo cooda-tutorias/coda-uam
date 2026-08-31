@@ -25,7 +25,7 @@ from django.utils.text import slugify
 from django.core.exceptions import PermissionDenied
 from django.core.mail import send_mail, EmailMessage
 from django.contrib import messages
-from datetime import datetime, timedelta
+from datetime import datetime, time, timedelta
 import pandas as pd
 from urllib3 import request
 from .constants import TEMAS
@@ -88,6 +88,7 @@ from icalendar import Calendar, Event
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 
+
 # Función para convertir una fecha en formato string a un objeto datetime con zona horaria.
 def convertir_fecha_local(valor):
     fecha_sin_zona = datetime.strptime(
@@ -99,6 +100,22 @@ def convertir_fecha_local(valor):
         fecha_sin_zona,
         timezone.get_current_timezone(),
     )
+
+
+def siguiente_dia_habil_a_las_diez(fecha_base=None):
+    fecha_local = timezone.localtime(fecha_base or timezone.now())
+    siguiente_dia = fecha_local.date() + timedelta(days=1)
+    while siguiente_dia.weekday() >= 5:
+        siguiente_dia += timedelta(days=1)
+
+    return timezone.make_aware(
+        datetime.combine(siguiente_dia, time(10, 0)),
+        timezone.get_current_timezone(),
+    )
+
+
+def es_dia_habil(fecha):
+    return fecha.weekday() < 5
 
 
 def resolver_franja_tutor(slot, valor_franja):
@@ -159,6 +176,26 @@ def proponer_fechas_tutoria(request, pk):
                     "Alguna de las fechas proporcionadas no es válida.",
                 )
                 return redirect("Panel-tutorias-tutor")
+
+            propuestas = [propuesta_1]
+            if propuesta_2 is not None:
+                propuestas.append(propuesta_2)
+
+            fecha_minima = siguiente_dia_habil_a_las_diez()
+            if any(fecha < fecha_minima for fecha in propuestas):
+                messages.error(
+                    request,
+                    "Las fechas deben ser posteriores o iguales al siguiente día hábil a las 10:00.",
+                )
+                return redirect("Panel-tutorias-tutor")
+
+            if any(not es_dia_habil(fecha) for fecha in propuestas):
+                messages.error(request, "Las fechas propuestas deben ser días hábiles.")
+                return redirect("Panel-tutorias-tutor")
+
+            if propuesta_2 is not None and propuesta_1 == propuesta_2:
+                messages.error(request, "Las dos opciones de fecha deben ser diferentes.")
+                return redirect("Panel-tutorias-tutor")
                                    
             # Si hay dos propuestas, se envían al alumno para que elija. Si solo hay una, se acepta directamente.
             if propuesta_2_raw:
@@ -200,7 +237,12 @@ def proponer_fechas_tutoria(request, pk):
                 tutoria=tutoria,
                 actor=request.user,
                 recipient=tutoria.alumno,
-            )            
+            )
+            pestaña_destino = "agendadas" if tutoria.estado == ACEPTADO else "solicitadas"
+            return redirect(
+                f"{reverse('Panel-tutorias-tutor')}?tab={pestaña_destino}"
+                f"&highlight={tutoria.pk}"
+            )
         else:
             messages.error(request, "Debes ingresar al menos la Opción 1.")
 
@@ -208,47 +250,60 @@ def proponer_fechas_tutoria(request, pk):
 
 # Función para que el alumno pueda seleccionar una de las fechas propuestas por el tutor.
 @login_required
+@require_POST
 def seleccionar_propuesta_tutoria(request, pk):
     tutoria = get_object_or_404(Tutoria, pk=pk)
-    
-    if request.method == 'POST':
-        opcion_elegida = request.POST.get('opcion_elegida') # '1' o '2'
 
-        if opcion_elegida == '1' and tutoria.fecha_propuesta_1:
-            tutoria.fecha = tutoria.fecha_propuesta_1
-        elif opcion_elegida == '2' and tutoria.fecha_propuesta_2:
-            tutoria.fecha = tutoria.fecha_propuesta_2
-        else:
-            messages.error(request, "Selección inválida.")
-            return redirect('Tutorias-alumno')
+    if not request.user.has_role("ALU") or tutoria.alumno_id != request.user.pk:
+        raise PermissionDenied("No tienes permiso para modificar esta tutoría")
 
-        # Se confirma el horario y se resetean las propuestas
-        tutoria.estado = ACEPTADO
-        tutoria.fecha_propuesta_1 = None
-        tutoria.fecha_propuesta_2 = None
-        tutoria.reagendacion_pendiente = False
-        tutoria.save()
+    opcion_elegida = request.POST.get('opcion_elegida') # '1' o '2'
 
-        messages.success(request, "Tu solicitud ha sido agendada con éxito. No faltes a la cita en el día y horario que elegiste 📅.")
+    if opcion_elegida == '1' and tutoria.fecha_propuesta_1:
+        tutoria.fecha = tutoria.fecha_propuesta_1
+    elif opcion_elegida == '2' and tutoria.fecha_propuesta_2:
+        tutoria.fecha = tutoria.fecha_propuesta_2
+    else:
+        messages.error(request, "Selección inválida.")
+        return redirect('Tutorias-alumno')
 
-        # El alumno eligió una fecha propuesta, el tutor recibe la notifación.
-        tutoria_notification_requested.send(
-            sender=seleccionar_propuesta_tutoria,
-            event=EventoTutoria.ALU_ELIGE_FECHA_PROPUESTA,
-            tutoria=tutoria,
-            actor=request.user,
-            recipient=tutoria.tutor,
-        )
+    # Se confirma el horario y se resetean las propuestas
+    tutoria.estado = ACEPTADO
+    tutoria.fecha_propuesta_1 = None
+    tutoria.fecha_propuesta_2 = None
+    tutoria.reagendacion_pendiente = False
+    tutoria.save()
 
-    return redirect('Tutorias-alumno')
+    messages.success(request, "Tu solicitud ha sido agendada con éxito. No faltes a la cita en el día y horario que elegiste 📅.")
+
+    # El alumno eligió una fecha propuesta, el tutor recibe la notifación.
+    tutoria_notification_requested.send(
+        sender=seleccionar_propuesta_tutoria,
+        event=EventoTutoria.ALU_ELIGE_FECHA_PROPUESTA,
+        tutoria=tutoria,
+        actor=request.user,
+        recipient=tutoria.tutor,
+    )
+
+    return redirect(
+        f"{reverse('Tutorias-alumno')}?tab=agendadas&highlight={tutoria.pk}"
+    )
 
 # Esta función se usa para crear el archivo .ics con información de la 
-# fecha de la tutoria para que se pueda agregar el evento a 
+# fecha de la tutoría para que se pueda agregar el evento a
 # Calendarios de Apple o Outlook.
-# Para Google Calendar se usa otro procedimiento.
+# Para Google Calendar se usa el procedimiento de Tutorias/models.py
+@login_required
 def descargar_ics_tutoria(request, tutoria_id):
     # 1. Obtener la tutoria
     tutoria = get_object_or_404(Tutoria, pk=tutoria_id)
+
+    if request.user.pk == tutoria.alumno_id:
+        recipient_role = "alumno"
+    elif request.user.pk == tutoria.tutor_id:
+        recipient_role = "tutor"
+    else:
+        raise PermissionDenied("No tienes permiso para descargar esta cita.")
     
     # 2. Crear el objeto calendario
     cal = Calendar()
@@ -257,7 +312,7 @@ def descargar_ics_tutoria(request, tutoria_id):
     
     # 3. Crear el evento
     event = Event()
-    event.add('summary', f"Tutoría con {tutoria.alumno.nombre_completo}")
+    event.add('summary', tutoria.calendar_summary_for(recipient_role))
     
     # Manejar los tiempos
     start_time = tutoria.fecha
@@ -267,9 +322,13 @@ def descargar_ics_tutoria(request, tutoria_id):
     event.add('dtend', end_time)
     
     # Descripción y ubicación (Opcional)
-    # Como tu tema es una lista, usamos tu lógica de join si es necesario
+    # Usar join para unir los temas de la tutoría.
     temas_str = ", ".join(tutoria.get_tema_display())
-    event.add('description', f"Tema(s): {temas_str}")
+    event.add('description',
+                f"Tema(s): {temas_str}\n"
+                f"Descripción: {tutoria.descripcion or 'sin descripción'}"
+    )
+
     
     # 4. Agregar evento al calendario
     cal.add_component(event)
@@ -282,17 +341,14 @@ def descargar_ics_tutoria(request, tutoria_id):
 
 
 #Funcion para descargar pdf
+@login_required
+@require_GET
 def carta_tutorados_pdf(request):
-    print(request)
-    print(request.user)
-    tutor_id = int(request.GET.get('tutor-id'))
-    print(type(tutor_id))
-    print(tutor_id)
-    tutor = get_object_or_404(Tutor, matricula=tutor_id)
-    print(tutor.coordinacion)
+    if not request.user.has_role(CODA):
+        raise PermissionDenied("Solo el personal CODDAA puede generar este reporte")
+
+    tutor = get_object_or_404(Tutor, matricula=request.GET.get('tutor-id'))
     tutorados = Alumno.objects.filter(tutor_asignado=tutor.pk)
-    print(tutorados)
-    print(type(tutorados))
 
     # Crear un buffer de bytes para almacenar el PDF
     buffer = BytesIO()
@@ -338,7 +394,6 @@ def carta_tutorados_pdf(request):
             None,
             alumno.first_name,
         ])
-        print(f"Alumno completo: {alumno.matricula} {alumno.first_name} {alumno.last_name}")
 
     # Estilo de la tabla
     style = TableStyle([
@@ -472,10 +527,14 @@ def generar_pdf(request):
     return FileResponse(buffer, as_attachment=True, filename='tabla.pdf')
 
 #Generar archivo txt de tutorias
+@login_required
+@require_GET
 def generar_archivo_txt(request,pk):
+    if not request.user.has_role(CODA):
+        raise PermissionDenied("Solo el personal CODDAA puede generar este reporte")
 
     # Genera el contenido del archivo de texto (aquí es solo un ejemplo)
-    tutor = Tutor.objects.get(pk=pk)
+    tutor = get_object_or_404(Tutor, pk=pk)
     tutorias = Tutoria.objects.filter(tutor=tutor)
 
     # Obtener las fechas seleccionadas del formulario HTML
@@ -501,15 +560,9 @@ def generar_archivo_txt(request,pk):
         contenido += f"Tema: {tutoria.get_tema_display()}\n"
         contenido += f"Notas: {tutoria.descripcion}\n\n"
 
-    # Escribe el contenido en un archivo de texto
-    with open("tutoria.txt", "w") as archivo:
-        archivo.write(contenido)
-
-    # Abre el archivo de texto y lo sirve como una respuesta HTTP para descargarlo
-    with open("tutoria.txt", "rb") as archivo:
-        response = HttpResponse(archivo.read(), content_type='text/plain')
-        response['Content-Disposition'] = 'attachment; filename=archivo.txt'
-        return response
+    response = HttpResponse(contenido, content_type='text/plain; charset=utf-8')
+    response['Content-Disposition'] = 'attachment; filename="tutorias.txt"'
+    return response
 
 
 # Create your views here.
@@ -532,7 +585,7 @@ class AceptarTutoriaView(View):
 
         if tutoria.estado == ACEPTADO:
             return redirect(
-                f"{reverse('Panel-tutorias-tutor')}?tab=agendadas"
+                f"{reverse('Panel-tutorias-tutor')}?tab=agendadas&highlight={tutoria.pk}"
             )
 
         tutoria.estado = ACEPTADO
@@ -548,7 +601,7 @@ class AceptarTutoriaView(View):
             recipient=tutoria.alumno
         )
         return redirect(
-            f"{reverse('Panel-tutorias-tutor')}?tab=agendadas"
+            f"{reverse('Panel-tutorias-tutor')}?tab=agendadas&highlight={tutoria.pk}"
         )
 
   
@@ -559,22 +612,33 @@ class RechazarTutoriaView(View):
             raise PermissionDenied("No tienes permiso para modificar esta tutoría")
 
         if tutoria.estado == RECHAZADO:
-            return redirect('Panel-tutorias-tutor')
+            return redirect(
+                f"{reverse('Panel-tutorias-tutor')}?tab=historial&highlight={tutoria.pk}"
+            )
 
         motivo = request.POST.get("motivo_rechazo", "").strip()
-        if motivo == "otro":
-            motivo = request.POST.get("motivo_rechazo_otro", "", ).strip()
+        motivos_validos = dict(MOTIVOS_RECHAZO_TUTOR)
+        detalle_motivo = request.POST.get("motivo_rechazo_otro", "").strip()
 
-        if not motivo:
+        if motivo not in motivos_validos:
             messages.error(
                 request,
-                "Debes seleccionar o escribir una razón para el rechazo.",
+                "Debes seleccionar un motivo de rechazo válido.",
             )
+            return redirect("Panel-tutorias-tutor")
+
+        if motivo == MOTIVO_RECHAZO_OTRO and not detalle_motivo:
+            messages.error(request, "Debes escribir el detalle del motivo de rechazo.")
             return redirect("Panel-tutorias-tutor")
         
         tutoria.estado = RECHAZADO
         tutoria.motivo_rechazo = motivo
-        tutoria.save(update_fields=["estado", "motivo_rechazo"])
+        tutoria.detalle_motivo_rechazo = (
+            detalle_motivo if motivo == MOTIVO_RECHAZO_OTRO else None
+        )
+        tutoria.save(update_fields=[
+            "estado", "motivo_rechazo", "detalle_motivo_rechazo",
+        ])
 
         tutoria_notification_requested.send(
             sender=self.__class__,
@@ -592,7 +656,9 @@ class RechazarTutoriaView(View):
             ),
         )
 
-        return redirect('Panel-tutorias-tutor')
+        return redirect(
+            f"{reverse('Panel-tutorias-tutor')}?tab=historial&highlight={tutoria.pk}"
+        )
 
 class CancelarTutoriaView(View):
     def post(self, request, pk):
@@ -670,7 +736,9 @@ class CancelarTutoriaView(View):
                 recipient=tutoria.tutor
             )
 
-            return redirect('Tutorias-alumno')
+            return redirect(
+                f"{reverse('Tutorias-alumno')}?tab=historial&highlight={tutoria.pk}"
+            )
 
         if tutoria.estado_efectivo != ACEPTADO:
             messages.error(
@@ -723,7 +791,7 @@ class CancelarTutoriaView(View):
         )
         
         return redirect(
-            f"{reverse('Panel-tutorias-tutor')}?tab=historial"
+            f"{reverse('Panel-tutorias-tutor')}?tab=historial&highlight={tutoria.pk}"
         )
    
 
@@ -1063,6 +1131,10 @@ def solicitar_cambio_fecha_tutoria(request, pk):
         messages.error(request, "La fecha u horario seleccionado no es válido.")
         return redirect("Tutorias-alumno")
 
+    if not horario_id and not es_dia_habil(nueva_fecha):
+        messages.error(request, "La fecha sugerida debe ser un día hábil.")
+        return redirect("Tutorias-alumno")
+
     if nueva_fecha <= timezone.now():
         messages.error(request, "La nueva fecha debe ser posterior a la fecha actual.")
         return redirect("Tutorias-alumno")
@@ -1107,7 +1179,10 @@ def solicitar_cambio_fecha_tutoria(request, pk):
         messages.success(request, "La tutoría se reagendó en un horario disponible del tutor.")
     else:
         messages.success(request, "La nueva fecha se envió al tutor para su confirmación.")
-    return redirect("Tutorias-alumno")
+    pestaña_destino = "agendadas" if nuevo_estado == ACEPTADO else "solicitadas"
+    return redirect(
+        f"{reverse('Tutorias-alumno')}?tab={pestaña_destino}&highlight={tutoria.pk}"
+    )
 
     
 # Vista para que el ALUMNO solicite tutorias, ya sea:
@@ -1124,6 +1199,13 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
     form_class = FormTutorias
     template_name = 'Tutorias/solicitudTutoria.html'
     success_url = reverse_lazy('Tutorias-alumno')
+
+    def get_success_url(self):
+        pestaña_destino = "agendadas" if self.object.estado == ACEPTADO else "solicitadas"
+        return (
+            f"{reverse('Tutorias-alumno')}?tab={pestaña_destino}"
+            f"&highlight={self.object.pk}"
+        )
 
 
     def get_form_kwargs(self):
@@ -1158,11 +1240,11 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
             alerta_tipo = "warning"
             subtitulo_modal = "Tu persona tutora aún no registra horarios de atención para tutorías, pero puedes sugerirle una fecha para visitarle."
 
-        info_adicional = "Información adicional sobre la tutoría."
+        info_adicional = "Descripción del motivo de la tutoría."
 
         # Colocar todas las variantes de clave que usamos en plantillas anteriores
         context["tiene_horarios"] = tiene_horarios
-        context["titulo_formulario"] = titulo
+        context["titulo_formulario"] = "Elegir una fecha"
         context["titulo_form"] = titulo              # compatibilidad
         context["texto_boton"] = texto_boton
         context["boton_texto"] = texto_boton         # compatibilidad
@@ -1260,6 +1342,13 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
             try:
                 form.instance.fecha = datetime.fromisoformat(fecha_final)
 
+                if not es_dia_habil(form.instance.fecha):
+                    form.add_error(
+                        "fecha_sugerida",
+                        "La fecha sugerida debe ser un día hábil.",
+                    )
+                    return self.form_invalid(form)
+
                 # Como el alumno sugirió una fecha, queda PENDIENTE hasta que el
                 # tutor acepte la tutoría en esa fecha.
                 form.instance.estado = "PEN"
@@ -1276,26 +1365,22 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
             resumen_notificacion="Nueva tutoría agendada"
             evento = EventoTutoria.ALU_AGENDA_TUTORIA
 
+        # Guardar antes de notificar: las ligas de calendario necesitan el ID
+        # definitivo de la tutoría para construir la descarga del archivo ICS.
+        response = super().form_valid(form)
+
         # Eliminar corchetes de la lista
         # El alumno solicita o agenda una tutoría, y el tutor debe recibir la notificación.
         tutoria_notification_requested.send(
             sender=self.__class__,
             event=evento,
-            tutoria=form.instance,
+            tutoria=self.object,
             actor=alumno,
             recipient=tutor,
-            description=f'{", ".join(form.instance.get_tema_display())}',
+            description=f'{", ".join(self.object.get_tema_display())}',
         )
         
-        # TODO utilizar una rutina para mandar los correos
-        #send_mail(
-         #   subject='Nueva solicitud de tutoria',
-          #  message=f'Solicitud de tutoria creada por {alumno.get_full_name()} con tema: {form.instance.get_tema_display()}',
-           # from_email=CORREO,
-            #recipient_list=[recipient.email],
-            #fail_silently=False
-    
-        return super().form_valid(form)
+        return response
     
 
     def get_initial(self) -> dict[str, Any]:
@@ -2085,9 +2170,18 @@ class HistorialTutoriasListView(BaseAccessMixin, ListView):
         return Tutoria.objects.none()
  
 
-class HistorialTutoriasGenerateView(BaseAccessMixin, ListView):
+class HistorialTutoriasGenerateView(TutorViewMixin, ListView):
     model = Tutoria
     template_name = 'Tutorias/generarhistorialtutoria.html'
+
+    def get_queryset(self) -> QuerySet[Any]:
+        return (
+            super()
+            .get_queryset()
+            .filter(tutor_id=self.request.user.pk)
+            .select_related("alumno", "tutor")
+            .order_by("-fecha")
+        )
 
 class VerTutoriasCoordinadorListView(CordinadorViewMixin, FormView):
     model = Tutoria
@@ -2332,6 +2426,8 @@ class VerTutoriasTutorTabView(TutorViewMixin, ListView):
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
         context['motivos_cancelacion'] = MOTIVOS_CANCELACION_TUTOR
+        context['motivos_rechazo'] = MOTIVOS_RECHAZO_TUTOR
+        context['motivo_rechazo_otro'] = MOTIVO_RECHAZO_OTRO
         tutorias = list(context['tutorias'])
 
         # 1. Solicitadas: ordenadas por fecha de solicitud (las más recientes primero)
@@ -2588,7 +2684,9 @@ class TutoriaInSituCreateView(LoginRequiredMixin, ContextConRolesMixin, Template
                 recipient=alumno.tutor_asignado
             )
 
-            return redirect("Tutorias-alumno")
+            return redirect(
+                f"{reverse('Tutorias-alumno')}?tab=historial&highlight={nueva.pk}"
+            )
 
         # Si el formulario es inválido, regenerar el contexto completo
         context = self.get_context_data(

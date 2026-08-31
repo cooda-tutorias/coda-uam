@@ -1,5 +1,6 @@
 from collections.abc import Iterable
 from django.db import models, transaction
+from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.contrib.postgres.fields import ArrayField
@@ -58,6 +59,7 @@ class Usuario(AbstractUser):
     # por lo tanto: last_name = apellido paterno,
     # second_last_name = apellido materno
     second_last_name = models.CharField(max_length=150, blank=True,null=True)
+    notificaciones_habilitadas = models.BooleanField(default=False)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ['matricula']
@@ -115,6 +117,45 @@ class Usuario(AbstractUser):
 
     def has_role(self, role: str) -> bool:
         return role in self.rol  # Check if user has a specific role
+
+
+class PushDevice(models.Model):
+    """Preferencias de entrega para una suscripción Web Push registrada."""
+
+    class Status(models.TextChoices):
+        ACTIVE = "ACTIVE", "Activo"
+        PAUSED = "PAUSED", "Pausado"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="push_devices",
+    )
+    subscription = models.OneToOneField(
+        "webpush.SubscriptionInfo",
+        on_delete=models.CASCADE,
+        related_name="device",
+    )
+    installation_id = models.UUIDField(null=True, blank=True, unique=True)
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.ACTIVE,
+    )
+    browser = models.CharField(max_length=100, blank=True)
+    operating_system = models.CharField(max_length=100, blank=True)
+    device_name = models.CharField(max_length=150, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    last_seen_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-last_seen_at",)
+
+    def __str__(self):
+        label = self.device_name or self.browser or "Dispositivo"
+        return f"{label} - {self.user}"
+
 
 class Tutor(Usuario):
     cubiculo = models.CharField("Oficina", max_length=10, blank=True, null=True)

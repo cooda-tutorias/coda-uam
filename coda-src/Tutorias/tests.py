@@ -2,16 +2,23 @@ from types import SimpleNamespace
 from datetime import datetime, time, timedelta
 from urllib import response
 import json
+import random
 from unittest.mock import Mock, patch
+from requests.exceptions import ConnectionError as RequestsConnectionError
 
-from django.test import TestCase, SimpleTestCase
+from django.test import RequestFactory, TestCase, SimpleTestCase
 from django.urls import reverse
 from django.test import override_settings
 from django.core import mail
+from django.core.exceptions import PermissionDenied
 from django.utils import timezone
+from django.contrib.auth.models import AnonymousUser
 
-from Usuarios.models import Tutor, Alumno, HorarioTutor
+from Usuarios.models import Coda, Tutor, Alumno, HorarioTutor, PushDevice
+from webpush.models import PushInformation, SubscriptionInfo
+from pywebpush import WebPushException
 from Tutorias.models import Tutoria, HistorialCambioTutoria
+from Tutorias.views import HistorialTutoriasGenerateView
 from Tutorias.forms import FormSeguimiento
 from Tutorias.services.docx_reportes import _tutoria_es_reportable
 from Tutorias.constants import (
@@ -24,6 +31,7 @@ from Tutorias.constants import (
     VENCIDA,
     REPORTADA,
     REALIZADA,
+    MOTIVO_RECHAZO_OTRO,
 )
 from notifications.models import Notification
 from Tutorias.signals.events import EventoTutoria
@@ -40,6 +48,143 @@ from Tutorias.signals.notification_service import (
     notify_tutoria_event,
 )
 from Tutorias.signals.signals_definitions import tutoria_notification_requested
+
+
+class HistorialTutoriasGenerateAccessTests(TestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.tutor = Tutor.objects.create_user(
+            first_name="Tutor",
+            last_name="Propietario",
+            email="tutor.historial@example.com",
+            matricula="THIST001",
+            password="password123",
+        )
+        self.otro_tutor = Tutor.objects.create_user(
+            first_name="Otro",
+            last_name="Tutor",
+            email="otro.historial@example.com",
+            matricula="THIST002",
+            password="password123",
+        )
+        self.alumno = Alumno.objects.create_user(
+            email="alumno.historial@example.com",
+            matricula="AHIST001",
+            password="password123",
+            tutor_asignado=self.tutor,
+        )
+        self.tutoria_propia = Tutoria.objects.create(
+            tutor=self.tutor,
+            alumno=self.alumno,
+            tema=["BEC"],
+            descripcion="Tutoría propia",
+            fecha=timezone.now(),
+            estado=ACEPTADO,
+        )
+        self.tutoria_ajena = Tutoria.objects.create(
+            tutor=self.otro_tutor,
+            alumno=self.alumno,
+            tema=["BEC"],
+            descripcion="Tutoría ajena",
+            fecha=timezone.now(),
+            estado=ACEPTADO,
+        )
+        self.url = reverse("Tutorias-historial-generar")
+
+    def get_response_for(self, user, role=None):
+        request = self.factory.get(self.url)
+        request.user = user
+        request.session = {"role": role} if role else {}
+        return HistorialTutoriasGenerateView.as_view()(request)
+
+    def test_usuario_anonimo_no_puede_acceder(self):
+        response = self.get_response_for(AnonymousUser())
+
+        self.assertEqual(response.status_code, 302)
+
+    def test_alumno_no_puede_acceder(self):
+        with self.assertRaises(PermissionDenied):
+            self.get_response_for(self.alumno, "alumno")
+
+    def test_tutor_solo_recibe_sus_propias_tutorias(self):
+        response = self.get_response_for(self.tutor, "tutor")
+        tutorias = list(response.context_data["object_list"])
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(tutorias, [self.tutoria_propia])
+        self.assertNotIn(self.tutoria_ajena, tutorias)
+
+
+class ReportesAntiguosAccessTests(TestCase):
+    def setUp(self):
+        self.coda = Coda.objects.create_user(
+            email="coda.reportes@example.com",
+            matricula="CODAREP001",
+            password="password123",
+        )
+        self.tutor = Tutor.objects.create_user(
+            first_name="Tutor",
+            last_name="Reportes",
+            email="tutor.reportes@example.com",
+            matricula="10001",
+            password="password123",
+            coordinacion="COM",
+        )
+        self.alumno = Alumno.objects.create_user(
+            first_name="Alumno",
+            last_name="Reportes",
+            email="alumno.reportes@example.com",
+            matricula="AREP001",
+            password="password123",
+            carrera="COM",
+            tutor_asignado=self.tutor,
+        )
+        Tutoria.objects.create(
+            tutor=self.tutor,
+            alumno=self.alumno,
+            tema=["BEC"],
+            descripcion="Información protegida del reporte",
+            fecha=timezone.now(),
+            estado=ACEPTADO,
+        )
+        self.url_carta = reverse("tutorados_pdf")
+        self.url_txt = reverse("generar_txt", args=[self.tutor.pk])
+
+    def test_anonimo_no_puede_descargar_reportes(self):
+        carta = self.client.get(self.url_carta, {"tutor-id": self.tutor.matricula})
+        txt = self.client.get(self.url_txt)
+
+        self.assertEqual(carta.status_code, 302)
+        self.assertEqual(txt.status_code, 302)
+
+    def test_usuario_sin_rol_coda_no_puede_descargar_reportes(self):
+        self.client.force_login(self.tutor)
+
+        carta = self.client.get(self.url_carta, {"tutor-id": self.tutor.matricula})
+        txt = self.client.get(self.url_txt)
+
+        self.assertEqual(carta.status_code, 403)
+        self.assertEqual(txt.status_code, 403)
+
+    def test_coda_puede_descargar_carta_de_tutorados(self):
+        self.client.force_login(self.coda)
+
+        response = self.client.get(
+            self.url_carta,
+            {"tutor-id": self.tutor.matricula},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+
+    def test_coda_puede_descargar_txt_sin_crear_archivo_compartido(self):
+        self.client.force_login(self.coda)
+
+        response = self.client.get(self.url_txt)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response["Content-Type"].startswith("text/plain"))
+        self.assertContains(response, "Información protegida del reporte")
 
 
 
@@ -109,6 +254,12 @@ class PanelTutoriasAlumnoTests(TestCase):
     def fecha_pasada(self):
         return timezone.now() - timedelta(days=2)
 
+    def siguiente_fecha_con_dia(self, dia_semana, hora=11):
+        fecha = timezone.localdate() + timedelta(days=1)
+        while fecha.weekday() != dia_semana:
+            fecha += timedelta(days=1)
+        return timezone.make_aware(datetime.combine(fecha, time(hora, 0)))
+
     def test_requiere_autenticacion(self):
         self.client.logout()
 
@@ -137,11 +288,52 @@ class PanelTutoriasAlumnoTests(TestCase):
             {"fecha_sugerida": nueva_fecha.strftime("%Y-%m-%dT%H:%M")},
         )
 
-        self.assertRedirects(response, self.url)
+        self.assertRedirects(
+            response,
+            f"{self.url}?tab=solicitadas&highlight={tutoria.pk}",
+            fetch_redirect_response=False,
+        )
         tutoria.refresh_from_db()
         self.assertEqual(tutoria.estado, PENDIENTE)
         self.assertEqual(timezone.localtime(tutoria.fecha), nueva_fecha)
         self.assertTrue(HistorialCambioTutoria.objects.filter(tutoria=tutoria).exists())
+
+    def test_cambio_sugerido_rechaza_fin_de_semana(self):
+        tutoria = self.crear_tutoria(ACEPTADO)
+        fecha_original = tutoria.fecha
+        sabado = self.siguiente_fecha_con_dia(5)
+
+        response = self.client.post(
+            reverse("solicitar_cambio_fecha_tutoria", args=[tutoria.pk]),
+            {"fecha_sugerida": sabado.strftime("%Y-%m-%dT%H:%M")},
+        )
+
+        self.assertRedirects(response, self.url)
+        tutoria.refresh_from_db()
+        self.assertEqual(tutoria.estado, ACEPTADO)
+        self.assertEqual(tutoria.fecha, fecha_original)
+        self.assertFalse(HistorialCambioTutoria.objects.filter(tutoria=tutoria).exists())
+
+    def test_nueva_solicitud_rechaza_fecha_sugerida_en_fin_de_semana(self):
+        sabado = self.siguiente_fecha_con_dia(5)
+
+        response = self.client.post(
+            reverse("Tutorias-create"),
+            {
+                "tema": ["BEC"],
+                "descripcion": "Solicitud en fin de semana",
+                "fecha_sugerida": sabado.strftime("%Y-%m-%dT%H:%M"),
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            "La fecha sugerida debe ser un día hábil.",
+            response.context["form"].errors["fecha_sugerida"],
+        )
+        self.assertFalse(
+            Tutoria.objects.filter(descripcion="Solicitud en fin de semana").exists()
+        )
 
     def test_cambio_a_horario_libre_queda_agendado(self):
         tutoria = self.crear_tutoria(PENDIENTE)
@@ -163,7 +355,11 @@ class PanelTutoriasAlumnoTests(TestCase):
             },
         )
 
-        self.assertRedirects(response, self.url)
+        self.assertRedirects(
+            response,
+            f"{self.url}?tab=agendadas&highlight={tutoria.pk}",
+            fetch_redirect_response=False,
+        )
         tutoria.refresh_from_db()
         self.assertEqual(tutoria.estado, ACEPTADO)
         self.assertEqual(timezone.localtime(tutoria.fecha).date(), dia)
@@ -232,6 +428,77 @@ class PanelTutoriasAlumnoTests(TestCase):
             response.context["tutorias_historial"],
             [realizada, reportada, rechazada, cancelada],
         )
+
+    def test_historial_muestra_motivos_en_badges_clicables(self):
+        cancelada = self.crear_tutoria(CANCELADO)
+        cancelada.origen_cancelacion = "ALUMNO"
+        cancelada.motivo_cancelacion = "ALU_PERSO"
+        cancelada.save(update_fields=["origen_cancelacion", "motivo_cancelacion"])
+
+        rechazada = self.crear_tutoria(RECHAZADO)
+        rechazada.motivo_rechazo = "SIN_DISPONIBILIDAD_FECHAS"
+        rechazada.save(update_fields=["motivo_rechazo"])
+
+        response = self.client.get(self.url)
+
+        self.assertContains(response, 'data-bs-toggle="popover"')
+        self.assertContains(response, "Cancelada por el alumno")
+        self.assertContains(response, "Imprevisto personal o de salud")
+        self.assertContains(response, "Rechazada por el tutor")
+        self.assertContains(
+            response,
+            "No tengo disponibilidad y no puedo proponer otro horario.",
+        )
+
+    def test_alumno_no_puede_elegir_propuesta_de_otro_alumno(self):
+        tutoria = self.crear_tutoria(PROPUESTA, alumno=self.otro_alumno)
+        tutoria.fecha_propuesta_1 = self.fecha_futura()
+        tutoria.save(update_fields=["fecha_propuesta_1"])
+
+        response = self.client.post(
+            reverse("seleccionar_propuesta_tutoria", args=[tutoria.pk]),
+            {"opcion_elegida": "1"},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        tutoria.refresh_from_db()
+        self.assertEqual(tutoria.estado, PROPUESTA)
+
+    def test_tutor_no_puede_elegir_propuesta_del_alumno(self):
+        tutoria = self.crear_tutoria(PROPUESTA)
+        tutoria.fecha_propuesta_1 = self.fecha_futura()
+        tutoria.save(update_fields=["fecha_propuesta_1"])
+        self.client.force_login(self.tutor)
+
+        response = self.client.post(
+            reverse("seleccionar_propuesta_tutoria", args=[tutoria.pk]),
+            {"opcion_elegida": "1"},
+        )
+
+        self.assertEqual(response.status_code, 403)
+        tutoria.refresh_from_db()
+        self.assertEqual(tutoria.estado, PROPUESTA)
+
+    def test_seleccionar_propuesta_no_admite_get(self):
+        tutoria = self.crear_tutoria(PROPUESTA)
+
+        response = self.client.get(
+            reverse("seleccionar_propuesta_tutoria", args=[tutoria.pk]),
+        )
+
+        self.assertEqual(response.status_code, 405)
+
+    def test_anonimo_no_puede_elegir_propuesta(self):
+        tutoria = self.crear_tutoria(PROPUESTA)
+        self.client.logout()
+
+        response = self.client.post(
+            reverse("seleccionar_propuesta_tutoria", args=[tutoria.pk]),
+            {"opcion_elegida": "1"},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("next=", response.url)
 
     def test_clasifica_estados_efectivos_segun_fecha(self):
         pendiente_vencida = self.crear_tutoria(
@@ -370,28 +637,56 @@ class MatrizTransicionesTutoriaIntegrationTests(TestCase):
             estado=PENDIENTE,
         )
 
-    def fecha_formulario(self, dias):
-        return (timezone.localtime() + timedelta(days=dias)).strftime('%Y-%m-%dT%H:%M')
+    def siguiente_fecha_habil(self, fecha):
+        while fecha.weekday() >= 5:
+            fecha += timedelta(days=1)
+        return fecha
 
     def proponer(self, *, segunda=False, reagendacion=False):
         self.client.force_login(self.tutor)
+        propuesta_1 = self.siguiente_fecha_habil(
+            timezone.localtime() + timedelta(days=5),
+        )
+        # Se deriva de la primera para garantizar que las opciones sean
+        # distintas incluso cuando una o ambas fechas iniciales caigan en fin
+        # de semana.
+        propuesta_2 = self.siguiente_fecha_habil(
+            propuesta_1 + timedelta(days=1),
+        )
         datos = {
-            'propuesta_1': self.fecha_formulario(5),
-            'propuesta_2': self.fecha_formulario(6) if segunda else '',
+            'propuesta_1': propuesta_1.strftime('%Y-%m-%dT%H:%M'),
+            'propuesta_2': (
+                propuesta_2.strftime('%Y-%m-%dT%H:%M') if segunda else ''
+            ),
         }
         if reagendacion:
             datos['es_reagendacion'] = '1'
-        return self.client.post(
+        response = self.client.post(
             reverse('proponer_fechas_tutoria', args=[self.tutoria.pk]),
             datos,
         )
+        pestana = 'solicitadas' if segunda else 'agendadas'
+        self.assertRedirects(
+            response,
+            f"{reverse('Panel-tutorias-tutor')}?tab={pestana}"
+            f"&highlight={self.tutoria.pk}",
+            fetch_redirect_response=False,
+        )
+        return response
 
     def seleccionar(self, opcion='1'):
         self.client.force_login(self.alumno)
-        return self.client.post(
+        response = self.client.post(
             reverse('seleccionar_propuesta_tutoria', args=[self.tutoria.pk]),
             {'opcion_elegida': opcion},
         )
+        self.assertRedirects(
+            response,
+            f"{reverse('Tutorias-alumno')}?tab=agendadas"
+            f"&highlight={self.tutoria.pk}",
+            fetch_redirect_response=False,
+        )
+        return response
 
     def assert_en_pestana(self, nombre_pestana, estado_efectivo):
         self.tutoria.refresh_from_db()
@@ -428,7 +723,7 @@ class MatrizTransicionesTutoriaIntegrationTests(TestCase):
         self.client.force_login(self.tutor)
         self.client.post(
             reverse('rechazar_tutoria', args=[self.tutoria.pk]),
-            {'motivo_rechazo': 'Sin disponibilidad'},
+            {'motivo_rechazo': 'SIN_DISPONIBILIDAD_FECHAS'},
         )
 
         self.assert_en_pestana('historial', RECHAZADO)
@@ -505,6 +800,9 @@ class MatrizTransicionesTutoriaIntegrationTests(TestCase):
     def test_caso_12_alumno_elige_fecha_de_solicitud(self):
         self.proponer(segunda=True)
         self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, PROPUESTA)
+        self.assertIsNotNone(self.tutoria.fecha_propuesta_1)
+        self.assertIsNotNone(self.tutoria.fecha_propuesta_2)
         fecha_elegida = self.tutoria.fecha_propuesta_2
         self.seleccionar('2')
 
@@ -518,6 +816,11 @@ class MatrizTransicionesTutoriaIntegrationTests(TestCase):
         self.tutoria.estado = ACEPTADO
         self.tutoria.save(update_fields=['estado'])
         self.proponer(segunda=True, reagendacion=True)
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, PROPUESTA)
+        self.assertTrue(self.tutoria.reagendacion_pendiente)
+        self.assertIsNotNone(self.tutoria.fecha_propuesta_1)
+        self.assertIsNotNone(self.tutoria.fecha_propuesta_2)
         self.seleccionar('1')
 
         self.tutoria.refresh_from_db()
@@ -1034,6 +1337,98 @@ class PropuestasFechaTutoriaTests(TestCase):
             estado=PENDIENTE,
         )
 
+    def fecha_habil_futura(self, dias=7, hora=11):
+        fecha = timezone.localdate() + timedelta(days=dias)
+        while fecha.weekday() >= 5:
+            fecha += timedelta(days=1)
+        return timezone.make_aware(datetime.combine(fecha, time(hora, 0)))
+
+    def enviar_propuestas(self, propuesta_1, propuesta_2='', **datos_extra):
+        datos = {
+            'propuesta_1': propuesta_1.strftime('%Y-%m-%dT%H:%M'),
+            'propuesta_2': (
+                propuesta_2.strftime('%Y-%m-%dT%H:%M') if propuesta_2 else ''
+            ),
+            **datos_extra,
+        }
+        return self.client.post(
+            reverse('proponer_fechas_tutoria', args=[self.tutoria.pk]),
+            datos,
+        )
+
+    def assert_propuesta_rechazada(self, response, mensaje):
+        self.assertRedirects(
+            response,
+            reverse('Panel-tutorias-tutor'),
+            fetch_redirect_response=False,
+        )
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, PENDIENTE)
+        self.assertIsNone(self.tutoria.fecha_propuesta_1)
+        self.assertIsNone(self.tutoria.fecha_propuesta_2)
+        self.assertTrue(
+            any(mensaje in str(item) for item in response.wsgi_request._messages),
+        )
+
+    def test_rechaza_una_fecha_anterior_al_siguiente_dia_habil(self):
+        self.client.force_login(self.tutor)
+        response = self.enviar_propuestas(timezone.localtime() - timedelta(days=1))
+        self.assert_propuesta_rechazada(response, 'siguiente día hábil')
+
+    def test_rechaza_fechas_en_fin_de_semana(self):
+        self.client.force_login(self.tutor)
+        fecha = timezone.localdate() + timedelta(days=7)
+        while fecha.weekday() != 5:
+            fecha += timedelta(days=1)
+        sabado = timezone.make_aware(datetime.combine(fecha, time(11, 0)))
+
+        response = self.enviar_propuestas(sabado)
+
+        self.assert_propuesta_rechazada(response, 'días hábiles')
+
+    def test_rechaza_dos_propuestas_iguales(self):
+        self.client.force_login(self.tutor)
+        propuesta = self.fecha_habil_futura()
+
+        response = self.enviar_propuestas(propuesta, propuesta)
+
+        self.assert_propuesta_rechazada(response, 'deben ser diferentes')
+
+    def test_reagendacion_rechaza_dos_propuestas_iguales(self):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.save(update_fields=['estado'])
+        fecha_original = self.tutoria.fecha
+        self.client.force_login(self.tutor)
+        propuesta = self.fecha_habil_futura()
+
+        response = self.enviar_propuestas(
+            propuesta,
+            propuesta,
+            es_reagendacion='1',
+        )
+
+        self.assertRedirects(
+            response,
+            reverse('Panel-tutorias-tutor'),
+            fetch_redirect_response=False,
+        )
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, ACEPTADO)
+        self.assertEqual(self.tutoria.fecha, fecha_original)
+        self.assertIsNone(self.tutoria.fecha_propuesta_1)
+        self.assertIsNone(self.tutoria.fecha_propuesta_2)
+
+    def test_reactivacion_rechaza_dos_propuestas_iguales(self):
+        self.tutoria.fecha = timezone.now() - timedelta(days=1)
+        self.tutoria.save(update_fields=['fecha'])
+        self.client.force_login(self.tutor)
+        propuesta = self.fecha_habil_futura()
+
+        response = self.enviar_propuestas(propuesta, propuesta)
+
+        self.assert_propuesta_rechazada(response, 'deben ser diferentes')
+        self.assertEqual(self.tutoria.estado_efectivo, VENCIDA)
+
     def test_una_fecha_propuesta_acepta_directamente_la_tutoria(self):
         self.client.force_login(self.tutor)
 
@@ -1047,7 +1442,7 @@ class PropuestasFechaTutoriaTests(TestCase):
 
         self.assertRedirects(
             response,
-            reverse('Panel-tutorias-tutor'),
+            f"{reverse('Panel-tutorias-tutor')}?tab=agendadas&highlight={self.tutoria.pk}",
             fetch_redirect_response=False,
         )
         self.tutoria.refresh_from_db()
@@ -1072,7 +1467,7 @@ class PropuestasFechaTutoriaTests(TestCase):
 
         self.assertRedirects(
             response,
-            reverse('Panel-tutorias-tutor'),
+            f"{reverse('Panel-tutorias-tutor')}?tab=solicitadas&highlight={self.tutoria.pk}",
             fetch_redirect_response=False,
         )
         self.tutoria.refresh_from_db()
@@ -1094,7 +1489,7 @@ class PropuestasFechaTutoriaTests(TestCase):
 
         self.assertRedirects(
             response,
-            reverse('Tutorias-alumno'),
+            f"{reverse('Tutorias-alumno')}?tab=agendadas&highlight={self.tutoria.pk}",
             fetch_redirect_response=False,
         )
         self.tutoria.refresh_from_db()
@@ -1112,8 +1507,16 @@ class PropuestasFechaTutoriaTests(TestCase):
         self.assertEqual(self.tutoria.estado_efectivo, VENCIDA)
         self.client.force_login(self.tutor)
 
-        propuesta_1 = timezone.localtime() + timedelta(days=1)
-        propuesta_2 = timezone.localtime() + timedelta(days=2)
+        propuesta_1 = self.fecha_habil_futura()
+        fecha_propuesta_2 = propuesta_1.date() + timedelta(
+            days=random.randint(1, 10),
+        )
+        while fecha_propuesta_2.weekday() >= 5:
+            fecha_propuesta_2 += timedelta(days=1)
+        propuesta_2 = timezone.make_aware(
+            datetime.combine(fecha_propuesta_2, propuesta_1.time()),
+        )
+        self.assertNotEqual(propuesta_1, propuesta_2)
         response = self.client.post(
             reverse('proponer_fechas_tutoria', args=[self.tutoria.pk]),
             {
@@ -1124,7 +1527,7 @@ class PropuestasFechaTutoriaTests(TestCase):
 
         self.assertRedirects(
             response,
-            reverse('Panel-tutorias-tutor'),
+            f"{reverse('Panel-tutorias-tutor')}?tab=solicitadas&highlight={self.tutoria.pk}",
             fetch_redirect_response=False,
         )
         self.tutoria.refresh_from_db()
@@ -1156,7 +1559,7 @@ class PropuestasFechaTutoriaTests(TestCase):
 
         self.assertRedirects(
             response,
-            reverse('Panel-tutorias-tutor'),
+            f"{reverse('Panel-tutorias-tutor')}?tab=agendadas&highlight={self.tutoria.pk}",
             fetch_redirect_response=False,
         )
         self.tutoria.refresh_from_db()
@@ -1191,7 +1594,7 @@ class PropuestasFechaTutoriaTests(TestCase):
 
         self.assertRedirects(
             response,
-            reverse('Panel-tutorias-tutor'),
+            f"{reverse('Panel-tutorias-tutor')}?tab=solicitadas&highlight={self.tutoria.pk}",
             fetch_redirect_response=False,
         )
         self.tutoria.refresh_from_db()
@@ -1214,7 +1617,7 @@ class PropuestasFechaTutoriaTests(TestCase):
 
         self.assertRedirects(
             response,
-            reverse('Panel-tutorias-tutor'),
+            f"{reverse('Panel-tutorias-tutor')}?tab=agendadas&highlight={self.tutoria.pk}",
             fetch_redirect_response=False,
         )
         self.tutoria.refresh_from_db()
@@ -1283,10 +1686,8 @@ class MotivosRechazoTutoriaTests(TestCase):
 
     def test_rechazo_con_motivo_predefinido(self):
         self.client.force_login(self.tutor)
-        motivo = (
-            'El tema solicitado se encuentra fuera de mi ámbito de '
-            'atención o conocimiento.'
-        )
+        motivo = 'FUERA_AMBITO'
+        descripcion = 'El tema está fuera de mi ámbito de atención.'
 
         response = self.client.post(
             self.url,
@@ -1295,12 +1696,17 @@ class MotivosRechazoTutoriaTests(TestCase):
 
         self.assertRedirects(
             response,
-            reverse('Panel-tutorias-tutor'),
+            f"{reverse('Panel-tutorias-tutor')}?tab=historial&highlight={self.tutoria.pk}",
             fetch_redirect_response=False,
         )
         self.tutoria.refresh_from_db()
         self.assertEqual(self.tutoria.estado, RECHAZADO)
         self.assertEqual(self.tutoria.motivo_rechazo, motivo)
+        self.assertFalse(self.tutoria.detalle_motivo_rechazo)
+        self.assertEqual(self.tutoria.motivo_rechazo_legible, descripcion)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn(f"Motivo: {descripcion}", mail.outbox[0].body)
+        self.assertNotIn(motivo, mail.outbox[0].body)
 
     def test_rechazo_con_otro_motivo_guarda_el_texto_escrito(self):
         self.client.force_login(self.tutor)
@@ -1312,20 +1718,27 @@ class MotivosRechazoTutoriaTests(TestCase):
         response = self.client.post(
             self.url,
             {
-                'motivo_rechazo': 'otro',
+                'motivo_rechazo': MOTIVO_RECHAZO_OTRO,
                 'motivo_rechazo_otro': motivo_personalizado,
             },
         )
 
         self.assertRedirects(
             response,
-            reverse('Panel-tutorias-tutor'),
+            f"{reverse('Panel-tutorias-tutor')}?tab=historial&highlight={self.tutoria.pk}",
             fetch_redirect_response=False,
         )
         self.tutoria.refresh_from_db()
         self.assertEqual(self.tutoria.estado, RECHAZADO)
-        self.assertEqual(self.tutoria.motivo_rechazo, motivo_personalizado)
-        self.assertNotEqual(self.tutoria.motivo_rechazo, 'otro')
+        self.assertEqual(self.tutoria.motivo_rechazo, MOTIVO_RECHAZO_OTRO)
+        self.assertEqual(
+            self.tutoria.detalle_motivo_rechazo,
+            motivo_personalizado,
+        )
+        self.assertEqual(
+            self.tutoria.motivo_rechazo_legible,
+            motivo_personalizado,
+        )
 
     def test_rechazo_sin_motivo_no_modifica_la_tutoria(self):
         self.client.force_login(self.tutor)
@@ -1343,7 +1756,7 @@ class MotivosRechazoTutoriaTests(TestCase):
         mensajes = list(response.wsgi_request._messages)
         self.assertEqual(len(mensajes), 1)
         self.assertIn(
-            'Debes seleccionar o escribir una razón',
+            'Debes seleccionar un motivo de rechazo válido',
             str(mensajes[0]),
         )
 
@@ -1353,7 +1766,7 @@ class MotivosRechazoTutoriaTests(TestCase):
         self.client.post(
             self.url,
             {
-                'motivo_rechazo': 'otro',
+                'motivo_rechazo': MOTIVO_RECHAZO_OTRO,
                 'motivo_rechazo_otro': '   ',
             },
         )
@@ -1464,7 +1877,7 @@ class CancelarTutoriaTests(TestCase):
 
         self.assertRedirects(
             response,
-            f"{reverse('Panel-tutorias-tutor')}?tab=historial",
+            f"{reverse('Panel-tutorias-tutor')}?tab=historial&highlight={self.tutoria.pk}",
             fetch_redirect_response=False,
         )
         self.tutoria.refresh_from_db()
@@ -1490,7 +1903,7 @@ class CancelarTutoriaTests(TestCase):
 
         self.assertRedirects(
             response,
-            f"{reverse('Panel-tutorias-tutor')}?tab=historial",
+            f"{reverse('Panel-tutorias-tutor')}?tab=historial&highlight={self.tutoria.pk}",
             fetch_redirect_response=False,
         )
         self.tutoria.refresh_from_db()
@@ -1558,7 +1971,7 @@ class CancelarTutoriaTests(TestCase):
 
         self.assertRedirects(
             response,
-            reverse("Tutorias-alumno"),
+            f"{reverse('Tutorias-alumno')}?tab=historial&highlight={self.tutoria.pk}",
             fetch_redirect_response=False,
         )
         self.tutoria.refresh_from_db()
@@ -1811,7 +2224,7 @@ class NotificacionesTutoriaTests(TestCase):
 
         self.assertRedirects(
             response,
-            f"{reverse('Panel-tutorias-tutor')}?tab=agendadas",
+            f"{reverse('Panel-tutorias-tutor')}?tab=agendadas&highlight={self.tutoria.pk}",
             fetch_redirect_response=False,
         )
         self.tutoria.refresh_from_db()
@@ -1919,6 +2332,7 @@ class CanalesNotificacionTutoriaTests(TestCase):
             cubiculo=1,
             coordinacion="COM",
             sexo="M",
+            notificaciones_habilitadas=True,
         )
         self.alumno = Alumno.objects.create(
             matricula="NA1001",
@@ -1937,6 +2351,23 @@ class CanalesNotificacionTutoriaTests(TestCase):
             fecha=timezone.now() + timedelta(days=1),
             descripcion="Prueba de los tres canales",
             estado=PENDIENTE,
+        )
+
+    def crear_dispositivo_push(self):
+        subscription = SubscriptionInfo.objects.create(
+            endpoint="https://fcm.googleapis.com/push/test",
+            p256dh="p256dh-test",
+            auth="auth-test",
+            browser="Chrome",
+        )
+        PushInformation.objects.create(user=self.tutor, subscription=subscription)
+        return PushDevice.objects.create(
+            user=self.tutor,
+            subscription=subscription,
+            status=PushDevice.Status.ACTIVE,
+            browser="Chrome",
+            operating_system="Linux",
+            device_name="Chrome · Linux",
         )
 
     @override_settings(
@@ -1958,9 +2389,48 @@ class CanalesNotificacionTutoriaTests(TestCase):
         html = correo.alternatives[0][0]
         self.assertIn("Revisar solicitud", html)
         self.assertIn(
-            "https://tutorias.test/panel-tutorias-tutor/?tab=solicitadas",
+            "https://tutorias.test/panel-tutorias-tutor/"
+            f"?tab=solicitadas&amp;highlight={self.tutoria.pk}",
             html,
         )
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        TUTORIAS_SITE_URL="https://tutorias.test",
+    )
+    def test_confirmacion_incluye_calendarios_para_el_alumno(self):
+        notify_tutoria_event(
+            event=EventoTutoria.TUT_ACEPTA_SOLICITUD,
+            tutoria=self.tutoria,
+            actor=self.tutor,
+        )
+
+        correo = mail.outbox[0]
+        self.assertEqual(correo.to, [self.alumno.email])
+        html = correo.alternatives[0][0]
+        self.assertIn("Google Calendar", html)
+        self.assertIn("Apple Calendar", html)
+        self.assertIn("Tutor%C3%ADa+con+Tutor+Canales", html)
+        self.assertIn(
+            f"https://tutorias.test{reverse('descargar_ics', kwargs={'tutoria_id': self.tutoria.pk})}",
+            html,
+        )
+
+    def test_ics_personaliza_el_titulo_segun_el_usuario(self):
+        self.client.force_login(self.alumno)
+        response = self.client.get(
+            reverse("descargar_ics", kwargs={"tutoria_id": self.tutoria.pk})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("SUMMARY:Tutoría con Tutor Canales", response.content.decode())
+
+        self.client.force_login(self.tutor)
+        response = self.client.get(
+            reverse("descargar_ics", kwargs={"tutoria_id": self.tutoria.pk})
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("SUMMARY:Tutoría con Alumno Canales", response.content.decode())
 
     def test_campana_usa_el_contrato_del_evento_actual(self):
         handle_inapp_notifications(
@@ -1976,21 +2446,9 @@ class CanalesNotificacionTutoriaTests(TestCase):
         self.assertEqual(notificacion.verb, "solicitó una tutoría")
         self.assertEqual(notificacion.description, "Nueva solicitud de tutoría")
 
-    @patch("Tutorias.signals.handle_push_notifications.PushInformation.objects.filter")
     @patch("Tutorias.signals.handle_push_notifications.webpush")
-    def test_push_envia_payload_y_url_relativa(self, webpush_mock, filter_mock):
-        class PushInfos(list):
-            def count(self):
-                return len(self)
-
-        subscription = SimpleNamespace(
-            endpoint="https://fcm.googleapis.com/push/test",
-            p256dh="p256dh-test",
-            auth="auth-test",
-        )
-        filter_mock.return_value = PushInfos([
-            SimpleNamespace(subscription=subscription),
-        ])
+    def test_push_envia_payload_y_url_relativa(self, webpush_mock):
+        self.crear_dispositivo_push()
         webpush_mock.return_value = Mock(status_code=201)
 
         _enviar_notificacion_push(
@@ -2004,8 +2462,68 @@ class CanalesNotificacionTutoriaTests(TestCase):
         self.assertEqual(payload["head"], "🙏 Nueva solicitud de tutoría")
         self.assertEqual(
             payload["url"],
-            f"{reverse('Panel-tutorias-tutor')}?tab=solicitadas",
+            f"{reverse('Panel-tutorias-tutor')}?tab=solicitadas"
+            f"&highlight={self.tutoria.pk}",
         )
+
+    @patch("Tutorias.signals.handle_push_notifications.webpush")
+    def test_error_de_conexion_push_no_interrumpe_la_operacion(self, webpush_mock):
+        self.crear_dispositivo_push()
+        webpush_mock.side_effect = RequestsConnectionError(
+            "Temporary failure in name resolution"
+        )
+
+        _enviar_notificacion_push(
+            EventoTutoria.ALU_SOLICITA_TUTORIA,
+            self.tutoria,
+            self.alumno,
+        )
+
+        webpush_mock.assert_called_once()
+
+    @patch("Tutorias.signals.handle_push_notifications.webpush")
+    def test_push_elimina_suscripcion_expirada(self, webpush_mock):
+        device = self.crear_dispositivo_push()
+        webpush_mock.side_effect = WebPushException(
+            "Suscripción expirada",
+            response=Mock(status_code=410),
+        )
+
+        _enviar_notificacion_push(
+            EventoTutoria.ALU_SOLICITA_TUTORIA,
+            self.tutoria,
+            self.alumno,
+        )
+
+        self.assertFalse(PushDevice.objects.filter(pk=device.pk).exists())
+
+    @patch("Tutorias.signals.handle_push_notifications.webpush")
+    def test_preferencia_global_desactivada_evitar_envio_push(self, webpush_mock):
+        self.crear_dispositivo_push()
+        self.tutor.notificaciones_habilitadas = False
+        self.tutor.save(update_fields=["notificaciones_habilitadas"])
+
+        _enviar_notificacion_push(
+            EventoTutoria.ALU_SOLICITA_TUTORIA,
+            self.tutoria,
+            self.alumno,
+        )
+
+        webpush_mock.assert_not_called()
+
+    @patch("Tutorias.signals.handle_push_notifications.webpush")
+    def test_dispositivo_pausado_no_recibe_push(self, webpush_mock):
+        device = self.crear_dispositivo_push()
+        device.status = PushDevice.Status.PAUSED
+        device.save(update_fields=["status"])
+
+        _enviar_notificacion_push(
+            EventoTutoria.ALU_SOLICITA_TUTORIA,
+            self.tutoria,
+            self.alumno,
+        )
+
+        webpush_mock.assert_not_called()
 
     @override_settings(
         EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
@@ -2036,6 +2554,25 @@ class CanalesNotificacionTutoriaTests(TestCase):
 
 
 class ConfiguracionCanalesNotificacionTests(SimpleTestCase):
+    def test_acciones_de_calendario_solo_aparecen_en_fechas_confirmadas(self):
+        eventos_con_calendario = {
+            EventoTutoria.ALU_AGENDA_TUTORIA,
+            EventoTutoria.TUT_ACEPTA_SOLICITUD,
+            EventoTutoria.TUT_PROPONE_1_FECHA,
+            EventoTutoria.ALU_SOL_CAMBIO_FECHA_AGEN,
+            EventoTutoria.TUT_REAGENDA_1_FECHA,
+            EventoTutoria.ALU_ELIGE_FECHA_PROPUESTA,
+            EventoTutoria.TUT_REACTIVA_1_FECHA,
+        }
+
+        self.assertEqual(
+            {
+                event for event, config in EMAIL_EVENT_CONFIG.items()
+                if config.get("show_calendar_actions")
+            },
+            eventos_con_calendario,
+        )
+
     def test_configuraciones_solo_contienen_eventos_y_roles_validos(self):
         eventos = set(EventoTutoria.values)
         roles = {"alumno", "tutor"}

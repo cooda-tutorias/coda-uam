@@ -1,5 +1,16 @@
 {% extends "Usuarios/HeaderAndFooterFachada.html" %}
+{% load static %}
 {% block title %}Panel de Tutorías{% endblock %}
+
+{% block styles %}
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/material_blue.css">
+  <link rel="stylesheet"
+        href="{% static 'Tutorias/css/selector_fecha_tutoria.css' %}">
+{% endblock %}
+
 {% block body %}
   <style>
     .tutorias-nav-tabs {
@@ -33,11 +44,40 @@
         box-shadow: 0 -1px 2px rgba(0, 0, 0, .04);
     }
 
+    .tutoria-reciente > * {
+        animation: resaltar-tutoria-reciente 4s ease-out;
+    }
+
+    @keyframes resaltar-tutoria-reciente {
+        0%, 55% {
+            box-shadow: inset 0 0 0 9999px rgba(240, 130, 0, .22);
+        }
+        100% {
+            box-shadow: inset 0 0 0 9999px rgba(240, 130, 0, 0);
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .tutoria-reciente > * {
+            animation: none;
+            box-shadow: inset 0 0 0 9999px rgba(240, 130, 0, .22) !important;
+        }
+    }
+
     @media (max-width: 575.98px) {
         .tutorias-nav-tabs .nav-link {
             padding: .75rem;
             font-size: .9rem;
         }
+    }
+
+    .estado-con-motivo {
+        cursor: pointer;
+    }
+
+    .estado-con-motivo:focus-visible {
+        outline: 3px solid rgba(240, 130, 0, .35);
+        outline-offset: 2px;
     }
 
 /* Limita el contenedor a un máximo de 2 renglones con puntos suspensivos */
@@ -198,7 +238,7 @@
                       </thead>
                       <tbody>
                         {% for tutoria in tutorias_solicitadas %}
-                          <tr class="text-body text-center">
+                          <tr class="text-body text-center" data-tutoria-id="{{ tutoria.pk }}">
                             <td>{{ tutoria.tutor.nombre_completo }}</td>
                             <td class="text-nowrap">
                               <span class="d-block fw-semibold">{{ tutoria.fecha_solicitud|date:"j M Y" }}</span>
@@ -307,7 +347,7 @@
                       </thead>
                       <tbody>
                         {% for tutoria in tutorias_agendadas %}
-                          <tr class="text-body text-center">
+                          <tr class="text-body text-center" data-tutoria-id="{{ tutoria.pk }}">
                             <td>{{ tutoria.tutor.nombre_completo }}</td>
                             <td class="text-nowrap">
                               <span class="d-block fw-semibold">{{ tutoria.fecha_solicitud|date:"j M Y" }}</span>
@@ -322,6 +362,35 @@
                                 <i class="bi bi-clock me-1"></i>
                                 {{ tutoria.fecha|date:"P" }}
                               </small>
+                              <!-- Este div es para el menú para agregar cita al calendario personal -->
+                              <div class="dropdown d-inline-block ms-2">
+                                <a href="#"
+                                   role="button"
+                                   id="dropdownMenuLink{{ tutoria.pk }}"
+                                   data-bs-toggle="dropdown"
+                                   aria-expanded="false"
+                                   class="text-secondary text-decoration-none">
+                                  <i class="bi bi-calendar-plus hover-primary"
+                                     title="Agregar a tu calendario Google/Apple"></i>
+                                </a>
+
+                                <ul class="dropdown-menu shadow"
+                                    aria-labelledby="dropdownMenuLink{{ tutoria.pk }}">
+                                  <li>
+                                    <a class="dropdown-item"
+                                       href="{{ tutoria.google_calendar_url_tutor }}"
+                                       target="_blank">
+                                      <i class="bi bi-google text-danger me-2"></i> Google Calendar
+                                    </a>
+                                  </li>
+
+                                  <li>
+                                    <a class="dropdown-item" href="{% url 'descargar_ics' tutoria.pk %}">
+                                      <i class="bi bi-apple text-dark me-2"></i> Apple Calendar
+                                    </a>
+                                  </li>
+                                </ul>
+                              </div>
                             </td>
                             <td>{{ tutoria.get_tema_display|join:", " }}</td>
                             <!-- Corta la descripción a 2 líneas y el texto completo lo muestra en el tooltip -->
@@ -394,7 +463,7 @@
                       </thead>
                       <tbody>
                         {% for tutoria in tutorias_historial %}
-                          <tr class="text-body text-center">
+                          <tr class="text-body text-center" data-tutoria-id="{{ tutoria.pk }}">
                             <td>{{ tutoria.tutor.nombre_completo }}</td>
                             <td class="text-nowrap">
                               <span class="d-block fw-semibold">{{ tutoria.fecha_solicitud|date:"j M Y" }}</span>
@@ -422,22 +491,7 @@
                             </td>
                             <!-- Celda que muestra el estado de la tutoría con un badge -->
                             <td>
-                              {% if tutoria.estado_efectivo == 'CAN' %}
-                                <span class="badge rounded-pill bg-cancelada"
-                                      data-mdb-toggle="tooltip"
-                                      title="Cancelada por el {{ tutoria.get_origen_cancelacion_display|lower }}">
-                                  Cancelada
-                                  {% if tutoria.origen_cancelacion == 'TUTOR' %}
-                                    <i class="bi bi-person-video ms-1" aria-hidden="true"></i>
-                                  {% elif tutoria.origen_cancelacion == 'ALUMNO' %}
-                                    <i class="bi bi-mortarboard ms-1" aria-hidden="true"></i>
-                                  {% elif tutoria.origen_cancelacion == 'SISTEMA' %}
-                                    <i class="bi bi-robot ms-1" aria-hidden="true"></i>
-                                  {% endif %}
-                                </span>
-                              {% else %}
-                                <span class="badge rounded-pill {{ tutoria.estado_badge_class }}">{{ tutoria.get_estado_display }}</span>
-                              {% endif %}
+                              {% include "Tutorias/includes/partials/badge_estado_historial.html" with tutoria=tutoria %}
                             </td>
                           </tr>
                         {% empty %}
@@ -639,6 +693,9 @@ document.addEventListener('DOMContentLoaded', function() {
   const pestañaDesdeUrl = new URLSearchParams(window.location.search).get(
     'tab'
   );
+  const tutoriaParaResaltar = new URLSearchParams(window.location.search).get(
+    'highlight'
+  );
   const pestañasPermitidas = ['solicitadas', 'agendadas', 'historial'];
   const selectorDesdeUrl = pestañasPermitidas.includes(pestañaDesdeUrl)
     ? `#${pestañaDesdeUrl}`
@@ -659,11 +716,53 @@ document.addEventListener('DOMContentLoaded', function() {
     sessionStorage.removeItem('pestañaTutoriasActiva');
   }
 
+  function resaltarTutoriaReciente() {
+    if (!/^\d+$/.test(tutoriaParaResaltar || '')) {
+      return;
+    }
+
+    const fila = document.querySelector(
+      `[data-tutoria-id="${tutoriaParaResaltar}"]`
+    );
+    if (!fila || fila.dataset.resaltada === 'true') {
+      return;
+    }
+
+    fila.dataset.resaltada = 'true';
+    fila.classList.add('tutoria-reciente');
+    fila.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    window.setTimeout(function () {
+      fila.classList.remove('tutoria-reciente');
+    }, 4000);
+
+    const urlLimpia = new URL(window.location.href);
+    urlLimpia.searchParams.delete('highlight');
+    window.history.replaceState({}, '', urlLimpia);
+  }
+
+  if (tutoriaParaResaltar) {
+    const botonDestino = selectorDesdeUrl
+      ? document.querySelector(`[data-mdb-target="${selectorDesdeUrl}"]`)
+      : null;
+    if (botonDestino) {
+      botonDestino.addEventListener(
+        'shown.mdb.tab',
+        resaltarTutoriaReciente,
+        { once: true }
+      );
+    }
+    window.setTimeout(resaltarTutoriaReciente, 250);
+  }
+
 
   // Inicializa todos los tooltips de la página
   const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-mdb-toggle="tooltip"]'));
   tooltipTriggerList.map(function (tooltipTriggerEl) {
     return new mdb.Tooltip(tooltipTriggerEl);
+  });
+
+  document.querySelectorAll('[data-bs-toggle="popover"]').forEach(function (elemento) {
+    bootstrap.Popover.getOrCreateInstance(elemento);
   });
 });
   </script>
@@ -722,4 +821,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
 });
   </script>
+{% endblock %}
+
+{% block scripts %}
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://npmcdn.com/flatpickr/dist/l10n/es.js"></script>
+  <script src="{% static 'Tutorias/js/selector_fecha_tutoria.js' %}"></script>
 {% endblock %}

@@ -27,15 +27,15 @@ CARRERAS = [
 
 # Departamentos de la DCNI
 DMAS = "Matemáticas Aplicadas y Sistemas"
-DCNI = "Ciencias Naturales"
-DCPT = "Procesos y Tecnologías"
+DCN = "Ciencias Naturales"
+DPT = "Procesos y Tecnologías"
 
 # MAPEO: COORDINACIÓN -> DEPARTAMENTO 
 COORDINACION_A_DEPARTAMENTO = {
     MATEMATICAS: DMAS,
     COMPUTACION: DMAS,
-    BMOLECULAR: DCNI,
-    IBIOLOGICA: DCPT,
+    BMOLECULAR: DCN,
+    IBIOLOGICA: DPT,
 }
 
 TEMPLATES = {
@@ -58,7 +58,23 @@ SEXOS = [
 
 ESTADOS_ALUMNO = [
     ('', 'Selecciona un estado'),
-    (1,"Activo"),
-    (2,"No reinscrito"),
-    (10, "Inscrito sin carga académica")
+    (1, "Activo"),
+    (2, "No activo"),
+    (3, "Suspendido"),
+    (4, "Baja definitiva"),
+    (5, "Titulado"),
+    (6, "Egresado con trámite de certificado"),
+    (7, "Baja reglamentaria"),
+    (8, "Egresado potencial"),
+    (9, "Baja por dictamen de órgano colegiado"),
+    (10, "Inscrito sin carga académica"),
+    (11, "Aceptado nuevo ingreso"),
+    (12, "Egresado sin trámite de certificado"),
+    (13, "Alumno de nuevo ingreso no presentado"),
+    (14, "Abandono de más de seis trimestres"),
+    (15, "Alumno con diploma"),
+    (16, "Alumno con grado"),
+    (17, "Admitido en lista complementaria"),
+    (18, "Estancia terminada (movilidad)"),
+    (19, "Cancelación del trámite de registro o de ingreso"),
 ]

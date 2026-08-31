@@ -1,9 +1,16 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from django.core.exceptions import ValidationError
 #from django.utils.translation import ugettext_lazy
 #from django.contrib.auth.models import User
 from import_export import resources
 from import_export.admin import ImportExportModelAdmin
+
+from .services.importacion_tutores import (
+    aplicar_filas_normalizadas_al_dataset,
+    mensajes_errores_tutores,
+    validar_y_normalizar_dataset_tutores,
+)
 
 from .models import Usuario, Tutor, Alumno, Coda, Cordinador, Documento
 
@@ -12,9 +19,41 @@ admin.site.register(Documento)
 
 class TutorResource(resources.ModelResource):
 
+    def before_import(self, dataset, using_transactions, dry_run, **kwargs):
+        resultado = validar_y_normalizar_dataset_tutores(dataset)
+        if not resultado.es_valido:
+            raise ValidationError(mensajes_errores_tutores(resultado.errores))
+        aplicar_filas_normalizadas_al_dataset(
+            dataset,
+            resultado.filas_normalizadas,
+        )
+
+    def before_save_instance(self, instance, using_transactions, dry_run):
+        password_plano = instance.password
+        if not password_plano:
+            raise ValidationError("La contraseña es obligatoria.")
+        instance.set_password(password_plano)
+
+    def dehydrate_password(self, instance):
+        """Evita incluir hashes de contraseñas al exportar tutores."""
+        return ""
+
     class Meta:
         model = Tutor
-        fields = ('id', 'password', 'email', 'coordinacion', 'carrera', 'first_name', 'last_name', 'second_last_name')
+        import_id_fields = ('matricula',)
+        fields = (
+            'matricula',
+            'first_name',
+            'last_name',
+            'second_last_name',
+            'email',
+            'sexo',
+            'coordinacion',
+            'cubiculo',
+            'password',
+        )
+        export_order = fields
+        use_transactions = True
 
 class CodaResource(resources.ModelResource):
 
@@ -72,6 +111,8 @@ class UserAdmin(BaseUserAdmin):
 class TutorAdmin(ImportExportModelAdmin, UserAdmin):
     """Define admin model for custom User model with no email field."""
 
+    resource_class = TutorResource
+
     fieldsets = (
         (None, {'fields': ('email', 'password', 'matricula')}),
         (('Información Personal'), {'fields': ('first_name', 'last_name', 'second_last_name', 'sexo','cubiculo', 'coordinacion', 'foto',)}),
@@ -82,7 +123,7 @@ class TutorAdmin(ImportExportModelAdmin, UserAdmin):
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('first_name', 'last_name','second_last_name', 'email','matricula', 'coordinacion', 'cubiculo', 'password1', 'password2', 'es_coordinador'),
+            'fields': ('first_name', 'last_name', 'second_last_name', 'sexo', 'email', 'matricula', 'coordinacion', 'cubiculo', 'password1', 'password2'),
         }),
     )
     list_display = ('pk', 'email', 'matricula', 'coordinacion', 'first_name', 'last_name', 'second_last_name', 'sexo','is_staff', 'es_coordinador', 'es_tutor')
@@ -132,7 +173,7 @@ class CordinadorAdmin(ImportExportModelAdmin, UserAdmin):
     add_fieldsets = (
         (None, {
             'classes': ('wide',),
-            'fields': ('first_name', 'last_name','second_last_name', 'email','matricula', 'coordinacion', 'cubiculo', 'password1', 'password2', 'es_tutor'),
+            'fields': ('first_name', 'last_name', 'second_last_name', 'email', 'matricula', 'coordinacion', 'cubiculo', 'password1', 'password2'),
         }),
     )
     list_display = ('pk', 'email', 'matricula', 'coordinacion', 'first_name', 'last_name', 'second_last_name', 'is_staff', 'es_coordinador', 'es_tutor')

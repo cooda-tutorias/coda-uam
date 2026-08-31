@@ -8,11 +8,12 @@ from django.conf import settings
 from typing import Any
 
 from django.dispatch import receiver
-from webpush.models import PushInformation
 from urllib.parse import urlencode, urlparse
 from pywebpush import webpush, WebPushException
+from requests.exceptions import RequestException
 
 from django.urls import reverse
+from Usuarios.models import PushDevice
 
 from .signals_definitions import tutoria_notification_requested
 from .events import EventoTutoria
@@ -191,10 +192,89 @@ def _url_para_destinatario(info_noti: dict[str, object], role: str, tutoria: Any
     """Construye la URL del panel y pestaña configurados para el rol."""
     url_name, tab = info_noti["url"][role]
     tab = tab or _pestana_por_estado(tutoria)
-    return f"{reverse(url_name)}?{urlencode({'tab': tab})}"
+    return f"{reverse(url_name)}?{urlencode({'tab': tab, 'highlight': tutoria.pk})}"
 
 
-#def _enviar_notificacion_push(tutor, alumno, alumno_sugirio, encabezado):
+def _deliver_push(device, payload, *, ttl=1000):
+    """Envía a un dispositivo sin permitir que el canal push rompa la operación."""
+    subscription = device.subscription
+    parsed = urlparse(subscription.endpoint)
+    audience = f"{parsed.scheme}://{parsed.netloc}"
+
+    try:
+        response = webpush(
+            subscription_info={
+                "endpoint": subscription.endpoint,
+                "keys": {
+                    "p256dh": subscription.p256dh,
+                    "auth": subscription.auth,
+                },
+            },
+            data=json.dumps(payload),
+            vapid_private_key=settings.WEBPUSH_SETTINGS["VAPID_PRIVATE_KEY"],
+            vapid_claims={
+                "sub": settings.WEBPUSH_SETTINGS["VAPID_ADMIN_EMAIL"],
+                "aud": audience,
+            },
+            ttl=ttl,
+        )
+        logger.info(
+            "Push aceptada para usuario=%s dispositivo=%s status=%s servicio=%s",
+            device.user_id,
+            device.pk,
+            response.status_code,
+            parsed.netloc,
+        )
+        return True, "Notificación enviada."
+    except WebPushException as error:
+        status_code = getattr(getattr(error, "response", None), "status_code", None)
+        if status_code in (404, 410):
+            logger.info(
+                "Se eliminó la suscripción inválida %s del usuario %s (HTTP %s)",
+                device.pk,
+                device.user_id,
+                status_code,
+            )
+            subscription.delete()
+            return False, "La suscripción ya no era válida y fue eliminada."
+        logger.warning(
+            "El servicio push rechazó el dispositivo %s del usuario %s: %s",
+            device.pk,
+            device.user_id,
+            error,
+        )
+        return False, "El servicio de notificaciones rechazó el envío."
+    except RequestException as error:
+        logger.warning(
+            "No se pudo contactar %s para el dispositivo %s del usuario %s: %s",
+            parsed.netloc,
+            device.pk,
+            device.user_id,
+            error,
+        )
+        return False, "No fue posible contactar el servicio de notificaciones."
+    except Exception:
+        logger.exception(
+            "Error inesperado enviando push al dispositivo %s del usuario %s",
+            device.pk,
+            device.user_id,
+        )
+        return False, "Ocurrió un error inesperado al enviar la notificación."
+
+
+def send_test_push(device):
+    return _deliver_push(
+        device,
+        {
+            "head": "🔔 Notificación de prueba",
+            "body": "Las notificaciones están funcionando correctamente en este dispositivo.",
+            "icon": "/static/img/icon-v2.png",
+            "badge": "/static/img/badge-v5.png",
+            "url": reverse("configuracion_app"),
+        },
+    )
+
+
 def _enviar_notificacion_push(event, tutoria, actor=None):
     """
     Envía la notificación push para el tutor o el alumno según el tipo
@@ -212,7 +292,8 @@ def _enviar_notificacion_push(event, tutoria, actor=None):
     payload = {
         "head": encabezado,
         "body": cuerpo_texto,
-        "icon": "/static/img/icon.png",
+        "icon": "/static/img/icon-v2.png",
+        "badge": "/static/img/badge-v5.png",
         "url": None, 
     }
 
@@ -230,65 +311,30 @@ def _enviar_notificacion_push(event, tutoria, actor=None):
             )
             continue
 
+        if not destinatario.notificaciones_habilitadas:
+            logger.info(
+                "El usuario %s desactivó globalmente las notificaciones push",
+                destinatario.pk,
+            )
+            continue
+
         payload["url"] = _url_para_destinatario(info_noti, role, tutoria)
 
-        logger.info("==== La URL es %s", payload["url"])
-
-        # Obtener todas las suscripciones que tenga el tutor (Chrome, Firefox, Safari, etc.)
-        push_infos = PushInformation.objects.filter(user=destinatario)
-
-        # Para cada suscripción del tutor hacemos el envío de la notificación push.
-        for push_info in push_infos:
-            sub = push_info.subscription
-            endpoint = sub.endpoint
-
-            # Analizar el endpoint para obtener el 'aud' correcto según el servicio (Safari o FCM)
-            parsed = urlparse(endpoint)
-            aud = f"{parsed.scheme}://{parsed.netloc}"
-            
-            # if "web.push.apple.com" in endpoint:
-            #     aud = "https://web.push.apple.com"
-            # else:
-            #     aud = "https://fcm.googleapis.com"
-
-            try:
-                #print("DEBUG PUSH endpoint:", endpoint)
-
-                logger.info(
-                    "====>> Procesando push evento=%s tutoria=%s destinatario=%s suscripciones=%s",
-                    event,
-                    tutoria.pk,
-                    destinatario.pk,
-                    push_infos.count(),
-                )
-
-                # Aquí enviamos la notificación para la suscripción 'sub' de la iteración actual.
-                respuesta = webpush(
-                    subscription_info={
-                        "endpoint": sub.endpoint,
-                        "keys": {
-                            "p256dh": sub.p256dh,
-                            "auth": sub.auth,
-                        }
-                    },
-                    data = json.dumps(payload),
-                    vapid_private_key = settings.WEBPUSH_SETTINGS["VAPID_PRIVATE_KEY"],
-                    vapid_claims = {
-                        "sub": settings.WEBPUSH_SETTINGS["VAPID_ADMIN_EMAIL"],
-                        "aud": aud, # Este campo es importante para Safari.
-                    },
-                    ttl=1000
-                )
-
-                logger.info(
-                    "<<== Push aceptada para usuario=%s status=%s servicio=%s",
-                    destinatario.pk,
-                    respuesta.status_code,
-                    parsed.netloc,
-                )
-
-            except WebPushException as e:
-                print("DEBUG PUSH ERROR:", e)
+        devices = list(
+            PushDevice.objects.filter(
+                user_id=destinatario.pk,
+                status=PushDevice.Status.ACTIVE,
+            ).select_related("subscription")
+        )
+        logger.info(
+            "Procesando push evento=%s tutoria=%s destinatario=%s dispositivos=%s",
+            event,
+            tutoria.pk,
+            destinatario.pk,
+            len(devices),
+        )
+        for device in devices:
+            _deliver_push(device, payload)
 
         # =========================
         # CHROME / ANDROID (FCM)
@@ -315,4 +361,3 @@ def handle_push_notifications(sender, event=None, tutoria=None, actor=None, **kw
         return
     
     _enviar_notificacion_push(event=event, tutoria=tutoria, actor=actor)
-

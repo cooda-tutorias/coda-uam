@@ -1,0 +1,34 @@
+{% if tutoria.estado_efectivo == 'CAN' %}
+  <button type="button"
+          class="badge rounded-pill bg-cancelada border-0 estado-con-motivo"
+          data-bs-toggle="popover"
+          data-bs-trigger="focus"
+          data-bs-placement="top"
+          data-bs-title="Cancelada por el {{ tutoria.get_origen_cancelacion_display|default:'usuario'|lower }}"
+          data-bs-content="Motivo: {{ tutoria.motivo_cancelacion_legible|default:'No se registró un motivo' }}"
+          aria-label="Ver motivo de cancelación">
+    Cancelada
+    {% if tutoria.origen_cancelacion == 'TUTOR' %}
+      <i class="bi bi-person-video ms-1" aria-hidden="true"></i>
+    {% elif tutoria.origen_cancelacion == 'ALUMNO' %}
+      <i class="bi bi-mortarboard ms-1" aria-hidden="true"></i>
+    {% elif tutoria.origen_cancelacion == 'SISTEMA' %}
+      <i class="bi bi-robot ms-1" aria-hidden="true"></i>
+    {% endif %}
+    <i class="bi bi-info-circle ms-1" aria-hidden="true"></i>
+  </button>
+{% elif tutoria.estado_efectivo == 'REJ' %}
+  <button type="button"
+          class="badge rounded-pill {{ tutoria.estado_badge_class }} border-0 estado-con-motivo"
+          data-bs-toggle="popover"
+          data-bs-trigger="focus"
+          data-bs-placement="top"
+          data-bs-title="Rechazada por el tutor"
+          data-bs-content="Motivo: {{ tutoria.motivo_rechazo_legible|default:'No se registró un motivo' }}"
+          aria-label="Ver motivo del rechazo">
+    Rechazada
+    <i class="bi bi-info-circle ms-1" aria-hidden="true"></i>
+  </button>
+{% else %}
+  <span class="badge rounded-pill {{ tutoria.estado_badge_class }}">{{ tutoria.get_estado_display }}</span>
+{% endif %}
