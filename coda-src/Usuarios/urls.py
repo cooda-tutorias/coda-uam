@@ -32,6 +32,11 @@ urlpatterns = [
     path('registrar-tutor/', views.CreateTutorView.as_view(), name='crear-tutor'),
     path('registrar-coordinador/', views.CreateCordinadorView.as_view(), name='crear-coordinador'),
     path("importar-alumnos/", views.ImportAlumnosView.as_view(), name="importar-alumnos"),
+    path(
+        "importar-alumnos/plantilla/",
+        views.DescargarPlantillaAlumnosView.as_view(),
+        name="plantilla-importacion-alumnos",
+    ),
     path('ver-alumnos/', views.VerAlumnosCODDAAView.as_view(), name='ver-alumnos'),
     path('ajustes/', views.ajustes.as_view(), name='ajustes'),
     path('cargar_plantilla/', views.CargarPlantilla.as_view(), name='cargar_plantilla'),
@@ -43,8 +48,14 @@ urlpatterns = [
     path("mis-horarios/", views.HorariosTutorView.as_view(), name="tutor_horarios"),
     path("mis-horarios/eliminar/<int:pk>/", views.EliminarHorarioTutorView.as_view(), name="tutor_horario_eliminar"),
 
-    # Para la configuración de la notificaciones push del tutor.
+    # Configuración de notificaciones push para cualquier usuario autenticado.
     path("configuracion_app/", views.SettingsTutorView.as_view(), name="configuracion_app"),
+    path("configuracion_app/notificaciones/estado/", views.push_notification_state, name="push_notification_state"),
+    path("configuracion_app/notificaciones/preferencia/", views.set_push_preference, name="set_push_preference"),
+    path("configuracion_app/notificaciones/dispositivos/<int:device_id>/estado/", views.set_push_device_status, name="set_push_device_status"),
+    path("configuracion_app/notificaciones/dispositivos/<int:device_id>/nombre/", views.rename_push_device, name="rename_push_device"),
+    path("configuracion_app/notificaciones/dispositivos/<int:device_id>/eliminar/", views.delete_push_device, name="delete_push_device"),
+    path("configuracion_app/notificaciones/dispositivos/<int:device_id>/prueba/", views.test_push_device, name="test_push_device"),
     path('webpush/save_information/', views.save_information, name='save_webpush_info'),
     # ... (other existing URL patterns)    
 ]

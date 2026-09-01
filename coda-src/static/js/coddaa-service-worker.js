@@ -2,7 +2,8 @@ self.addEventListener('push', function(event) {
     // Valores predeterminados en caso de notificación silenciosa o fallo de payload
     let head = "🔔 Solicitud de tutoría 🙏",
     body = "Has recibido una solicitud de tutoría. Revisa la plataforma.",
-    icon = "/static/img/icon.png",
+    icon = "/static/img/icon-v2.png",
+    badge = "/static/img/badge-v4.png",
     url = self.location.origin;
 
     // Si hay datos, intenta leerlos
@@ -34,6 +35,7 @@ self.addEventListener('push', function(event) {
             head = data.head || head;
             body = data.body || body;
             icon = data.icon || icon;
+            badge = data.badge || badge;
             url = data.url || url;
 
             console.log('SW DEBUG: Datos personalizados cargados.');
@@ -50,7 +52,7 @@ self.addEventListener('push', function(event) {
     const options = {
         body: body,
         icon: icon, 
-        badge: icon, // Android usa esto para el icono pequeño en barra de estado
+        badge: badge, // Android usa esto para el icono pequeño en barra de estado
         vibrate: [100, 50, 100], // Android vibra, iOS lo ignora (no da error)
         data: { url: url },
         // Añadimos tag para que no se acumulen infinitamente si mandas muchas.

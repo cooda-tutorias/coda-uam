@@ -1,33 +1,3 @@
-<link rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-<link rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/material_blue.css">
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<script src="https://npmcdn.com/flatpickr/dist/l10n/es.js"></script>
-
-<style>
-  /* Conserva la apariencia del selector usado al solicitar una tutoría. */
-  #franjasCambioFecha .btn-horario-slot {
-    color: #3D3028 !important;
-    background-color: #fff !important;
-    border: 1.5px solid #3D3028 !important;
-    font-weight: 600;
-    transition: all .2s ease-in-out;
-  }
-
-  #franjasCambioFecha .btn-horario-slot:hover {
-    color: #fff !important;
-    background-color: #3D3028 !important;
-  }
-
-  #franjasCambioFecha .btn-check:checked + .btn-horario-slot {
-    color: #fff !important;
-    background-color: #F08200 !important;
-    border-color: #F08200 !important;
-    box-shadow: 0 2px 6px rgba(240, 130, 0, .35) !important;
-  }
-</style>
-
 <div class="modal fade"
      id="modalSolicitarCambioFecha"
      tabindex="-1"
@@ -43,7 +13,7 @@
                 data-mdb-dismiss="modal"
                 aria-label="Cerrar"></button>
       </div>
-      <div class="modal-body">
+      <div class="modal-body selector-fecha-tutoria">
         <div id="cambioFechaCargando" class="py-4 text-center">
           <span class="spinner-border spinner-border-sm text-primary"></span> Consultando horarios…
         </div>
@@ -100,13 +70,17 @@ document.addEventListener('DOMContentLoaded', function () {
   let calendario = null;
 
   function limpiar() {
-    confirmar.disabled = true;
     cargando.classList.remove('d-none');
     bloqueSlots.classList.add('d-none');
     bloqueSugerencia.classList.add('d-none');
-    form.querySelectorAll('input[type="hidden"]:not([name="csrfmiddlewaretoken"])').forEach(i => i.value = '');
-    document.getElementById('franjasCambioFecha').innerHTML = '<small class="text-muted">Elige un día para consultar sus horarios.</small>';
-    if (calendario) { calendario.destroy(); calendario = null; }
+    calendario = SelectorFechaTutoria.limpiarSelector({
+      calendario,
+      contenedorFranjas: document.getElementById('franjasCambioFecha'),
+      botonConfirmar: confirmar,
+      campos: form.querySelectorAll(
+        'input[type="hidden"]:not([name="csrfmiddlewaretoken"])'
+      ),
+    });
   }
 
   document.addEventListener('click', async function (event) {
@@ -116,26 +90,37 @@ document.addEventListener('DOMContentLoaded', function () {
     form.action = boton.dataset.action;
     modal.show();
     try {
-      const respuesta = await fetch(`/api/slots-tutor/${boton.dataset.tutorId}/`);
-      if (!respuesta.ok) throw new Error('No fue posible consultar los horarios.');
-      const data = await respuesta.json();
+      const slots = await SelectorFechaTutoria
+        .consultarHorariosTutor(boton.dataset.tutorId);
       cargando.classList.add('d-none');
-      if (data.slots && data.slots.length) {
+      if (slots.length) {
         bloqueSlots.classList.remove('d-none');
-        const dias = [...new Set(data.slots.map(slot => slot.dia_semana_num))];
-        calendario = flatpickr('#calendarioCambioFecha', {
-          inline: true, locale: 'es', minDate: 'today', dateFormat: 'Y-m-d',
-          enable: [date => dias.includes((date.getDay() + 6) % 7)],
-          onChange: (_, fecha) => cargarFranjas(boton.dataset.tutorId, fecha)
+        calendario = SelectorFechaTutoria.crearCalendario({
+          elemento: '#calendarioCambioFecha',
+          slots,
+          alCambiarFecha(fecha) {
+            SelectorFechaTutoria.cargarFranjas({
+              tutorId: boton.dataset.tutorId,
+              fecha,
+              contenedor: document.getElementById('franjasCambioFecha'),
+              botonConfirmar: confirmar,
+              prefijoId: 'cambio-fecha-franja',
+              alSeleccionar(seleccion) {
+                document.getElementById('cambioFechaHorario').value =
+                  seleccion.horarioId;
+                document.getElementById('cambioFechaSeleccionada').value =
+                  seleccion.fecha;
+                document.getElementById('cambioFranjaSeleccionada').value =
+                  seleccion.fechaHora;
+              },
+            });
+          },
         });
       } else {
         bloqueSugerencia.classList.remove('d-none');
         const input = document.getElementById('inputCambioFechaSugerida');
-        const manana = new Date();
-        manana.setDate(manana.getDate() + 1);
-        manana.setMinutes(manana.getMinutes() - manana.getTimezoneOffset());
-        input.min = manana.toISOString().slice(0, 16);
-        input.value = '';
+        SelectorFechaTutoria.inicializarFechaSugerida(input);
+        confirmar.disabled = false;
         input.oninput = () => { confirmar.disabled = !input.value; };
       }
     } catch (error) {
@@ -144,48 +129,6 @@ document.addEventListener('DOMContentLoaded', function () {
       alert('No se pudieron consultar los horarios del tutor.');
     }
   });
-
-  async function cargarFranjas(tutorId, fecha) {
-    confirmar.disabled = true;
-    const contenedor = document.getElementById('franjasCambioFecha');
-    contenedor.innerHTML = '<div class="text-center"><span class="spinner-border spinner-border-sm"></span></div>';
-    try {
-      const respuesta = await fetch(`/api/franjas-disponibles/${tutorId}/?fecha=${fecha}`);
-      const data = await respuesta.json();
-      contenedor.innerHTML = '';
-      if (!data.franjas || !data.franjas.length) {
-        contenedor.innerHTML = '<small class="text-muted">No hay horarios libres ese día.</small>';
-        return;
-      }
-      data.franjas.forEach(franja => {
-        const id = `cambio-fecha-franja-${fecha}-${franja.slot_id}-${franja.hora_inicio.replace(':', '')}`;
-        const opcion = document.createElement('input');
-        opcion.type = 'radio';
-        opcion.className = 'btn-check';
-        opcion.name = 'opcion_cambio_fecha';
-        opcion.id = id;
-        opcion.autocomplete = 'off';
-
-        const etiqueta = document.createElement('label');
-        etiqueta.className = 'btn btn-horario-slot btn-sm text-start w-100';
-        etiqueta.htmlFor = id;
-        etiqueta.textContent = `${franja.hora_inicio} - ${franja.hora_fin}`;
-
-        opcion.addEventListener('change', function () {
-          if (!opcion.checked) return;
-          document.getElementById('cambioFechaHorario').value = franja.slot_id;
-          document.getElementById('cambioFechaSeleccionada').value = fecha;
-          document.getElementById('cambioFranjaSeleccionada').value = franja.datetime_iso;
-          confirmar.disabled = false;
-        });
-
-        contenedor.appendChild(opcion);
-        contenedor.appendChild(etiqueta);
-      });
-    } catch (error) {
-      contenedor.innerHTML = '<small class="text-danger">No fue posible cargar los horarios.</small>';
-    }
-  }
 
   form.addEventListener('submit', function (event) {
     const sugerencia = document.getElementById('inputCambioFechaSugerida');

@@ -1,58 +1,123 @@
-{% extends "Usuarios/perfil_base.html" %}
+{% extends "Usuarios/HeaderAndFooterFachada.html" %}
 
 {% load static %}
-{% block title %}Configuración{% endblock %}
+{% block title %}Configuración de notificaciones{% endblock %}
 
-{% block perfil %}
+{% block body %}
+  <style>
+    .push-section-divider,
+    .push-device-row {
+      border-bottom: 1px solid #d9dee3;
+    }
 
-  <div class="d-flex justify-content-center">
-    <div class="card border-top border-bottom border-4 my-4"
-         style="border-color: #F08200 !important;
+    .push-device-row:last-child {
+      border-bottom: 0;
+    }
+
+    .push-device-actions .btn-link {
+      text-decoration: none;
+    }
+
+    .push-rename-button {
+      color: #6c757d;
+      line-height: 1;
+    }
+
+    .push-rename-button:hover,
+    .push-rename-button:focus {
+      color: #F08200;
+    }
+  </style>
+  <section class="py-4" aria-labelledby="push-settings-title">
+    <div class="card border-top border-bottom border-4 mx-auto"
+         style="max-width: 900px;
+                border-color: #F08200 !important;
                 border-radius: .5rem">
-      <div class="card-body text-center">
-        <h5 class="mb-3">Configuración de tu perfil</h5>
+      <div class="card-body p-4 p-lg-5">
+        <div class="mb-4">
+          <h3 id="push-settings-title" class="mb-2 text-primary text-title-bold">Notificaciones en pantalla</h3>
+          <p class="mb-0 text-muted">Administra en qué dispositivos quieres recibir avisos sobre solicitudes, citas y cambios relacionados con tus tutorías.</p>
+        </div>
 
-        <hr class="mt-0 mb-4">
-
-        <div class="d-flex justify-content-between align-items-center">
-
-          <div>
-            <h6 class="mb-1">Notificaciones en este dispositivo</h6>
-            <p class="text-muted small mb-0">
-              <i class="fas fa-mobile-alt me-2"></i> Al activar, recibirás alertas académicas en este navegador.
-            </p>
-          </div>
-
-          <div class="form-check form-switch ms-3">
-            <input class="form-check-input"
-                   type="checkbox"
-                   role="switch"
-                   id="pushNotificationSwitch"
-                   style="transform: scale(1.2);
-                          cursor: pointer">
-            <label class="form-check-label" for="pushNotificationSwitch"></label>
+        <div class="push-section-divider pb-4 mb-4">
+          <div class="d-flex justify-content-between align-items-start gap-3">
+            <div>
+              <h5 class="mb-1">Recibir notificaciones</h5>
+              <p class="mb-0 text-muted small">Esta preferencia se aplica a todos tus dispositivos registrados.</p>
+            </div>
+            <div class="form-check form-switch m-0 pt-1">
+              <input class="form-check-input"
+                     type="checkbox"
+                     role="switch"
+                     id="pushGlobalSwitch"
+                     aria-label="Recibir notificaciones"
+                     {% if push_enabled %}checked{% endif %}>
+            </div>
           </div>
         </div>
 
-        <div id="notificationStatusMsg"
-             class="text-end mt-2"
-             style="font-size: 0.85rem;
-                    display: none"></div>
+        <div id="pushPageMessage" class="alert d-none" role="alert"></div>
 
+        <div id="pushLoading" class="py-4 text-center text-muted">
+          <span class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+          Comprobando este dispositivo…
+        </div>
+
+        <div id="pushUnsupported" class="alert alert-warning d-none" role="alert">
+          <h5 class="alert-heading">Este navegador no admite notificaciones</h5>
+          <p class="mb-0">Puedes seguir administrando los dispositivos que registraste anteriormente.</p>
+        </div>
+
+        <div id="pushIosInstall" class="alert alert-warning d-none" role="alert">
+          <h5 class="alert-heading">Instala el sitio para activar notificaciones</h5>
+          <p class="mb-0">En iPhone o iPad, toca <strong>Compartir</strong> <i class="bi bi-box-arrow-up"></i>, selecciona <strong>Agregar a Inicio</strong> y abre el sistema desde ese icono.</p>
+        </div>
+
+        <div id="pushPermissionDenied"
+             class="alert alert-warning d-none"
+             role="alert">
+          <h5 class="alert-heading">Las notificaciones están bloqueadas en este navegador</h5>
+          <p>Abre la configuración de este sitio, cambia el permiso de notificaciones <i class="bi bi-sliders"></i> a <strong>Permitir</strong> y vuelve a esta página.</p>
+          <button type="button"
+                  class="btn btn-outline-primary btn-sm"
+                  id="pushRecheckPermission">Volver a comprobar</button>
+        </div>
+
+        <section id="currentDeviceSection"
+                 class="d-none mb-4"
+                 aria-labelledby="current-device-title">
+          <h4 id="current-device-title" class="h5 push-section-divider pb-2 mb-0">Este dispositivo</h4>
+          <div id="currentDeviceCard" class="push-device-row py-4"></div>
+        </section>
+
+        <section id="otherDevicesSection"
+                 class="d-none"
+                 aria-labelledby="other-devices-title">
+          <h4 id="other-devices-title" class="h5 push-section-divider pb-2 mb-0">Otros dispositivos</h4>
+          <div id="otherDevicesList"></div>
+        </section>
       </div>
     </div>
-  </div>
-
+  </section>
 {% endblock %}
 
 {% block scripts %}
+  {{ block.super }}
   <script>
-    // El valor 'vapid_public_key' se pasa en el contexto de SettingsTutorView de views.py
-    var vapidPublicKey = "{{ vapid_public_key }}"; 
-    
-    // Django convierte True/False de Python a "true"/"false" de JS
-    var serverIsSubscribed = {{ is_push_active|yesno:"true,false" }};
+    window.pushSettings = {
+      vapidPublicKey: "{{ vapid_public_key|escapejs }}",
+      initialPreference: {{ push_enabled|yesno:"true,false" }},
+      serviceWorkerUrl: "{% static 'js/coddaa-service-worker.js' %}?v=10",
+      urls: {
+        state: "{% url 'push_notification_state' %}",
+        preference: "{% url 'set_push_preference' %}",
+        register: "{% url 'save_webpush_info' %}",
+        statusTemplate: "{% url 'set_push_device_status' 0 %}",
+        renameTemplate: "{% url 'rename_push_device' 0 %}",
+        deleteTemplate: "{% url 'delete_push_device' 0 %}",
+        testTemplate: "{% url 'test_push_device' 0 %}"
+      }
+    };
   </script>
-
-  <script src="{% static 'js/webpush_toggle_setup.js' %}"></script>
+  <script src="{% static 'js/push_notification_settings.js' %}?v=5"></script>
 {% endblock %}

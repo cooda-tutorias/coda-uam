@@ -325,7 +325,7 @@
                                    type="radio"
                                    name="motivo_rechazo"
                                    id="otro-{{ tutoria.pk }}"
-                                   value="otro"
+                                   value="TUT_RECH_OTRO"
                                    data-textarea-id="otro-motivo-{{ tutoria.pk }}">
                             <label class="form-check-label" for="otro-{{ tutoria.pk }}">Otro</label>
                           </div>
@@ -430,7 +430,7 @@
     document.querySelectorAll('.motivo-rechazo').forEach(function (radio) {
       radio.addEventListener('change', function () {
         const form = this.closest('form');
-        const otroRadio = form.querySelector('input[value="otro"]');
+        const otroRadio = form.querySelector('input[value="TUT_RECH_OTRO"]');
         const otroContainer = document.getElementById(
           otroRadio.dataset.textareaId
         );

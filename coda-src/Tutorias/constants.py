@@ -90,6 +90,25 @@ MOTIVOS_CANCELACION_TUTOR = [
 # Unión para el campo choices del modelo Tutoria
 MOTIVOS_CANCELACION = MOTIVOS_CANCELACION_ALUMNO + MOTIVOS_CANCELACION_TUTOR
 
+
+# Motivos para rechazar una solicitud de tutoría.
+MOTIVO_RECHAZO_OTRO = 'TUT_RECH_OTRO'
+MOTIVOS_RECHAZO_TUTOR = [
+    (
+        'SIN_DISPONIBILIDAD_FECHAS',
+        'No tengo disponibilidad y no puedo proponer otro horario.',
+    ),
+    (
+        'FUERA_AMBITO',
+        'El tema está fuera de mi ámbito de atención.',
+    ),
+    (
+        'REQUIERE_CANALIZACION',
+        'El tema requiere canalización especializada.',
+    ),
+    (MOTIVO_RECHAZO_OTRO, 'Otro motivo'),
+]
+
 DURACION_ASESORIA = [
     (0, 'Menos de 30 minutos'),
     (1, '30 minutos'),

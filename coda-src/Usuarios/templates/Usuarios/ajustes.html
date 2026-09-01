@@ -33,12 +33,15 @@
                                         <td class="text-body">{{ documento.archivo.name|slice:"11:" }}</td>
                                         <td class="text-body-bold "><a href="{% url 'ver_plantilla' documento.id %}">Ver</a></td>
                                         <td>
-                                            <a class="text-body-bold text-muted" 
-                                                href="{% url 'eliminar_documento' documento.id %}"
-                                                onclick="return confirm('¿Estás seguro de que deseas eliminar este documento?')"
-                                            >
-                                            Eliminar
-                                            </a>
+                                            <form method="post"
+                                                  action="{% url 'eliminar_documento' documento.id %}"
+                                                  onsubmit="return confirm('¿Estás seguro de que deseas eliminar este documento?')">
+                                                {% csrf_token %}
+                                                <button type="submit"
+                                                        class="btn btn-link p-0 text-body-bold text-danger">
+                                                    Eliminar
+                                                </button>
+                                            </form>
                                         </td>
                                     </tr>
                                     {% empty %}

@@ -17,46 +17,19 @@
         </div>
         <div class="modal-body">
           <p class="text-muted small">Selecciona el motivo del rechazo.</p>
-          <div class="form-check mb-2">
-            <input class="form-check-input motivo-rechazo"
-                   type="radio"
-                   name="motivo_rechazo"
-                   id="sin-disponibilidad-{{ tutoria.pk }}"
-                   value="SIN_DISPONIBILIDAD_FECHAS"
-                   required>
-            <label class="form-check-label" for="sin-disponibilidad-{{ tutoria.pk }}">
-              No tengo disponibilidad y no puedo proponer otro horario.
-            </label>
-          </div>
-          <div class="form-check mb-2">
-            <input class="form-check-input motivo-rechazo"
-                   type="radio"
-                   name="motivo_rechazo"
-                   id="fuera-ambito-{{ tutoria.pk }}"
-                   value="FUERA_AMBITO">
-            <label class="form-check-label" for="fuera-ambito-{{ tutoria.pk }}">
-              El tema está fuera de mi ámbito de atención.
-            </label>
-          </div>
-          <div class="form-check mb-2">
-            <input class="form-check-input motivo-rechazo"
-                   type="radio"
-                   name="motivo_rechazo"
-                   id="canalizacion-{{ tutoria.pk }}"
-                   value="REQUIERE_CANALIZACION">
-            <label class="form-check-label" for="canalizacion-{{ tutoria.pk }}">
-              El tema requiere canalización especializada.
-            </label>
-          </div>
-          <div class="form-check mb-3">
-            <input class="form-check-input motivo-rechazo"
-                   type="radio"
-                   name="motivo_rechazo"
-                   id="otro-{{ tutoria.pk }}"
-                   value="otro"
-                   data-textarea-id="otro-motivo-{{ tutoria.pk }}">
-            <label class="form-check-label" for="otro-{{ tutoria.pk }}">Otro</label>
-          </div>
+          {% for codigo, descripcion in motivos_rechazo %}
+            <div class="form-check {% if codigo == motivo_rechazo_otro %}mb-3{% else %}mb-2{% endif %}">
+              <input class="form-check-input motivo-rechazo"
+                     type="radio"
+                     name="motivo_rechazo"
+                     id="motivo-rechazo-{{ codigo|lower }}-{{ tutoria.pk }}"
+                     value="{{ codigo }}"
+                     {% if codigo == motivo_rechazo_otro %}data-requiere-detalle="true"{% endif %}
+                     {% if forloop.first %}required{% endif %}>
+              <label class="form-check-label"
+                     for="motivo-rechazo-{{ codigo|lower }}-{{ tutoria.pk }}">{{ descripcion }}</label>
+            </div>
+          {% endfor %}
           <div id="otro-motivo-{{ tutoria.pk }}" class="d-none">
             <label class="form-label" for="motivo-personalizado-{{ tutoria.pk }}">Escribe el motivo</label>
             <textarea id="motivo-personalizado-{{ tutoria.pk }}"

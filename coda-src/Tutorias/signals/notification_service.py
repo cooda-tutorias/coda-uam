@@ -43,18 +43,21 @@ EMAIL_EVENT_CONFIG: dict[str, dict[str, Any]] = {
         "subject": "Nueva tutoría agendada", "title": "El alumno agendó una tutoría",
         "message": "El alumno eligió uno de tus horarios disponibles.",
         "confirmation_type": "agendada", "origin": "slot",
+        "show_calendar_actions": True,
     },
     EventoTutoria.TUT_ACEPTA_SOLICITUD: {
         "template": CONFIRMATION_TEMPLATE, "recipients": ("alumno",),
         "subject": "Tu solicitud de tutoría fue aceptada", "title": "Tutoría confirmada",
         "message": "El tutor aceptó la solicitud con la fecha que sugeriste.",
         "confirmation_type": "aceptada", "origin": "solicitud",
+        "show_calendar_actions": True,
     },
     EventoTutoria.TUT_PROPONE_1_FECHA: {
         "template": CONFIRMATION_TEMPLATE, "recipients": ("alumno",),
         "subject": "Tu tutoría fue agendada en otra fecha", "title": "Tutoría confirmada",
         "message": "El tutor agendó tu solicitud en una nueva fecha.",
         "confirmation_type": "agendada", "origin": "propuesta",
+        "show_calendar_actions": True,
     },
     EventoTutoria.TUT_PROPONE_2_FECHAS: {
         "template": ACTION_TEMPLATE, "recipients": ("alumno",),
@@ -70,6 +73,7 @@ EMAIL_EVENT_CONFIG: dict[str, dict[str, Any]] = {
         "title": "Solicitud reactivada y confirmada",
         "message": "El tutor reactivó tu solicitud vencida y asignó una nueva fecha.",
         "confirmation_type": "reactivada", "origin": "reactivacion",
+        "show_calendar_actions": True,
     },
     EventoTutoria.TUT_REACTIVA_2_FECHAS: {
         "template": ACTION_TEMPLATE, "recipients": ("alumno",),
@@ -97,6 +101,7 @@ EMAIL_EVENT_CONFIG: dict[str, dict[str, Any]] = {
         "subject": "Tutoría reagendada por el alumno", "title": "Se actualizó la fecha de una tutoría",
         "message": "El alumno eligió otro de tus horarios disponibles.",
         "confirmation_type": "reagendada", "origin": "slot",
+        "show_calendar_actions": True,
     },
     EventoTutoria.ALU_CANCELA_SOLICITUD: {
         "template": ADVERSE_TEMPLATE, "recipients": ("tutor",),
@@ -134,6 +139,7 @@ EMAIL_EVENT_CONFIG: dict[str, dict[str, Any]] = {
         "subject": "Tu tutoría fue reagendada", "title": "Nueva fecha confirmada",
         "message": "El tutor reagendó la tutoría en una nueva fecha.",
         "confirmation_type": "reagendada", "origin": "propuesta",
+        "show_calendar_actions": True,
     },
     EventoTutoria.TUT_REAGENDA_2_FECHAS: {
         "template": ACTION_TEMPLATE, "recipients": ("alumno",),
@@ -155,6 +161,7 @@ EMAIL_EVENT_CONFIG: dict[str, dict[str, Any]] = {
         "subject": "El alumno confirmó la fecha de tutoría", "title": "Fecha de tutoría confirmada",
         "message": "El alumno eligió una de las fechas que propusiste.",
         "confirmation_type": "fecha_elegida", "origin": "propuesta",
+        "show_calendar_actions": True,
     },
     EventoTutoria.PROPUESTA_FECHAS_CANCELADA: {
         "template": ADVERSE_TEMPLATE, "recipients": ("alumno", "tutor"),
@@ -232,7 +239,7 @@ def _absolute_action_url(config: dict[str, Any], role: str, tutoria: Any) -> str
         return ""
     action_tab = _value_for_role(config.get("action_tab"), role)
     if action_tab:
-        path = f"{path}?{urlencode({'tab': action_tab})}"
+        path = f"{path}?{urlencode({'tab': action_tab, 'highlight': tutoria.pk})}"
     return urljoin(f"{site_url.rstrip('/')}/", path.lstrip("/"))
 
 
@@ -251,6 +258,12 @@ def _cancellation_reason(tutoria: Any) -> str:
 
 def _build_context(*, event: str, config: dict[str, Any], tutoria: Any, actor: Any, recipient: Any, role: str) -> dict[str, Any]:
     contact = _institutional_contact()
+    show_calendar_actions = config.get("show_calendar_actions", False)
+    site_url = settings.TUTORIAS_SITE_URL.strip()
+    apple_calendar_url = ""
+    if show_calendar_actions and site_url:
+        ics_path = reverse("descargar_ics", kwargs={"tutoria_id": tutoria.pk})
+        apple_calendar_url = urljoin(f"{site_url.rstrip('/')}/", ics_path.lstrip("/"))
     proposals = []
     if config.get("show_proposals"):
         proposals = [_format_datetime(value) for value in (getattr(tutoria, "fecha_propuesta_1", None), getattr(tutoria, "fecha_propuesta_2", None)) if value]
@@ -267,6 +280,9 @@ def _build_context(*, event: str, config: dict[str, Any], tutoria: Any, actor: A
         "accion_url": action_url, "mostrar_accion": bool(action_text and action_url),
         "tipo_confirmacion": config.get("confirmation_type", ""),
         "origen_agendamiento": config.get("origin", ""),
+        "mostrar_calendarios": show_calendar_actions,
+        "google_calendar_url": tutoria.google_calendar_url_for(role) if show_calendar_actions else "",
+        "apple_calendar_url": apple_calendar_url,
         "tipo_estado": config.get("status_type", ""),
         "es_cancelacion_definitiva": config.get("is_final", False),
         "fecha_actual": _format_datetime(getattr(tutoria, "fecha", None)),
@@ -275,7 +291,7 @@ def _build_context(*, event: str, config: dict[str, Any], tutoria: Any, actor: A
         "temas": ", ".join(tutoria.get_tema_display()), "descripcion": tutoria.descripcion or "",
         "alumno_nombre": tutoria.alumno.nombre_completo, "alumno_email": tutoria.alumno.email,
         "tutor_nombre": tutoria.tutor.nombre_completo, "tutor_email": tutoria.tutor.email,
-        "motivo": tutoria.motivo_rechazo if config.get("show_rejection_reason") else _cancellation_reason(tutoria) if config.get("show_cancellation_reason") else "",
+        "motivo": tutoria.motivo_rechazo_legible if config.get("show_rejection_reason") else _cancellation_reason(tutoria) if config.get("show_cancellation_reason") else "",
         "contact": contact, "uam_phone_href": _phone_href(contact["uam_phone"]),
         "coddaa_phone_href": _phone_href(contact["coddaa_phone"]),
     }
@@ -294,6 +310,12 @@ def _build_plain_text(context: dict[str, Any]) -> str:
         lines.extend(["", f"Fecha límite: {context['fecha_limite']}"])
     if context["mostrar_accion"]:
         lines.extend(["", f"{context['accion_texto']}: {context['accion_url']}"])
+    if context["mostrar_calendarios"]:
+        lines.extend([
+            "", "Agregar al calendario:",
+            f"- Google Calendar: {context['google_calendar_url']}",
+            f"- Apple Calendar: {context['apple_calendar_url']}",
+        ])
     lines.extend(["", "Universidad Autónoma Metropolitana Unidad Cuajimalpa",
                   f"Dirección: {context['contact']['address']}", f"Ubicación: {context['contact']['maps_url']}",
                   f"Teléfono UAM: {context['contact']['uam_phone']}", f"Teléfono CODDAA: {context['contact']['coddaa_phone']}"])

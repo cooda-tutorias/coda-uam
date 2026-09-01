@@ -49,6 +49,15 @@
     --mdb-tooltip-color: #fff;
   }
 
+  .estado-con-motivo {
+    cursor: pointer;
+  }
+
+  .estado-con-motivo:focus-visible {
+    outline: 3px solid rgba(240, 130, 0, .35);
+    outline-offset: 2px;
+  }
+
   .action-group {
     overflow: hidden;
     border: 1px solid #d6d6d6;
@@ -109,6 +118,26 @@
     color: #212529 !important;
     background-color: var(--bs-yellow) !important;
     border: 1px solid #d39e00;
+  }
+
+  .tutoria-reciente > * {
+    animation: resaltar-tutoria-reciente 4s ease-out;
+  }
+
+  @keyframes resaltar-tutoria-reciente {
+    0%, 55% {
+      box-shadow: inset 0 0 0 9999px rgba(240, 130, 0, .22);
+    }
+    100% {
+      box-shadow: inset 0 0 0 9999px rgba(240, 130, 0, 0);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tutoria-reciente > * {
+      animation: none;
+      box-shadow: inset 0 0 0 9999px rgba(240, 130, 0, .22) !important;
+    }
   }
 
   @media (max-width: 575.98px) {
@@ -199,7 +228,7 @@
                       </thead>
                       <tbody>
                         {% for tutoria in tutorias_solicitadas %}
-                          <tr class="text-body text-center">
+                          <tr class="text-body text-center" data-tutoria-id="{{ tutoria.pk }}">
                             <td>{{ tutoria.alumno.matricula }}</td>
                             <td>{{ tutoria.alumno.nombre_completo }}</td>
                             <td>{{ tutoria.alumno.get_estado_display }}</td>
@@ -333,7 +362,7 @@
                       </thead>
                       <tbody>
                         {% for tutoria in tutorias_agendadas %}
-                          <tr class="text-body text-center">
+                          <tr class="text-body text-center" data-tutoria-id="{{ tutoria.pk }}">
                             <td>{{ tutoria.alumno.matricula }}</td>
                             <td>{{ tutoria.alumno.nombre_completo }}</td>
                             <td class="text-nowrap">
@@ -348,6 +377,35 @@
                               <small class="text-muted">
                                 <i class="bi bi-clock me-1"></i>{{ tutoria.fecha|date:"P" }}
                               </small>
+                              <!-- Este div es para el menú para agregar cita al calendario personal -->
+                              <div class="dropdown d-inline-block ms-2">
+                                <a href="#"
+                                   role="button"
+                                   id="dropdownMenuLink{{ tutoria.pk }}"
+                                   data-bs-toggle="dropdown"
+                                   aria-expanded="false"
+                                   class="text-secondary text-decoration-none">
+                                  <i class="bi bi-calendar-plus hover-primary"
+                                     title="Agregar a tu calendario Google/Apple"></i>
+                                </a>
+
+                                <ul class="dropdown-menu shadow"
+                                    aria-labelledby="dropdownMenuLink{{ tutoria.pk }}">
+                                  <li>
+                                    <a class="dropdown-item"
+                                       href="{{ tutoria.google_calendar_url_tutor }}"
+                                       target="_blank">
+                                      <i class="bi bi-google text-danger me-2"></i> Google Calendar
+                                    </a>
+                                  </li>
+
+                                  <li>
+                                    <a class="dropdown-item" href="{% url 'descargar_ics' tutoria.pk %}">
+                                      <i class="bi bi-apple text-dark me-2"></i> Apple Calendar
+                                    </a>
+                                  </li>
+                                </ul>
+                              </div>
                             </td>
                             <td>{{ tutoria.get_tema_display|join:", " }}</td>
                             <!-- Corta la descripción a 2 líneas y el texto completo lo muestra en el tooltip -->
@@ -419,7 +477,7 @@
                       </thead>
                       <tbody>
                         {% for tutoria in tutorias_historial %}
-                          <tr class="text-body text-center">
+                          <tr class="text-body text-center" data-tutoria-id="{{ tutoria.pk }}">
                             <td>{{ tutoria.alumno.matricula }}</td>
                             <td>{{ tutoria.alumno.nombre_completo }}</td>
                             <td class="text-nowrap">
@@ -445,22 +503,7 @@
                               </span>
                             </td>
                             <td>
-                              {% if tutoria.estado_efectivo == 'CAN' %}
-                                <span class="badge rounded-pill bg-cancelada"
-                                      data-mdb-toggle="tooltip"
-                                      title="Cancelada por el {{ tutoria.get_origen_cancelacion_display|lower }}">
-                                  Cancelada
-                                  {% if tutoria.origen_cancelacion == 'TUTOR' %}
-                                    <i class="bi bi-person-video ms-1" aria-hidden="true"></i>
-                                  {% elif tutoria.origen_cancelacion == 'ALUMNO' %}
-                                    <i class="bi bi-mortarboard ms-1" aria-hidden="true"></i>
-                                  {% elif tutoria.origen_cancelacion == 'SISTEMA' %}
-                                    <i class="bi bi-robot ms-1" aria-hidden="true"></i>
-                                  {% endif %}
-                                </span>
-                              {% else %}
-                                <span class="badge rounded-pill {{ tutoria.estado_badge_class }}">{{ tutoria.get_estado_display }}</span>
-                              {% endif %}
+                              {% include "Tutorias/includes/partials/badge_estado_historial.html" with tutoria=tutoria %}
                             </td>
                             <td>
                               {% if tutoria.estado_efectivo == 'REA' %}
@@ -659,6 +702,7 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   const pestañaDesdeUrl = new URLSearchParams(window.location.search).get("tab");
+  const tutoriaParaResaltar = new URLSearchParams(window.location.search).get("highlight");
   const pestañasPermitidas = ["solicitadas", "agendadas", "historial"];
   const selectorDesdeUrl = pestañasPermitidas.includes(pestañaDesdeUrl)
     ? `#${pestañaDesdeUrl}`
@@ -670,6 +714,33 @@ document.addEventListener("DOMContentLoaded", function () {
     const botonPestaña = document.querySelector(`[data-mdb-target="${selectorGuardado}"]`);
     if (botonPestaña) new mdb.Tab(botonPestaña).show();
     sessionStorage.removeItem("pestañaTutoriasTutorActiva");
+  }
+
+  function resaltarTutoriaReciente() {
+    if (!/^\d+$/.test(tutoriaParaResaltar || "")) return;
+    const fila = document.querySelector(`[data-tutoria-id="${tutoriaParaResaltar}"]`);
+    if (!fila || fila.dataset.resaltada === "true") return;
+
+    fila.dataset.resaltada = "true";
+    fila.classList.add("tutoria-reciente");
+    fila.scrollIntoView({behavior: "smooth", block: "center", inline: "nearest"});
+    window.setTimeout(function () {
+      fila.classList.remove("tutoria-reciente");
+    }, 4000);
+
+    const urlLimpia = new URL(window.location.href);
+    urlLimpia.searchParams.delete("highlight");
+    window.history.replaceState({}, "", urlLimpia);
+  }
+
+  if (tutoriaParaResaltar) {
+    const botonDestino = selectorDesdeUrl
+      ? document.querySelector(`[data-mdb-target="${selectorDesdeUrl}"]`)
+      : null;
+    if (botonDestino) {
+      botonDestino.addEventListener("shown.mdb.tab", resaltarTutoriaReciente, {once: true});
+    }
+    window.setTimeout(resaltarTutoriaReciente, 250);
   }
 
   function inicializarTooltips(contenedor) {
@@ -689,6 +760,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
   document.querySelectorAll('[data-mdb-toggle="tooltip"]').forEach(function (elemento) {
     new mdb.Tooltip(elemento);
+  });
+
+  document.querySelectorAll('[data-bs-toggle="popover"]').forEach(function (elemento) {
+    bootstrap.Popover.getOrCreateInstance(elemento);
   });
 
   inicializarTooltips(document.querySelector(".tab-pane.active"));
@@ -722,20 +797,45 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   });
 
+  function validarPropuestas(formulario) {
+    const propuesta1 = formulario.querySelector('input[name="propuesta_1"]');
+    const propuesta2 = formulario.querySelector('input[name="propuesta_2"]');
+    if (!propuesta1 || !propuesta2) return;
+
+    propuesta1.setCustomValidity("");
+    propuesta2.setCustomValidity("");
+
+    [propuesta1, propuesta2].forEach(function (input) {
+      if (input.value && [0, 6].includes(new Date(input.value).getDay())) {
+        input.setCustomValidity("Selecciona un día hábil de lunes a viernes.");
+      }
+    });
+
+    if (propuesta1.value && propuesta1.value === propuesta2.value) {
+      propuesta2.setCustomValidity("Las dos opciones de fecha deben ser diferentes.");
+    }
+  }
+
+  document.querySelectorAll('input[name="propuesta_1"]').forEach(function (input) {
+    const formulario = input.closest("form");
+    if (!formulario) return;
+    formulario.addEventListener("input", function () {
+      validarPropuestas(formulario);
+    });
+    formulario.addEventListener("submit", function () {
+      validarPropuestas(formulario);
+    });
+  });
+
   document.querySelectorAll(".motivo-rechazo, .motivo-cancelacion").forEach(function (radio) {
     radio.addEventListener("change", function () {
       const formulario = radio.closest("form");
       const esCancelacion = radio.classList.contains("motivo-cancelacion");
-      const otro = esCancelacion
-        ? radio
-        : formulario.querySelector('input[value="otro"]');
       const contenedorOtro = esCancelacion
         ? formulario.querySelector('[id^="otro-motivo-cancelacion-"]')
-        : document.getElementById(otro.dataset.textareaId);
+        : formulario.querySelector('[id^="otro-motivo-"]');
       const textarea = contenedorOtro.querySelector("textarea");
-      const mostrarOtro = esCancelacion
-        ? radio.dataset.requiereDetalle === "true"
-        : otro.checked;
+      const mostrarOtro = radio.dataset.requiereDetalle === "true";
       contenedorOtro.classList.toggle("d-none", !mostrarOtro);
       textarea.required = mostrarOtro;
       if (!mostrarOtro) textarea.value = "";

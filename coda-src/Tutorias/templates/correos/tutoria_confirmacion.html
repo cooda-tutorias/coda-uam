@@ -12,4 +12,16 @@
       </table>
     </td>
   </tr>
+  {% if mostrar_calendarios %}
+    <tr>
+      <td align="center" style="padding:0 24px 24px">
+        <div style="margin-bottom:10px;font-size:14px;font-weight:700;color:#333">Agregar esta tutoría a tu calendario</div>
+        <a href="{{ google_calendar_url }}"
+           target="_blank"
+           style="display:inline-block;margin:4px;background:#b25800;color:#fff;text-decoration:none;font-size:14px;font-weight:700;padding:11px 18px;border-radius:6px">Google Calendar</a>
+        <a href="{{ apple_calendar_url }}"
+           style="display:inline-block;margin:4px;background:#555;color:#fff;text-decoration:none;font-size:14px;font-weight:700;padding:11px 18px;border-radius:6px">Apple Calendar</a>
+      </td>
+    </tr>
+  {% endif %}
 {% endblock %}
