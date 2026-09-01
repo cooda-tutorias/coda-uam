@@ -7,4 +7,6 @@ class TutoriasConfig(AppConfig):
 
     def ready(self):
         """Carga las señales de Tutorías al inicializar la aplicación."""
-        from . import signals  # noqa: F401
+        import Tutorias.signals.handle_system_notifications
+        import Tutorias.signals.handle_email_notifications
+        import Tutorias.signals.handle_push_notifications

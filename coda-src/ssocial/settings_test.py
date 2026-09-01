@@ -23,6 +23,10 @@ class CompatibleArrayField(models.JSONField):
 
 postgres_fields.ArrayField = CompatibleArrayField
 
+os.environ.setdefault("VAPID_PUBLIC_KEY", "test-public-key")
+os.environ.setdefault("VAPID_PRIVATE_KEY", "test-private-key")
+os.environ.setdefault("VAPID_ADMIN_EMAIL", "test@example.com")
+
 # Import all settings from ssocial AFTER patching
 from ssocial.settings import *  # noqa
 

@@ -1,0 +1,23 @@
+{% extends "correos/base_notificacion.html" %}
+
+{% block contenido %}
+  <tr>
+    <td style="padding:14px 24px 20px">
+      {% if fechas_propuestas %}
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:14px;background:#fff8ef;border:1px solid #ffd8a6;border-radius:8px">
+          <tr><td style="padding:12px 14px;font-size:14px;font-weight:700;color:#7a4a00">Fechas propuestas</td></tr>
+          {% for fecha in fechas_propuestas %}
+            <tr><td style="padding:10px 14px;font-size:14px;border-top:1px solid #ffd8a6">Opción {{ forloop.counter }}: <strong>{{ fecha }}</strong></td></tr>
+          {% endfor %}
+        </table>
+      {% endif %}
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #ececec;border-radius:8px">
+        <tr><td style="padding:11px 14px;font-size:14px;border-bottom:1px solid #ececec"><strong>Alumno:</strong> {{ alumno_nombre }}</td></tr>
+        <tr><td style="padding:11px 14px;font-size:14px;border-bottom:1px solid #ececec"><strong>Tutor:</strong> {{ tutor_nombre }}</td></tr>
+        <tr><td style="padding:11px 14px;font-size:14px;border-bottom:1px solid #ececec"><strong>Fecha solicitada o actual:</strong> {{ fecha_actual }}</td></tr>
+        <tr><td style="padding:11px 14px;font-size:14px;border-bottom:1px solid #ececec"><strong>Tema(s):</strong> {{ temas }}</td></tr>
+        <tr><td style="padding:11px 14px;font-size:14px"><strong>Descripción:</strong> {{ descripcion|default:"-" }}</td></tr>
+      </table>
+    </td>
+  </tr>
+{% endblock %}

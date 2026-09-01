@@ -43,7 +43,10 @@ from .forms import (
     FormVerTutorias,
     FormReporteTutoriasMasivo,
 )
-from .signals import tutoria_notification_requested
+
+from Tutorias.signals.events import EventoTutoria
+from Tutorias.signals.signals_definitions import tutoria_notification_requested
+
 # from .forms import FormSeguimiento # de nuevo, no estoy seguro, FormReporte
 
 # De esta manera se incluyen todas la constantes.
@@ -136,6 +139,10 @@ def proponer_fechas_tutoria(request, pk):
         propuesta_1_raw = request.POST.get('propuesta_1')
         propuesta_2_raw = request.POST.get('propuesta_2')
         es_reagendacion = request.POST.get('es_reagendacion') == '1'
+        # Debe calcularse antes de modificar el estado de la tutoría. Una
+        # solicitud pendiente cuya fecha ya pasó tiene estado efectivo VENCIDA,
+        # aunque el valor persistido en ``estado`` continúe siendo PENDIENTE.
+        es_reactivacion = tutoria.estado_efectivo == VENCIDA
 
         if es_reagendacion and tutoria.estado_efectivo != ACEPTADO:
             messages.error(request, "Solo se pueden reagendar tutorías agendadas.")
@@ -162,8 +169,13 @@ def proponer_fechas_tutoria(request, pk):
                 tutoria.reagendacion_pendiente = es_reagendacion
                 if es_reagendacion:
                     messages.success(request, "Se enviaron al alumno las opciones para reagendar la tutoría.")
+                    evento = EventoTutoria.TUT_REAGENDA_2_FECHAS
+                elif es_reactivacion:
+                    messages.success(request, "Se reactivó la solicitud y se enviaron al alumno las nuevas opciones de fecha.")
+                    evento = EventoTutoria.TUT_REACTIVA_2_FECHAS
                 else:
                     messages.success(request, "Se han enviado las alternativas de horario al alumno.")
+                    evento = EventoTutoria.TUT_PROPONE_2_FECHAS
             else:
                 # CASO B: Una sola fecha -> Se reasigna la fecha y se ACEPTA directamente
                 tutoria.fecha = propuesta_1
@@ -172,8 +184,23 @@ def proponer_fechas_tutoria(request, pk):
                 tutoria.estado = ACEPTADO
                 tutoria.reagendacion_pendiente = False
                 messages.success(request, "Se ha actualizado y aceptado la tutoría con la nueva fecha.")
-            
+                if es_reagendacion:
+                    evento = EventoTutoria.TUT_REAGENDA_1_FECHA
+                elif es_reactivacion:
+                    evento = EventoTutoria.TUT_REACTIVA_1_FECHA
+                else:
+                    evento = EventoTutoria.TUT_PROPONE_1_FECHA
+
             tutoria.save()
+
+            # El tutor propuso 1 o 2 fechas para reagendar o aceptar solicitud, el alumno recibe la notificación.
+            tutoria_notification_requested.send(
+                sender=proponer_fechas_tutoria,
+                event=evento,
+                tutoria=tutoria,
+                actor=request.user,
+                recipient=tutoria.alumno,
+            )            
         else:
             messages.error(request, "Debes ingresar al menos la Opción 1.")
 
@@ -203,6 +230,15 @@ def seleccionar_propuesta_tutoria(request, pk):
         tutoria.save()
 
         messages.success(request, "Tu solicitud ha sido agendada con éxito. No faltes a la cita en el día y horario que elegiste 📅.")
+
+        # El alumno eligió una fecha propuesta, el tutor recibe la notifación.
+        tutoria_notification_requested.send(
+            sender=seleccionar_propuesta_tutoria,
+            event=EventoTutoria.ALU_ELIGE_FECHA_PROPUESTA,
+            tutoria=tutoria,
+            actor=request.user,
+            recipient=tutoria.tutor,
+        )
 
     return redirect('Tutorias-alumno')
 
@@ -361,7 +397,7 @@ def generar_pdf(request):
 
     # Encabezado del PDF
     header_style = ParagraphStyle(name='HeaderStyle', fontSize=12)
-    header_text = 'Historial tutorias'
+    header_text = 'Historial de tutorías'
     header_paragraph = Paragraph(header_text, header_style)
     elements.append(header_paragraph)
 
@@ -457,7 +493,7 @@ def generar_archivo_txt(request,pk):
         # Si no se han proporcionado fechas, obtener todas las tutorías del tutor
         tutorias = Tutoria.objects.filter(tutor=tutor)
     
-    contenido = "Tutorias \n"
+    contenido = "Tutorías \n"
     for tutoria in tutorias:
         contenido += f"Alumno: {tutoria.alumno.first_name} {tutoria.alumno.last_name} {tutoria.alumno.second_last_name}\n"
         contenido += f"Tutor: {tutoria.tutor.first_name} {tutoria.tutor.last_name} {tutoria.tutor.second_last_name}\n"
@@ -502,13 +538,14 @@ class AceptarTutoriaView(View):
         tutoria.estado = ACEPTADO
         tutoria.save(update_fields=["estado"])
 
-        messages.success(request, f"Haz aceptado la solicitud de tutoría de {tutoria.alumno.nombre_completo}.")
+        messages.success(request, f"Has aceptado la solicitud de tutoría de {tutoria.alumno.nombre_completo}.")
 
         tutoria_notification_requested.send(
             sender=self.__class__,
-            event="aceptada",
+            event= EventoTutoria.TUT_ACEPTA_SOLICITUD, #"aceptada",
             tutoria=tutoria,
             actor=request.user,
+            recipient=tutoria.alumno
         )
         return redirect(
             f"{reverse('Panel-tutorias-tutor')}?tab=agendadas"
@@ -538,11 +575,13 @@ class RechazarTutoriaView(View):
         tutoria.estado = RECHAZADO
         tutoria.motivo_rechazo = motivo
         tutoria.save(update_fields=["estado", "motivo_rechazo"])
+
         tutoria_notification_requested.send(
             sender=self.__class__,
-            event="rechazada",
+            event=EventoTutoria.TUT_RECHAZA_SOLICITUD, # "rechazada",
             tutoria=tutoria,
             actor=request.user,
+            recipient=tutoria.alumno
         )
 
         messages.info(
@@ -571,6 +610,8 @@ class CancelarTutoriaView(View):
         if not es_tutor_propietario and not es_alumno_propietario:
             raise PermissionDenied("No tienes permiso para cancelar esta tutoría")
 
+        #TODO: revisar si se debe quitar el estado VENCIDA porque el alumno no puede cancelar una tutoría vencida,
+        # solamente lo puede hacer un tutor.
         if es_alumno_propietario:
             if tutoria.estado_efectivo not in [PENDIENTE, VENCIDA, ACEPTADO]:
                 messages.error(
@@ -593,6 +634,11 @@ class CancelarTutoriaView(View):
                 messages.error(request, "Debes escribir el detalle del motivo de cancelación.")
                 return redirect('Tutorias-alumno')
 
+            if tutoria.estado_efectivo in [PENDIENTE, VENCIDA]:
+                evento = EventoTutoria.ALU_CANCELA_SOLICITUD
+            else: # Es decir, cuando el estado es CANCELADO
+                evento = EventoTutoria.ALU_CANCELA_AGENDADA
+
             tutoria.estado = CANCELADO
             tutoria.motivo_cancelacion = motivo
             tutoria.detalle_motivo_cancelacion = (
@@ -614,6 +660,16 @@ class CancelarTutoriaView(View):
                 "reagendacion_pendiente",
             ])
             messages.success(request, "La tutoría se canceló correctamente.")
+
+            # El alumno cancela, y el tutor debe recibir notificación.
+            tutoria_notification_requested.send(
+                sender=self.__class__,
+                event= evento, 
+                tutoria=tutoria,
+                actor=request.user,
+                recipient=tutoria.tutor
+            )
+
             return redirect('Tutorias-alumno')
 
         if tutoria.estado_efectivo != ACEPTADO:
@@ -656,6 +712,16 @@ class CancelarTutoriaView(View):
             "origen_cancelacion",
         ])
         messages.success(request, "La tutoría agendada se canceló correctamente.")
+
+        # El tutor cancela, y el alumno debe recibir la notificación.
+        tutoria_notification_requested.send(
+            sender=self.__class__,
+            event= EventoTutoria.TUT_CANCELA_AGENDADA, 
+            tutoria=tutoria,
+            actor=request.user,
+            recipient=tutoria.alumno
+        )
+        
         return redirect(
             f"{reverse('Panel-tutorias-tutor')}?tab=historial"
         )
@@ -769,31 +835,36 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
         else:
             recipient = Tutor.objects.none()
 
-        tutoria_notification_requested.send(
-            sender=self.__class__,
-            event="tutoria_modificada",
-            tutoria=self.object,
-            actor=actor,
-            recipient=recipient,
-            verb="Tutoria Modificada",
-        )
+        # TODO: ajustar el manejador del canal de correo porque el evento ahora se llama diferente.
+        # tutoria_notification_requested.send(
+        #     sender=self.__class__,
+        #     event="tutoria_modificada",
+        #     tutoria=self.object,
+        #     actor=actor,
+        #     recipient=recipient,
+        #     verb="Tutoria Modificada",
+        # )
         response = super().form_valid(form)
 
-        if fecha_changed_by_tutor:
-            tutoria_notification_requested.send(
-                sender=self.__class__,
-                event="cita_programada",
-                tutoria=self.object,
-                actor=actor,
-            )
+        # TODO: esta llamada ya no es necesaria porque el tutor no puede cambiar la info de
+        # la tutoría (temas y descripción).
+        # if fecha_changed_by_tutor:
+        #     tutoria_notification_requested.send(
+        #         sender=self.__class__,
+        #         event="cita_programada",
+        #         tutoria=self.object,
+        #         actor=actor,
+        #     )
 
-        if estado_changed_by_tutor and estado_notification_event:
-            tutoria_notification_requested.send(
-                sender=self.__class__,
-                event=estado_notification_event,
-                tutoria=self.object,
-                actor=actor,
-            )
+        # TODO: esta llamada ya no es necesaria porque el tutor no puede cambiar la info de
+        # la tutoría (temas y descripción).
+        # if estado_changed_by_tutor and estado_notification_event:
+        #     tutoria_notification_requested.send(
+        #         sender=self.__class__,
+        #         event=estado_notification_event,
+        #         tutoria=self.object,
+        #         actor=actor,
+        #     )
 
         HistorialCambioTutoria.objects.create(
             tutoria=self.object,
@@ -827,6 +898,17 @@ class TutoriaModalUpdateView(TutoriaUpdateView):
     def form_valid(self, form):
         # Reutiliza guardado, historial y notificaciones de la vista original.
         super().form_valid(form)
+
+        recipient = self.request.user.alumno.tutor_asignado
+
+        # El alumno edita detalles, y el alumno debe recibir la notificación.
+        tutoria_notification_requested.send(
+            sender=self.__class__,
+            event= EventoTutoria.ALU_EDITA_INFO_TUTORIA, 
+            tutoria=self.object,
+            actor=self.request.user, # Debería ser el alumno porque solamente puede editar desde UI.
+            recipient=recipient
+        )
 
         return JsonResponse({
             "ok": True,
@@ -972,9 +1054,11 @@ def solicitar_cambio_fecha_tutoria(request, pk):
             slot = HorarioTutor.objects.get(pk=horario_id, tutor=tutoria.tutor, activo=True)
             nueva_fecha = resolver_franja_tutor(slot, franja_seleccionada)
             nuevo_estado = ACEPTADO
+            evento = EventoTutoria.ALU_SOL_CAMBIO_FECHA_AGEN
         else:
             nueva_fecha = convertir_fecha_local(fecha_sugerida)
             nuevo_estado = PENDIENTE
+            evento = EventoTutoria.ALU_SOL_CAMBIO_FECHA_SUG
     except (HorarioTutor.DoesNotExist, TypeError, ValueError):
         messages.error(request, "La fecha u horario seleccionado no es válido.")
         return redirect("Tutorias-alumno")
@@ -1010,15 +1094,15 @@ def solicitar_cambio_fecha_tutoria(request, pk):
             f"-> '{timezone.localtime(nueva_fecha):%d/%m/%Y %H:%M}'"
         ),
     )
+
     tutoria_notification_requested.send(
         sender=solicitar_cambio_fecha_tutoria,
-        event="tutoria_modificada",
+        event=evento,
         tutoria=tutoria,
         actor=request.user,
-        recipient=Tutor.objects.filter(pk=tutoria.tutor_id),
-        verb="Solicitud de cambio de fecha",
+        recipient=tutoria.tutor,
     )
-
+    
     if nuevo_estado == ACEPTADO:
         messages.success(request, "La tutoría se reagendó en un horario disponible del tutor.")
     else:
@@ -1066,13 +1150,13 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
             texto_boton = "Agendar tutoría"
             alerta_texto = "Estás por agendar una tutoría dentro de los horarios definidos por tu tutor."
             alerta_tipo = "success"
-            subtitulo_modal = "Tu tutor(a) definió horarios de atención. Selecciona un día y un horario disponible."
+            subtitulo_modal = "Tu persona tutora definió horarios de atención. Selecciona un día y un horario disponible."
         else:
             titulo = "Solicitar tutoría"
             texto_boton = "Solicitar tutoría"
             alerta_texto = "Estás por solicitar una tutoría. Debes sugerir una fecha y hora."
             alerta_tipo = "warning"
-            subtitulo_modal = "Tu tutor(a) aún no registra horarios de atención para tutorías. Pero puedes sugerirle una fecha para visitarlo."
+            subtitulo_modal = "Tu persona tutora aún no registra horarios de atención para tutorías, pero puedes sugerirle una fecha para visitarle."
 
         info_adicional = "Información adicional sobre la tutoría."
 
@@ -1186,17 +1270,20 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
 
         # Mensaje corto para saber si es tutoría agendada o solicitada.
         resumen_notificacion="Nueva solicitud de tutoría"
+        evento = EventoTutoria.ALU_SOLICITA_TUTORIA
+
         if not alumno_sugirio:
             resumen_notificacion="Nueva tutoría agendada"
+            evento = EventoTutoria.ALU_AGENDA_TUTORIA
 
         # Eliminar corchetes de la lista
+        # El alumno solicita o agenda una tutoría, y el tutor debe recibir la notificación.
         tutoria_notification_requested.send(
             sender=self.__class__,
-            event="solicitud_creada",
+            event=evento,
             tutoria=form.instance,
             actor=alumno,
             recipient=tutor,
-            verb=resumen_notificacion,
             description=f'{", ".join(form.instance.get_tema_display())}',
         )
         
@@ -2373,13 +2460,13 @@ class QuickCreateTutoriaView(AlumnoViewMixin, CreateView):
         try:
             alumno = Alumno.objects.get(pk=self.request.user.pk)
         except Alumno.DoesNotExist:
-            raise PermissionDenied("Sólo los alumnos pueden registrar tutorias con QR")
+            raise PermissionDenied("Sólo los alumnos pueden registrar tutorías mediante QR")
         self.initial["alumno"] = alumno
         self.initial["tutor"] = alumno.tutor_asignado
         self.initial["tema"] = alumno.tutor_asignado.tema_tutorias
         print(f'Fecha: {datetime.now().strftime("%Y-%m-%d %H:%M")}')
         self.initial["fecha"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-        self.initial["descripcion"] = "Tutoria registrada con QR"
+        self.initial["descripcion"] = "Tutoría registrada mediante QR"
         return self.initial 
       
     
@@ -2490,7 +2577,16 @@ class TutoriaInSituCreateView(LoginRequiredMixin, ContextConRolesMixin, Template
             nueva.save()
 
             # Agregar mensaje de confirmación
-            messages.success(request, "Tutoría In Situ registrada con éxito.")
+            messages.success(request, "Tutoría in situ registrada con éxito.")
+
+            # El alumno registra tutoría por QR, el tutor debe recibir notificación.
+            tutoria_notification_requested.send(
+                sender=self.__class__,
+                event= EventoTutoria.ALU_AGENDA_POR_QR, 
+                tutoria=nueva,
+                actor=alumno,
+                recipient=alumno.tutor_asignado
+            )
 
             return redirect("Tutorias-alumno")
 
@@ -2746,9 +2842,11 @@ class RealizarSeguimientoView(TutorViewMixin, UpdateView):
                 cambios_realizados=change_summary,
             )
 
+        #TODO: ajustar el manejador de notificaciones por correo porque el nombre del evento
+        # ya cambió.
         tutoria_notification_requested.send(
             sender=self.__class__,
-            event="seguimiento_registrado",
+            event= EventoTutoria.TUTORIA_INFORME_REGISTRADO, #"seguimiento_registrado",
             tutoria=self.object,
             actor=tutor,
         )
@@ -2881,11 +2979,11 @@ class ExportarTutoriasAceptadasExcelView(CodaViewMixin, View):
             
             data.append({
                 "Id":tutoria.pk,
-                "Matricula": tutoria.alumno.matricula,
+                "Matrícula": tutoria.alumno.matricula,
                 "Alumno:":nombre_alumno,
                 "Correo Alumno": tutoria.alumno.email,
                 "Tutor": nombre_tutor,
-                "Numero Economico Tutor": tutoria.tutor.matricula,
+                "Numero económico del tutor": tutoria.tutor.matricula,
                 "Fecha": tutoria.fecha.strftime("%d/%m/%Y"),
                 "Hora": tutoria.fecha.strftime("%H:%M"),
                 "Tema(s)": temas,
@@ -2904,19 +3002,10 @@ class ExportarTutoriasAceptadasExcelView(CodaViewMixin, View):
         return response
 
 
-class ComunicacionMasivaTutoriasView(FormView):
-
-    print("Inicializando vista de comunicación masiva")
-
+class ComunicacionMasivaTutoriasView(TutorViewMixin, FormView):
     template_name = 'Tutorias/comunicacionMasiva.html'
     form_class = ComunicacionMasivaForm
     success_url = reverse_lazy('tutorias-comunicacion-masiva')
-
-    def get_context_data(self, **kwargs):
-        ctx = super().get_context_data(**kwargs)
-        ctx['header_footer'] = "Usuarios/base.html"
-        print("Contexto:", ctx)
-        return ctx
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -2967,6 +3056,6 @@ class ComunicacionMasivaTutoriasView(FormView):
                 messages.error(self.request, f'Ocurrió un error al enviar el correo: {str(e)}')
                 return super().form_invalid(form)
         else:
-            messages.warning(self.request, 'No alumnos con correo válido.')
+            messages.warning(self.request, 'No hay alumnos con un correo válido.')
 
         return super().form_valid(form)

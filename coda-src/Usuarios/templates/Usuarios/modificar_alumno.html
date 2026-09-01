@@ -1,157 +1,159 @@
 {% extends "Usuarios/HeaderAndFooterFachada.html" %}
 
-{% block title  %}  Modificar Alumno {% endblock %}
+{% block title %}Modificar alumno{% endblock %}
 {% load custom_filters %}
 
 {% block body %}
-    <section style="background-color: #eee; " id="section">
-        <div class="container py-5 h-100">
-            <div class="row d-flex justify-content-center align-items-center h-100">
-                <div class="col-lg-8 col-xl-6">
-                    <div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
-                        <div class="card-body px-5 py-4 overflow-y-auto">
-                            <h3 class=" mb-3 text-primary text-title-bold">Modificar Alumno</h3>
+  <section style="background-color: #eee; " id="section">
+    <div class="container py-5 h-100">
+      <div class="row d-flex justify-content-center align-items-center h-100">
+        <div class="col-lg-8 col-xl-6">
+          <div class="card border-top border-bottom border-4"
+               style="border-color: #F08200 !important">
+            <div class="card-body px-5 py-4 overflow-y-auto">
+              <h3 class="mb-3 text-primary text-title-bold">Modificar alumno</h3>
 
-                            {% comment %} Separador de información personal {% endcomment %}
-                            <div class="m-0 d-flex flex-column mb-2 border-1 border-bottom">
-                                <span class="text-title text-muted h6">Información Personal</span>
-                            </div>
+              {% comment %} Separador de información personal {% endcomment %}
+              <div class="m-0 d-flex flex-column mb-2 border-1 border-bottom">
+                <span class="text-title text-muted h6">Información personal</span>
+              </div>
 
-                            {% load widget_tweaks%}    
-                            <form method="post" class="text-body">
-                                {% csrf_token %}
-                                <div class="d-flex mb-3 justify-content-evenly w-100">
-                                        <div class="form-outline">
-                                            <!-- <input type="text" class="form-control" value="" /> -->
-                                            {% render_field form.first_name type="text" class="form-control" id="nombre"%}
-                                            <label class="form-label" for="nombre">Nombre(s)</label>
-                                        </div>
-                                    </div>
+              {% load widget_tweaks %}
 
-                                <div class="d-flex w-100">
-                                    <div class="form-outline mb-3">
-                                        <!-- <input type="text" class="form-control" value="" /> -->
-                                        {% render_field form.last_name type="text" class="form-control" id="apellido_paterno"%}
-                                        <label class="form-label " for="apellido_paterno">Primer Apellido</label>
-                                    </div>
-                                    <div class="form-outline mb-3 ms-1">
-                                        <!-- <input type="text" class="form-control" value="" /> -->
-                                        {% render_field form.second_last_name type="text" class="form-control" id="apellido_materno"%}
-                                        <label class="form-label " for="apellido_paterno">Segundo Apellido</label>
-                                    </div>
-                                </div>
-
-                                <div class="form-outline mb-3">
-                                    <!-- <input type="text" class="form-control" value=""/> -->
-                                    {% render_field form.correo_personal type="text" class="form-control" id="correo_personal"%}
-                                    <label class="form-label" for="correo_personal">Correo Personal</label>
-                                </div>
-
-                                <div class="d-flex w-100 mb-3">
-                                    <div class="form-outline w-75 me-1">
-                                        <!-- <input type="text" class="form-control" value="" /> -->
-                                        {% render_field form.rfc type="text" class="form-control" id="rfc"%}
-                                        <label class="form-label" for="rfc">RFC</label>
-                                    </div>
-                                    <div class="w-50 ms-1">
-                                        <!-- <input type="text" class="form-control" value="" /> -->
-                                        {% render_field form.sexo type="text" class="form-select" id="sexo"%}
-                                    </div>
-                                </div>
-
-
-                                 {% comment %} Separador de información de la cuenta {% endcomment %}
-                                <div class=" d-flex flex-column mt-4 mb-2 border-1 border-bottom">
-                                    <span class="text-title text-muted h6">Información Académica</span>
-                                </div>
-
-                                <!-- Numero de cuenta input -->
-                                <!-- La matrícula es un campo de alta importancia en el sistema, por lo que no puede ser cambiada. -->
-                                <div class="form-outline mb-3 disabled">
-                                    <!-- <input type="number" class="form-control" value="" /> -->
-                                    {% render_field form.matricula type="number" class="form-control" id="matricula"%}
-                                    <label class="form-label" for="matricula">Matricula</label>
-                                </div>
-
-                                 <!-- Tema de la tutoria input -->
-                                 <div class="form-outline mb-3">
-                                    <!-- <input type="text" class="form-control" value=""/> -->
-                                    {% render_field form.email type="text" class="form-control" id="email"%}
-                                    <label class="form-label" for="email">Correo Institucional</label>
-                                </div>
-    
-                                <!-- Text input -->
-                                <!-- Select input -->
-                                <div class="form-floating mb-3">
-                                
-                                    {% render_field form.carrera class="form-select " id="carrera"%}
-                                    <label class="form-label " for="carrera">Carrera</label>
-                                    
-                                </div>
-
-                                <!-- Tutor Imput -->
-                                <div class="form-floating mb-3">
-                                    <select name="tutor_asignado" class="form-select" id="tutor">
-                                      {% regroup form.tutor_asignado.field.queryset by coordinacion as tutor_list %}
-                                      {% for group in tutor_list %}
-                                        <optgroup label="{{ coordinacion_dict|get_item:group.grouper }}">
-                                          {% for tutor in group.list %}
-                                            <option value="{{ tutor.pk }}" {% if tutor.pk == form.initial.tutor_asignado %}selected{% endif %}>
-                                                {{ tutor.matricula }} - {{ tutor.first_name }} {{ tutor.last_name }} 
-                                                {% if tutor.second_last_name %}
-                                                    {{ tutor.second_last_name }}
-                                                {% endif %}
-                                            </option>
-                                          {% endfor %}
-                                        </optgroup>
-                                      {% endfor %}
-                                    </select>
-                                    <label for="tutor">Tutor asignado</label>
-                                </div>
-
-                                {% comment %} Información de trayectoria académica {% endcomment %}
-                                <div class="d-flex w-100 mb-4">
-                                    <div class="form-outline w-50 me-1">
-                                        <!-- <input type="text" class="form-control" value="" /> -->
-                                        {% render_field form.trimestre_ingreso type="text" class="form-control" id="trimestre_ingreso"%}
-                                        <label class="form-label" for="trimestre_ingreso">Trimestre de Ingreso</label>
-                                    </div>
-                                    <div class="w-50 ms-1 h-25"
-                                    >
-                                        <!-- <input type="text" class="form-control" value="" /> -->
-                                        {% render_field form.estado type="text" class="form-select" id="sexo"%}
-                                    </div>
-                                </div>
-                                
-    
-                                <!-- Submit button -->
-                                <div class="d-flex flex-row  justify-content-evenly w-100 text-title mt-3">
-                                    <a href="{% url 'login_success' %}"><button type="button" class="btn btn-outline-primary">Cancelar</button></a>
-                                    <button type="submit" class="btn btn-primary">Guardar</button>
-                                </div>
-                            </form>
-                            
-                            {% if form.errors %}
-                                <div class="alert alert-danger">
-                                    <ul>
-                                    {% for field in form %}
-                                        {% for error in field.errors %}
-                                        <li><strong>{{ field.label }}:</strong> {{ error }}</li>
-                                        {% endfor %}
-                                    {% endfor %}
-                                    {% for error in form.non_field_errors %}
-                                        <li>{{ error }}</li>
-                                    {% endfor %}
-                                    </ul>
-                                </div>
-                            {% endif %}
-
-                        </div>
-                    </div>
+              <form method="post" class="text-body">
+                {% csrf_token %}
+                <div class="d-flex mb-3 justify-content-evenly w-100">
+                  <div class="form-outline">
+                    <!-- <input type="text" class="form-control" value="" /> -->
+                    {% render_field form.first_name type="text" class="form-control" id="nombre" %}
+                    <label class="form-label" for="nombre">Nombre(s)</label>
+                  </div>
                 </div>
+
+                <div class="d-flex w-100">
+                  <div class="form-outline mb-3">
+                    <!-- <input type="text" class="form-control" value="" /> -->
+                    {% render_field form.last_name type="text" class="form-control" id="apellido_paterno" %}
+                    <label class="form-label" for="apellido_paterno">Primer apellido</label>
+                  </div>
+                  <div class="form-outline mb-3 ms-1">
+                    <!-- <input type="text" class="form-control" value="" /> -->
+                    {% render_field form.second_last_name type="text" class="form-control" id="apellido_materno" %}
+                    <label class="form-label" for="apellido_paterno">Segundo apellido</label>
+                  </div>
+                </div>
+
+                <div class="form-outline mb-3">
+                  <!-- <input type="text" class="form-control" value=""/> -->
+                  {% render_field form.correo_personal type="text" class="form-control" id="correo_personal" %}
+                  <label class="form-label" for="correo_personal">Correo personal</label>
+                </div>
+
+                <div class="d-flex w-100 mb-3">
+                  <div class="form-outline w-75 me-1">
+                    <!-- <input type="text" class="form-control" value="" /> -->
+                    {% render_field form.rfc type="text" class="form-control" id="rfc" %}
+                    <label class="form-label" for="rfc">RFC</label>
+                  </div>
+                  <div class="w-50 ms-1">
+                    <!-- <input type="text" class="form-control" value="" /> -->
+                    {% render_field form.sexo type="text" class="form-select" id="sexo" %}
+                  </div>
+                </div>
+
+                {% comment %} Separador de información de la cuenta {% endcomment %}
+                <div class="d-flex flex-column mt-4 mb-2 border-1 border-bottom">
+                  <span class="text-title text-muted h6">Información académica</span>
+                </div>
+
+                <!-- Numero de cuenta input -->
+                <!-- La matrícula es un campo de alta importancia en el sistema, por lo que no puede ser cambiada. -->
+                <div class="form-outline mb-3 disabled">
+                  <!-- <input type="number" class="form-control" value="" /> -->
+                  {% render_field form.matricula type="number" class="form-control" id="matricula" %}
+                  <label class="form-label" for="matricula">Matrícula</label>
+                </div>
+
+                <!-- Tema de la tutoria input -->
+                <div class="form-outline mb-3">
+                  <!-- <input type="text" class="form-control" value=""/> -->
+                  {% render_field form.email type="text" class="form-control" id="email" %}
+                  <label class="form-label" for="email">Correo institucional</label>
+                </div>
+
+                <!-- Text input -->
+                <!-- Select input -->
+                <div class="form-floating mb-3">
+
+                  {% render_field form.carrera class="form-select " id="carrera" %}
+                  <label class="form-label" for="carrera">Licenciatura</label>
+
+                </div>
+
+                <!-- Tutor Imput -->
+                <div class="form-floating mb-3">
+                  <select name="tutor_asignado" class="form-select" id="tutor">
+                    {% regroup form.tutor_asignado.field.queryset by coordinacion as tutor_list %}
+                    {% for group in tutor_list %}
+                      <optgroup label="{{ coordinacion_dict|get_item:group.grouper }}">
+                        {% for tutor in group.list %}
+                          <option value="{{ tutor.pk }}"
+                                  {% if tutor.pk == form.initial.tutor_asignado %}selected{% endif %}>
+                            {{ tutor.matricula }} - {{ tutor.first_name }} {{ tutor.last_name }}
+                            {% if tutor.second_last_name %}
+                              {{ tutor.second_last_name }}
+                            {% endif %}
+                          </option>
+                        {% endfor %}
+                      </optgroup>
+                    {% endfor %}
+                  </select>
+                  <label for="tutor">Tutor asignado</label>
+                </div>
+
+                {% comment %} Información de trayectoria académica {% endcomment %}
+                <div class="d-flex w-100 mb-4">
+                  <div class="form-outline w-50 me-1">
+                    <!-- <input type="text" class="form-control" value="" /> -->
+                    {% render_field form.trimestre_ingreso type="text" class="form-control" id="trimestre_ingreso" %}
+                    <label class="form-label" for="trimestre_ingreso">Trimestre de ingreso</label>
+                  </div>
+                  <div class="w-50 ms-1 h-25">
+                    <!-- <input type="text" class="form-control" value="" /> -->
+                    {% render_field form.estado type="text" class="form-select" id="sexo" %}
+                  </div>
+                </div>
+
+                <!-- Submit button -->
+                <div class="d-flex flex-row justify-content-evenly w-100 text-title mt-3">
+                  <a href="{% url 'login_success' %}"><button type="button" class="btn btn-outline-primary">Cancelar</button></a>
+                  <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+              </form>
+
+              {% if form.errors %}
+                <div class="alert alert-danger">
+                  <ul>
+                    {% for field in form %}
+                      {% for error in field.errors %}
+                        <li><strong>{{ field.label }}:</strong> {{ error }}</li>
+                      {% endfor %}
+                    {% endfor %}
+                    {% for error in form.non_field_errors %}
+                      <li>{{ error }}</li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              {% endif %}
+
             </div>
+          </div>
         </div>
-    </section>
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
+      </div>
+    </div>
+  </section>
+  <script type="text/javascript"
+          src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
+  <script type="text/javascript"
+          src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
 {% endblock %}

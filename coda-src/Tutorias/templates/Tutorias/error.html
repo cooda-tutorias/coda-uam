@@ -1,178 +1,193 @@
 <!DOCTYPE html>
 <html lang="en">
 
-<head>
+  <head>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Solicitar Tutoria</title>
-    <link rel="icon" href="../../img/icon.jpg" sizes="32x32" type="image/png">
+    <link rel="icon" href="../../img/icon.png" sizes="32x32" type="image/png">
     <!-- Bootstrap CDN Bundle with Popper-->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0/dist/js/bootstrap.bundle.min.js"
-        integrity="sha384-p34f1UUtsS3wqzfto5wAAmdvj+osOnFyQFpp4Ua3gs/ZVWx6oOypYoCJhGGScy+8"
-        crossorigin="anonymous"></script>
+            integrity="sha384-p34f1UUtsS3wqzfto5wAAmdvj+osOnFyQFpp4Ua3gs/ZVWx6oOypYoCJhGGScy+8"
+            crossorigin="anonymous"></script>
     <!--Link CSS-->
     <link rel="stylesheet" href="../../css/main.css">
     <!-- Icons -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet" />
-</head>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+          rel="stylesheet" />
+  </head>
 
-<body>
+  <body>
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg bg-secondary p-2">
-        <!-- Container -->
-        <div class="container-fluid">
-            <!--Boton Toggle-->
-            <button class="navbar-toggler" type="button" data-mdb-toggle="collapse"
-                data-mdb-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false"
+      <!-- Container -->
+      <div class="container-fluid">
+        <!--Boton Toggle-->
+        <button class="navbar-toggler"
+                type="button"
+                data-mdb-toggle="collapse"
+                data-mdb-target="#navbarSupportedContent"
+                aria-controls="navbarSupportedContent"
+                aria-expanded="false"
                 aria-label="Toggle navigation">
-                <i class="fas fa-bars"></i>
-            </button>
+          <i class="fas fa-bars"></i>
+        </button>
 
-            <!-- Collapsible wrapper -->
-            <div class="collapse navbar-collapse" id="navbarSupportedContent">
-                <!-- Navbar brand -->
-                <a class="navbar-brand m-0 p-0" href="#">
-                    <img src="../../img/logovariacion2.png" height="55" loading="lazy" />
-                </a>
+        <!-- Collapsible wrapper -->
+        <div class="collapse navbar-collapse" id="navbarSupportedContent">
+          <!-- Navbar brand -->
+          <a class="navbar-brand m-0 p-0" href="#">
+            <img src="../../img/logovariacion2.png" height="55" loading="lazy" />
+          </a>
 
-                <!-- Izquierda links -->
-                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
-                    <li class="nav-item">
-                        <a class="nav-link text-primary" href="#">Solicitar tutoria</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link text-primary" href="#">Tutorias</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link text-primary" href="#">Editar Tutorias</a>
-                    </li>
-                </ul>
-                <!-- Izquierda links -->
-            </div>
-            <!-- Collapsible wrapper -->
-
-            <!-- Derecha elementos -->
-            <div class="d-flex align-items-center">
-                <!-- Icons -->
-                <!-- Notificaciones -->
-                <div class="dropdown">
-                    <a class="text-reset me-3 dropdown-toggle hidden-arrow" href="#" id="navbarDropdownMenuLink"
-                        role="button" data-mdb-toggle="dropdown" aria-expanded="false">
-                        <i class="far fa-message text-primary"></i>
-                        <span class="badge rounded-pill badge-notification bg-primary">10</span>
-                    </a>
-                </div>
-                <!-- Avatar -->
-                <div class="dropdown">
-                    <a class="dropdown-toggle d-flex align-items-center hidden-arrow" href="#"
-                        id="navbarDropdownMenuAvatar" role="button" data-mdb-toggle="dropdown" aria-expanded="false">
-                        <img src="https://mdbcdn.b-cdn.net/img/new/avatars/2.webp" class="rounded-circle" height="30"
-                            alt="" loading="lazy" />
-                    </a>
-                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownMenuAvatar">
-                        <li>
-                            <a class="dropdown-item" href="#">Mi perfil</a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="#">Configuraciones</a>
-                        </li>
-                        <li>
-                            <a class="dropdown-item" href="#">Cerrar Sesión</a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-            <!-- Right elements -->
+          <!-- Izquierda links -->
+          <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+            <li class="nav-item">
+              <a class="nav-link text-primary" href="#">Solicitar tutoria</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link text-primary" href="#">Tutorias</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link text-primary" href="#">Editar Tutorias</a>
+            </li>
+          </ul>
+          <!-- Izquierda links -->
         </div>
-        <!-- Container wrapper -->
+        <!-- Collapsible wrapper -->
+
+        <!-- Derecha elementos -->
+        <div class="d-flex align-items-center">
+          <!-- Icons -->
+          <!-- Notificaciones -->
+          <div class="dropdown">
+            <a class="text-reset me-3 dropdown-toggle hidden-arrow"
+               href="#"
+               id="navbarDropdownMenuLink"
+               role="button"
+               data-mdb-toggle="dropdown"
+               aria-expanded="false">
+              <i class="far fa-message text-primary"></i>
+              <span class="badge rounded-pill badge-notification bg-primary">10</span>
+            </a>
+          </div>
+          <!-- Avatar -->
+          <div class="dropdown">
+            <a class="dropdown-toggle d-flex align-items-center hidden-arrow"
+               href="#"
+               id="navbarDropdownMenuAvatar"
+               role="button"
+               data-mdb-toggle="dropdown"
+               aria-expanded="false">
+              <img src="https://mdbcdn.b-cdn.net/img/new/avatars/2.webp"
+                   class="rounded-circle"
+                   height="30"
+                   alt=""
+                   loading="lazy" />
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end"
+                aria-labelledby="navbarDropdownMenuAvatar">
+              <li>
+                <a class="dropdown-item" href="#">Mi perfil</a>
+              </li>
+              <li>
+                <a class="dropdown-item" href="#">Configuraciones</a>
+              </li>
+              <li>
+                <a class="dropdown-item" href="#">Cerrar Sesión</a>
+              </li>
+            </ul>
+          </div>
+        </div>
+        <!-- Right elements -->
+      </div>
+      <!-- Container wrapper -->
     </nav>
     <!-- Navbar -->
 
     <!--Formulario Solicitud tutoria-->
     <section style="background-color: #eee;">
-        <div class="container py-5 h-100">
+      <div class="container py-5 h-100">
 
-            <!-- Error Alert -->
-            <div class="alert alert-danger alert-dismissible fade show">
-                <strong>Error!</strong> A problem has been occurred while submitting your data.
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-
-            <div class="row d-flex justify-content-center align-items-center h-100">
-                <div class="col-lg-8 col-xl-6">
-                    <div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
-                        <div class="card-body p-5">
-                            <h3 class=" mb-5 text-primary">Solicitud de Tutoria</h3>
-
-                            
- 
-
-                            <!-- Tema imput-->
-                            <div class="mb-4">
-                                <select class="form-select">
-                                    <option selected>Tema</option>
-                                        <option value="opcion1">Becas</option>
-                                        <option value="opcion2">Incripción</option>
-                                        <option value="opcion3">Inglés</option>
-                                        <option value="opcion3">Organo colegiados</option>
-                                        <option value="opcion3">Reglamentos</option>
-                                        <option value="opcion3">Servicio Social</option>
-                                        <option value="opcion3">Movilidad</option>
-                                        <option value="opcion3">Proyecto Terminal</option>
-                                        <option value="opcion3">Estancia de Verano</option>
-                                        <option value="opcion3">Trayectoria Curricular</option>
-                                        <option value="opcion3">Eleccion de grupo</option>
-                                        <option value="opcion3">Titulación</option>
-                                        <option value="opcion3">Egreso</option>
-                                        <option value="opcion3">Personales</option>
-                                        <option value="opcion3">Reporte de reunión</option>
-                                        <option value="opcion3">Otro</option>
-
-                                    </optgroup>
-                                </select>
-                            </div>
-                            
-                            <!-- Tema de la tutoria input -->
-                            <div class="form-outline mb-4">
-                                <input type="text" class="form-control" />
-                                <label class="form-label">Otro:</label>
-                            </div>
-
-
-                            <!-- Hora y Dia imput-->
-                            <div class="row mb-4">
-                                <!-- Dia de tutoria  imput-->
-                                <div class="col">
-                                    <div class="form-outline">
-                                        <input type="text" class="form-control" />
-                                        <label class="form-label">Fecha</label>
-                                    </div>
-                                </div>
-                                <!--Hora de tutoria imput-->
-                                <div class="col">
-                                    <div class="form-outline">
-                                        <input type="text" class="form-control" />
-                                        <label class="form-label">Hora</label>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Mensaje input -->
-                            <div class="form-outline mb-4">
-                                <textarea class="form-control" rows="4"></textarea>
-                                <label class="form-label">Informacion sobre la Tutoria</label>
-                            </div>
-
-                            <!-- Submit button -->
-                            <button type="submit" class="btn btn-primary btn-block mb-4">Solicitar Tutoria</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <!-- Error Alert -->
+        <div class="alert alert-danger alert-dismissible fade show">
+          <strong>Error!</strong> A problem has been occurred while submitting your data.
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
-    </section>
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
+
+        <div class="row d-flex justify-content-center align-items-center h-100">
+          <div class="col-lg-8 col-xl-6">
+            <div class="card border-top border-bottom border-4"
+                 style="border-color: #F08200 !important">
+              <div class="card-body p-5">
+                <h3 class="mb-5 text-primary">Solicitud de Tutoria</h3>
+
+                <!-- Tema imput-->
+                <div class="mb-4">
+                  <select class="form-select">
+                    <option selected>Tema</option>
+                    <option value="opcion1">Becas</option>
+                    <option value="opcion2">Incripción</option>
+                    <option value="opcion3">Inglés</option>
+                    <option value="opcion3">Organo colegiados</option>
+                    <option value="opcion3">Reglamentos</option>
+                    <option value="opcion3">Servicio Social</option>
+                    <option value="opcion3">Movilidad</option>
+                    <option value="opcion3">Proyecto Terminal</option>
+                    <option value="opcion3">Estancia de Verano</option>
+                    <option value="opcion3">Trayectoria Curricular</option>
+                    <option value="opcion3">Eleccion de grupo</option>
+                    <option value="opcion3">Titulación</option>
+                    <option value="opcion3">Egreso</option>
+                    <option value="opcion3">Personales</option>
+                    <option value="opcion3">Reporte de reunión</option>
+                    <option value="opcion3">Otro</option>
+
+                  </optgroup>
+                </select>
+              </div>
+
+              <!-- Tema de la tutoria input -->
+              <div class="form-outline mb-4">
+                <input type="text" class="form-control" />
+                <label class="form-label">Otro:</label>
+              </div>
+
+              <!-- Hora y Dia imput-->
+              <div class="row mb-4">
+                <!-- Dia de tutoria  imput-->
+                <div class="col">
+                  <div class="form-outline">
+                    <input type="text" class="form-control" />
+                    <label class="form-label">Fecha</label>
+                  </div>
+                </div>
+                <!--Hora de tutoria imput-->
+                <div class="col">
+                  <div class="form-outline">
+                    <input type="text" class="form-control" />
+                    <label class="form-label">Hora</label>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Mensaje input -->
+              <div class="form-outline mb-4">
+                <textarea class="form-control" rows="4"></textarea>
+                <label class="form-label">Informacion sobre la Tutoria</label>
+              </div>
+
+              <!-- Submit button -->
+              <button type="submit" class="btn btn-primary btn-block mb-4">Solicitar Tutoria</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  <script type="text/javascript"
+          src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
 </body>
 
 </html>

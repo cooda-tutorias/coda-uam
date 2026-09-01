@@ -1,52 +1,54 @@
- {% extends "Usuarios/perfil_base.html"%}
+{% extends "Usuarios/perfil_base.html" %}
 
-{% block title  %} Perfil Alumno {% endblock %}
-
+{% block title %}Perfil Alumno{% endblock %}
 
 {% block perfil %}
-<div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
-  <div class="d-flex flex-row">
-    <div class="d-flex p-5 flex-column justify-content-center align-items-center w-50 text-center">
-      {% load static %}
-      <!-- <img src="https://mdbcdn.b-cdn.net/img/new/avatars/2.webp" class="w-75 h-50 p-3"/> -->
-      <img 
-        src="{% static 'Alumnos/img/user.png'%}"
-        alt="" class="img-fluid shadow-2-strong mt-4 mb-2"
-        style="width: 150px; height: 150px; object-fit: cover; z-index: 1"
-       />
-      <h5 class="text-black">{{ usuario.first_name }}</h5>
-      <h5 class="text-black">{{ usuario.last_name }} {{ usuario.second_last_name }}</h5>
-      <!-- <a href="#">Editar Información</a> -->
-    </div>
-    <div class="d-flex flex-column w-50">
-      <div class="w-auto card-body p-4">
-        <h5>Datos Personales</h5>
-        <hr class="mt-0 mb-4">
-        <div class="row pt-1">
-          <div class="w-100">
-            <h6>Matricula</h6>
-            <p class="text-muted">{{ usuario.matricula }}</p>
+  <div class="card border-top border-bottom border-4"
+       style="border-color: #F08200 !important">
+    <div class="d-flex flex-row">
+      <div class="d-flex p-5 flex-column justify-content-center align-items-center w-50 text-center">
+        {% load static %}
+        <!-- <img src="https://mdbcdn.b-cdn.net/img/new/avatars/2.webp" class="w-75 h-50 p-3"/> -->
+        <img src="{% static 'Alumnos/img/user.png' %}"
+             alt=""
+             class="img-fluid shadow-2-strong mt-4 mb-2"
+             style="width: 150px;
+                    height: 150px;
+                    object-fit: cover;
+                    z-index: 1" />
+        <h5 class="text-black">{{ usuario.first_name }}</h5>
+        <h5 class="text-black">{{ usuario.last_name }} {{ usuario.second_last_name }}</h5>
+        <!-- <a href="#">Editar Información</a> -->
+      </div>
+      <div class="d-flex flex-column w-50">
+        <div class="w-auto card-body p-4">
+          <h5>Datos personales</h5>
+          <hr class="mt-0 mb-4">
+          <div class="row pt-1">
+            <div class="w-100">
+              <h6>Matrícula</h6>
+              <p class="text-muted">{{ usuario.matricula }}</p>
+            </div>
+            <div class="w-100">
+              <h6>Correo institucional</h6>
+              <p class="text-muted">{{ usuario.email }}</p>
+            </div>
+            <div class="w-100">
+              <h6>Licenciatura</h6>
+              <p class="text-muted">{{ usuario.alumno.get_carrera_display }}</p>
+            </div>
           </div>
-          <div class="w-100">
-            <h6>Correo institucional</h6>
-            <p class="text-muted">{{usuario.email}}</p>
-          </div>
-          <div class="w-100">
-            <h6>Licenciatura</h6>
-            <p class="text-muted">{{usuario.alumno.get_carrera_display}}</p>
-          </div>
-        </div>
-        <hr class="mt-0 mb-4">
-        <div class="row pt-1">
+          <hr class="mt-0 mb-4">
+          <div class="row pt-1">
 
-          <div class="col-6 mb-3">
-            <h6>Trayectoria Academica</h6>
-            <p class="text-muted">Ingreso: 24O</p>
-            <p class="text-muted">Estado: Activo</p>
+            <div class="col-6 mb-3">
+              <h6>Trayectoria Académica</h6>
+              <p class="text-muted">Ingreso: {{ usuario.alumno.trimestre_ingreso }}</p>
+              <p class="text-muted">Estado: {{ usuario.alumno.get_estado_display }}</p>
+            </div>
           </div>
         </div>
       </div>
     </div>
   </div>
-</div>
 {% endblock %}

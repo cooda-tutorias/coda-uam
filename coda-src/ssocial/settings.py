@@ -13,7 +13,7 @@ https://docs.djangoproject.com/en/4.1/ref/settings/
 from pathlib import Path
 # settings.py
 
-# TODO mochar esto en prod
+# TODO: mochar esto en prod
 # from .env_vars import *
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -32,13 +32,30 @@ SESSION_COOKIE_SECURE=False
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['127.0.0.1', os.environ['TUTORIAS_DOMINIO'], os.environ['IP_COMPUTADORA']]
+# Para confeccionar los dominios permitidos y la URL completa.
+TUTORIAS_DOMINIO = os.environ["TUTORIAS_DOMINIO"].strip()
+TUTORIAS_SCHEME = os.getenv("TUTORIAS_SCHEME", "https").strip()
+TUTORIAS_PORT = os.getenv("TUTORIAS_PORT", "").strip()
+
+puerto = f":{TUTORIAS_PORT}" if TUTORIAS_PORT else ""
+
+TUTORIAS_SITE_URL = (
+    f"{TUTORIAS_SCHEME}://{TUTORIAS_DOMINIO}{puerto}"
+)
+
+ALLOWED_HOSTS = [
+    '127.0.0.1', 
+    TUTORIAS_DOMINIO, 
+    os.environ['IP_COMPUTADORA']
+]
+
 if os.getenv('LOCAL_HOST_NAME'):
     ALLOWED_HOSTS.append(os.environ['LOCAL_HOST_NAME'])
 
-CSRF_TRUSTED_ORIGINS = ['http://'+os.environ['TUTORIAS_DOMINIO']]
+CSRF_TRUSTED_ORIGINS = [TUTORIAS_SITE_URL]
 
-
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    
 #Custom user model
 AUTH_USER_MODEL = "Usuarios.Usuario"
 
@@ -57,6 +74,7 @@ INSTALLED_APPS = [
     'widget_tweaks',
     'import_export',
     'storages',
+    'webpush',
 
     #Internal
     'Tutorias.apps.TutoriasConfig',
@@ -66,6 +84,12 @@ INSTALLED_APPS = [
 
 LOGIN_URL='login'
 LOGIN_REDIRECT_URL='login_success'
+
+WEBPUSH_SETTINGS = {
+    "VAPID_PUBLIC_KEY": os.environ["VAPID_PUBLIC_KEY"],
+    "VAPID_PRIVATE_KEY": os.environ["VAPID_PRIVATE_KEY"],
+    "VAPID_ADMIN_EMAIL": os.environ["VAPID_ADMIN_EMAIL"],
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -95,6 +119,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                "Usuarios.context_processors.notificaciones",
             ],
         },
     },
@@ -187,3 +212,20 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "loggers": {
+        "Tutorias.signals.handle_push_notifications": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
+}

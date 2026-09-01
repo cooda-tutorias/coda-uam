@@ -1,93 +1,95 @@
-{% extends "Usuarios/HeaderAndFooterFachada.html"%}
+{% extends "Usuarios/HeaderAndFooterFachada.html" %}
 
-{% block title %} Lista de tutorados {% endblock %}
-
+{% block title %}Lista de tutorados{% endblock %}
 
 {% block body %}
-<section id="section" style="background-color: #eee;">
-  <div class="container py-5 h-100 w-100">
+  <section id="section" style="background-color: #eee;">
+    <div class="container py-5 h-100 w-100">
       <div class="row d-flex w-100 justify-content-center align-items-center h-100">
-          <div class="col-lg-8 col-xl-10 w-100">
-              <div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
-                  <div class="card-body py-4 px-5">
-                    <div class="d-flex w-100 align-items-center mb-4">
-                      <div class="d-flex w-100 align-items-center min-w-100">
-                        <h3 class=" text-primary text-title-bold">Tutorados de</h3>
-                        <h4 class="ms-3 text-title text-black"> 
-                          {% if tutor.sexo == 'F' %}
-                            Dra.
-                          {% else %}
-                            Dr.
-                          {% endif %}
-                            {{ tutor.first_name }} {{ tutor.last_name }} 
-                          {% if tutor.second_last_name %}
-                            {{ tutor.second_last_name }}
-                          {% endif %}
-                        </h4>
-                      </div>
-                      <div
-                        style="
-                          width: 58em;
-                          display: flex;
-                          justify-content: center;
-                          /* min-width: 520px; */
-                        "
-                      >
-                        <!-- Submit button -->
-                        <a onclick="submitSelected()" href="#" class="text-title text-center bg-primary rounded text-white py-2 px-2 me-3 w-auto">
-                          Generar carta(s) de notificación
-                        </a>
-                        <a href="{% url 'Reporte-create' tutor.pk %}" class="btn-small text-title text-center bg-primary rounded text-white py-2 px-2">
-                          Generar reporte de tutorados
-                        </a>                     
-                      </div>
-                    </div>
-                      
-                      
-                      <!--Inicio de table-->
-                      <div class = "table-responsive">
-                        <table class="table table-striped table-hover datatable">
-                          <thead>
-                            <tr>
-                              <th><input type="checkbox" name="sample" id="select-all"/></th>
-                              <th class="text-title h6 text-center">Matrícula</th>
-                              <th class="text-title h6 text-center">Nombre</th>
-                              <th class="text-title h6 text-center">Correo</th>
-                              {% comment %} <th class="text-title h6 text-center">Correo personal</th> {% endcomment %}
-                              <th class="text-title h6 text-center">Carrera</th>
-                              <th class="text-title h6 text-center">Trimestre de Ingreso</th>
-                              <th class="text-title h6 text-center">Estado</th>
-                              <th class="text-title h6 text-center">Acciones</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {% for alumno in object_list %}
-                            <tr>
-                              <td><input type="checkbox" class="item-checkbox" value="{{alumno.pk}}"></td>
-                              <td class="text-body text-center">{{ alumno.matricula }} </td>
-                              <td class="text-body text-center">
-                                {{ alumno.first_name }} {{ alumno.last_name }} {{ alumno.second_last_name }}
-                              </td>
-                              <td class="text-body text-center">{{ alumno.email}} </td>
-                              {% comment %} <td class="text-body text-center">{{ alumno.correo_personal|default_if_none:"No registrado" }}</td> {% endcomment %}
-                              <td class="text-body text-center">{{ alumno.get_carrera_display }}</td>
-                              <td class="text-body text-center">{{ alumno.trimestre_ingreso }}</td>
-                              <td class="text-body text-center">{{ alumno.get_estado_display }}</td>
-                              <td class="text-center"><a class="text-body-bold text-primary" href="{% url 'editar-alumno' alumno.pk %}">Editar</a></td>
-                            </tr>
-                            {% endfor %}
-                          </tbody>
-                        </table>
-                      </div>
-                      <!--Fin de table-->
-                  </div>
+        <div class="col-lg-8 col-xl-10 w-100">
+          <div class="card border-top border-bottom border-4"
+               style="border-color: #F08200 !important">
+            <div class="card-body py-4 px-5">
+              <div class="d-flex w-100 align-items-center mb-4">
+                <div class="d-flex w-100 align-items-center min-w-100">
+                  <h3 class="text-primary text-title-bold">Tutorados de</h3>
+                  <h4 class="ms-3 text-title text-black">
+                    {% if tutor.sexo == 'F' %}
+                      Dra.
+                    {% else %}
+                      Dr.
+                    {% endif %}
+                    {{ tutor.first_name }} {{ tutor.last_name }}
+                    {% if tutor.second_last_name %}
+                      {{ tutor.second_last_name }}
+                    {% endif %}
+                  </h4>
+                </div>
+                <div style="width: 58em;
+                            display: flex;
+                            justify-content: center;
+                            /* min-width: 520px;
+                            */">
+                  <!-- Submit button -->
+                  <a onclick="submitSelected()"
+                     href="#"
+                     class="text-title text-center bg-primary rounded text-white py-2 px-2 me-3 w-auto">
+                    Generar carta(s) de notificación
+                  </a>
+                  <a href="{% url 'Reporte-create' tutor.pk %}"
+                     class="btn-small text-title text-center bg-primary rounded text-white py-2 px-2">
+                    Generar reporte de tutorados
+                  </a>
+                </div>
               </div>
-          </div>
-      </div>
-  </div>
-</section>
 
-<script>
+              <!--Inicio de table-->
+              <div class="table-responsive">
+                <table class="table table-striped table-hover datatable">
+                  <thead>
+                    <tr>
+                      <th>
+                        <input type="checkbox" name="sample" id="select-all" />
+                      </th>
+                      <th class="text-title h6 text-center">Matrícula</th>
+                      <th class="text-title h6 text-center">Nombre</th>
+                      <th class="text-title h6 text-center">Correo</th>
+                      {% comment %} <th class="text-title h6 text-center">Correo personal</th> {% endcomment %}
+                      <th class="text-title h6 text-center">Licenciatura</th>
+                      <th class="text-title h6 text-center">Trimestre ingreso</th>
+                      <th class="text-title h6 text-center">Estado</th>
+                      <th class="text-title h6 text-center">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for alumno in object_list %}
+                      <tr>
+                        <td>
+                          <input type="checkbox" class="item-checkbox" value="{{ alumno.pk }}">
+                        </td>
+                        <td class="text-body text-center">{{ alumno.matricula }}</td>
+                        <td class="text-body text-center">{{ alumno.first_name }} {{ alumno.last_name }} {{ alumno.second_last_name }}</td>
+                        <td class="text-body text-center">{{ alumno.email }}</td>
+                        {% comment %} <td class="text-body text-center">{{ alumno.correo_personal|default_if_none:"No registrado" }}</td> {% endcomment %}
+                        <td class="text-body text-center">{{ alumno.get_carrera_display }}</td>
+                        <td class="text-body text-center">{{ alumno.trimestre_ingreso }}</td>
+                        <td class="text-body text-center">{{ alumno.get_estado_display }}</td>
+                        <td class="text-center"><a class="text-body-bold text-primary"
+   href="{% url 'editar-alumno' alumno.pk %}">Editar</a></td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              <!--Fin de table-->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <script>
   const selectAllCheckbox = document.getElementById('select-all');
   const itemCheckboxes = document.querySelectorAll('.item-checkbox');
 
@@ -115,6 +117,6 @@
       // Redirect to Reporte2-create with selected student IDs
       window.location.href = `{% url 'Reporte2-create' tutor.pk %}?` + queryString;
   }
-</script>
+  </script>
 
 {% endblock %}

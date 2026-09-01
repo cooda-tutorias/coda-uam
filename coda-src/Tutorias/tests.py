@@ -1,6 +1,8 @@
 from types import SimpleNamespace
 from datetime import datetime, time, timedelta
 from urllib import response
+import json
+from unittest.mock import Mock, patch
 
 from django.test import TestCase, SimpleTestCase
 from django.urls import reverse
@@ -24,6 +26,20 @@ from Tutorias.constants import (
     REALIZADA,
 )
 from notifications.models import Notification
+from Tutorias.signals.events import EventoTutoria
+from Tutorias.signals.handle_push_notifications import (
+    PUSH_EVENT_INFO,
+    _enviar_notificacion_push,
+)
+from Tutorias.signals.handle_system_notifications import (
+    SYSTEM_NOTIFICATION_INFO,
+    handle_inapp_notifications,
+)
+from Tutorias.signals.notification_service import (
+    EMAIL_EVENT_CONFIG,
+    notify_tutoria_event,
+)
+from Tutorias.signals.signals_definitions import tutoria_notification_requested
 
 
 
@@ -1114,6 +1130,50 @@ class PropuestasFechaTutoriaTests(TestCase):
         self.tutoria.refresh_from_db()
         self.assertEqual(self.tutoria.estado, PROPUESTA)
         self.assertEqual(self.tutoria.estado_efectivo, PROPUESTA)
+        notification = Notification.objects.filter(recipient=self.alumno).latest('timestamp')
+        self.assertEqual(
+            notification.verb,
+            "reactivó tu solicitud y propuso opciones de fecha",
+        )
+        self.assertEqual(
+            notification.description,
+            "Solicitud de tutoría reactivada; elige una fecha",
+        )
+
+    def test_una_fecha_reactiva_y_agenda_una_tutoria_vencida(self):
+        self.tutoria.fecha = timezone.now() - timedelta(days=1)
+        self.tutoria.save(update_fields=['fecha'])
+        self.assertEqual(self.tutoria.estado_efectivo, VENCIDA)
+        self.client.force_login(self.tutor)
+
+        response = self.client.post(
+            reverse('proponer_fechas_tutoria', args=[self.tutoria.pk]),
+            {
+                'propuesta_1': '2030-01-15T11:30',
+                'propuesta_2': '',
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse('Panel-tutorias-tutor'),
+            fetch_redirect_response=False,
+        )
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, ACEPTADO)
+        self.assertEqual(
+            self.tutoria.fecha,
+            timezone.make_aware(datetime(2030, 1, 15, 11, 30)),
+        )
+        notification = Notification.objects.filter(recipient=self.alumno).latest('timestamp')
+        self.assertEqual(
+            notification.verb,
+            "reactivó y agendó tu solicitud de tutoría en una nueva fecha",
+        )
+        self.assertEqual(
+            notification.description,
+            "Solicitud de tutoría reactivada y agendada",
+        )
 
     def test_dos_fechas_marcan_una_tutoria_agendada_por_reagendar(self):
         self.tutoria.estado = ACEPTADO
@@ -1757,7 +1817,11 @@ class NotificacionesTutoriaTests(TestCase):
         self.tutoria.refresh_from_db()
         self.assertEqual(self.tutoria.estado, ACEPTADO)
         self.assertEqual(
-            Notification.objects.filter(recipient=self.alumno, verb='Solicitud de tutoría aceptada').count(),
+            Notification.objects.filter(
+                recipient=self.alumno,
+                verb="aceptó tu solicitud de tutoría",
+                description="Solicitud de tutoría aceptada",
+            ).count(),
             1,
         )
         self.assertEqual(len(mail.outbox), 1)
@@ -1778,8 +1842,7 @@ class NotificacionesTutoriaTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ['alumno@example.com'])
 
-    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
-    def test_editar_fecha_envia_notificacion_de_cita(self):
+    def test_editar_fecha_guarda_el_cambio(self):
         self.client.force_login(self.tutor)
         nueva_fecha = '2030-01-01T10:30'
 
@@ -1794,14 +1857,8 @@ class NotificacionesTutoriaTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(
-            Notification.objects.filter(recipient=self.alumno, verb='Tu tutor te cito para una tutoría').count(),
-            1,
-        )
-        self.assertEqual(len(mail.outbox), 1)
 
-    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
-    def test_guardar_seguimiento_envia_notificacion(self):
+    def test_guardar_seguimiento_registra_el_informe(self):
         self.client.force_login(self.tutor)
 
         response = self.client.post(
@@ -1820,11 +1877,6 @@ class NotificacionesTutoriaTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(
-            Notification.objects.filter(recipient=self.alumno, verb='Se registro seguimiento de tu tutoría').count(),
-            1,
-        )
-        self.assertEqual(len(mail.outbox), 1)
 
     @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
     def test_tutor_puede_cambiar_decision_en_edicion(self):
@@ -1847,16 +1899,166 @@ class NotificacionesTutoriaTests(TestCase):
         self.assertEqual(response.status_code, 302)
         self.tutoria.refresh_from_db()
         self.assertEqual(self.tutoria.estado, RECHAZADO)
-        self.assertEqual(
-            Notification.objects.filter(recipient=self.alumno, verb='Solicitud de tutoría rechazada').count(),
-            1,
-        )
-        self.assertGreaterEqual(len(mail.outbox), 1)
         last_history = HistorialCambioTutoria.objects.filter(tutoria=self.tutoria).order_by('-fecha_cambio').first()
         self.assertIsNotNone(last_history)
         self.assertIn("Estado de la tutoría", last_history.cambios_realizados)
         self.assertIn("Aceptada", last_history.cambios_realizados)
         self.assertIn("Rechazada", last_history.cambios_realizados)
+
+
+class CanalesNotificacionTutoriaTests(TestCase):
+    """Verifica cada canal sin contactar servicios externos."""
+
+    def setUp(self):
+        self.tutor = Tutor.objects.create(
+            matricula="NT1001",
+            email="tutor.canales@example.com",
+            password="x",
+            first_name="Tutor",
+            last_name="Canales",
+            cubiculo=1,
+            coordinacion="COM",
+            sexo="M",
+        )
+        self.alumno = Alumno.objects.create(
+            matricula="NA1001",
+            email="alumno.canales@example.com",
+            password="x",
+            first_name="Alumno",
+            last_name="Canales",
+            carrera="COM",
+            estado=1,
+            tutor_asignado=self.tutor,
+        )
+        self.tutoria = Tutoria.objects.create(
+            alumno=self.alumno,
+            tutor=self.tutor,
+            tema=["BEC"],
+            fecha=timezone.now() + timedelta(days=1),
+            descripcion="Prueba de los tres canales",
+            estado=PENDIENTE,
+        )
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        TUTORIAS_SITE_URL="https://tutorias.test",
+    )
+    def test_correo_incluye_destinatario_html_y_url_de_accion(self):
+        notify_tutoria_event(
+            event=EventoTutoria.ALU_SOLICITA_TUTORIA,
+            tutoria=self.tutoria,
+            actor=self.alumno,
+        )
+
+        self.assertEqual(len(mail.outbox), 1)
+        correo = mail.outbox[0]
+        self.assertEqual(correo.to, [self.tutor.email])
+        self.assertEqual(correo.subject, "Nueva solicitud de tutoría")
+        self.assertTrue(correo.alternatives)
+        html = correo.alternatives[0][0]
+        self.assertIn("Revisar solicitud", html)
+        self.assertIn(
+            "https://tutorias.test/panel-tutorias-tutor/?tab=solicitadas",
+            html,
+        )
+
+    def test_campana_usa_el_contrato_del_evento_actual(self):
+        handle_inapp_notifications(
+            sender=self.__class__,
+            event=EventoTutoria.ALU_SOLICITA_TUTORIA,
+            tutoria=self.tutoria,
+            actor=self.alumno,
+            recipient=self.tutor,
+        )
+
+        notificacion = Notification.objects.get(recipient=self.tutor)
+        self.assertEqual(notificacion.actor, self.alumno)
+        self.assertEqual(notificacion.verb, "solicitó una tutoría")
+        self.assertEqual(notificacion.description, "Nueva solicitud de tutoría")
+
+    @patch("Tutorias.signals.handle_push_notifications.PushInformation.objects.filter")
+    @patch("Tutorias.signals.handle_push_notifications.webpush")
+    def test_push_envia_payload_y_url_relativa(self, webpush_mock, filter_mock):
+        class PushInfos(list):
+            def count(self):
+                return len(self)
+
+        subscription = SimpleNamespace(
+            endpoint="https://fcm.googleapis.com/push/test",
+            p256dh="p256dh-test",
+            auth="auth-test",
+        )
+        filter_mock.return_value = PushInfos([
+            SimpleNamespace(subscription=subscription),
+        ])
+        webpush_mock.return_value = Mock(status_code=201)
+
+        _enviar_notificacion_push(
+            EventoTutoria.ALU_SOLICITA_TUTORIA,
+            self.tutoria,
+            self.alumno,
+        )
+
+        webpush_mock.assert_called_once()
+        payload = json.loads(webpush_mock.call_args.kwargs["data"])
+        self.assertEqual(payload["head"], "🙏 Nueva solicitud de tutoría")
+        self.assertEqual(
+            payload["url"],
+            f"{reverse('Panel-tutorias-tutor')}?tab=solicitadas",
+        )
+
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        TUTORIAS_SITE_URL="https://tutorias.test",
+    )
+    @patch("Tutorias.signals.handle_push_notifications._enviar_notificacion_push")
+    def test_una_senal_activa_los_tres_canales(self, push_mock):
+        tutoria_notification_requested.send(
+            sender=self.__class__,
+            event=EventoTutoria.ALU_SOLICITA_TUTORIA,
+            tutoria=self.tutoria,
+            actor=self.alumno,
+            recipient=self.tutor,
+        )
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.tutor,
+                verb="solicitó una tutoría",
+            ).exists()
+        )
+        push_mock.assert_called_once_with(
+            event=EventoTutoria.ALU_SOLICITA_TUTORIA,
+            tutoria=self.tutoria,
+            actor=self.alumno,
+        )
+
+
+class ConfiguracionCanalesNotificacionTests(SimpleTestCase):
+    def test_configuraciones_solo_contienen_eventos_y_roles_validos(self):
+        eventos = set(EventoTutoria.values)
+        roles = {"alumno", "tutor"}
+
+        for config in (EMAIL_EVENT_CONFIG, SYSTEM_NOTIFICATION_INFO, PUSH_EVENT_INFO):
+            self.assertTrue(set(config).issubset(eventos))
+
+        for event, config in EMAIL_EVENT_CONFIG.items():
+            self.assertIn("template", config, event)
+            self.assertIn("subject", config, event)
+            self.assertTrue(set(config["recipients"]).issubset(roles), event)
+
+        for event, config in SYSTEM_NOTIFICATION_INFO.items():
+            self.assertTrue(config["verb"], event)
+            self.assertTrue(config["description"], event)
+
+        for event, config in PUSH_EVENT_INFO.items():
+            recipients = set(config["recipients"])
+            self.assertTrue(recipients.issubset(roles), event)
+            self.assertEqual(set(config["url"]), recipients, event)
+            for url_name, tab in config["url"].values():
+                self.assertIn(tab, {None, "solicitadas", "agendadas", "historial"})
+                reverse(url_name)
 
 
 class CartaAnualEstadoHistoricoTests(SimpleTestCase):

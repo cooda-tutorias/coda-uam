@@ -1,62 +1,61 @@
 {% extends "Usuarios/HeaderAndFooterFachada.html" %}
 
-{% block title%}
-Tutoria rápida
+{% block title %}
+  Tutoría rápida
 {% endblock %}
 
 {% block body %}
-<body>
+  <body>
 
     <!--Formulario Solicitud tutoria-->
     <section id="section" style="background-color: #eee;">
-        <div class="container py-5 h-100">
-            <div class="row d-flex justify-content-center align-items-center h-100">
-                <div class="col-lg-8 col-xl-6">
-                    <div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
-                    
-                    {% load widget_tweaks%}
-                    <form method="post">{% csrf_token %}
-                        <div class="card-body p-5">
-                            <h3 class=" mb-5 text-primary">Registro de Tutoría</h3>
+      <div class="container py-5 h-100">
+        <div class="row d-flex justify-content-center align-items-center h-100">
+          <div class="col-lg-8 col-xl-6">
+            <div class="card border-top border-bottom border-4"
+                 style="border-color: #F08200 !important">
 
+              {% load widget_tweaks %}
+              <form method="post">
+                {% csrf_token %}
+                <div class="card-body p-5">
+                  <h3 class="mb-5 text-primary">Registro de tutoría</h3>
 
-                            <!-- Tema de la tutoria input -->
-                            <div class="form-outline mb-4">
-                                <!-- <input type="text" class="form-control" /> -->
-                                {% render_field form.tema class="form-select" id="tema" readonly="readonly"%}
-                                <label class="form-label" for="tema">Tema de la tutoria</label>
-                            </div>
+                  <!-- Tema de la tutoria input -->
+                  <div class="form-outline mb-4">
+                    <!-- <input type="text" class="form-control" /> -->
+                    {% render_field form.tema class="form-select" id="tema" readonly="readonly" %}
+                    <label class="form-label" for="tema">Tema de la tutoría</label>
+                  </div>
 
-                            
-
-                            <!-- Hora y Dia input-->
-                            <div class="row mb-4">
-                                <!-- Dia de tutoria  input-->
-                                <div class="col">
-                                    <div class="form-outline">
-                                        <!-- <input type="text" class="form-control" /> -->
-                                        {% render_field form.fecha class="form-select" id="fecha" readonly="readonly"%}
-                                        <label class="form-label" for="fecha">Fecha y Hora</label>
-                                    </div>
-                                </div>
-                                
-                            </div>
-
-                            <!-- Mensaje input -->
-                            <div class="form-group mb-4">
-                                
-                                {% render_field form.descripcion class="form-control" id="descripcion" rows="3" readonly="readonly"%}
-                                <label class="form-label" for="descripcion">Informacion sobre la Tutoria</label>
-                            </div>
-
-                            <!-- Submit button -->
-                            <button type="submit" value="Save" class="btn btn-primary btn-block mb-4">Registrar Tutoria</button>
-                        </div>
-                    </form>
+                  <!-- Hora y Dia input-->
+                  <div class="row mb-4">
+                    <!-- Dia de tutoria  input-->
+                    <div class="col">
+                      <div class="form-outline">
+                        <!-- <input type="text" class="form-control" /> -->
+                        {% render_field form.fecha class="form-select" id="fecha" readonly="readonly" %}
+                        <label class="form-label" for="fecha">Fecha y hora</label>
+                      </div>
                     </div>
+
+                  </div>
+
+                  <!-- Mensaje input -->
+                  <div class="form-group mb-4">
+
+                    {% render_field form.descripcion class="form-control" id="descripcion" rows="3" readonly="readonly" %}
+                    <label class="form-label" for="descripcion">Informacion sobre la tutoría</label>
+                  </div>
+
+                  <!-- Submit button -->
+                  <button type="submit" value="Save" class="btn btn-primary btn-block mb-4">Registrar tutoría</button>
                 </div>
+              </form>
             </div>
+          </div>
         </div>
+      </div>
     </section>
-</body>
+  </body>
 {% endblock %}

@@ -30,26 +30,26 @@ class ContextConRolesMixin:
         print(f"Debug: Context = {context}")
         return context
 
-class ContextNotificationsMixin:
+# class ContextNotificationsMixin:
 
-    def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
-        context = super().get_context_data(**kwargs)
-        user = Usuario.objects.get(pk=self.request.user.pk)
-        notifications_raw = user.notifications.unread()
-        unread_notifications = []
+#     def get_context_data(self, **kwargs: Any) -> dict[str, Any]:
+#         context = super().get_context_data(**kwargs)
+#         user = Usuario.objects.get(pk=self.request.user.pk)
+#         notifications_raw = user.notifications.unread()
+#         unread_notifications = []
 
-        for notification in notifications_raw:
-            notificacion_temp = {
-                "header": "Notificacion" if not notification.description else f"{notification.description}",
-                "text": f'{notification.verb} por {Usuario.objects.get(matricula=notification.actor).get_full_name()}',
-                "time": notification.timestamp
-            }
-            unread_notifications.append(notificacion_temp)
+#         for notification in notifications_raw:
+#             notificacion_temp = {
+#                 "header": "Notificacion" if not notification.description else f"{notification.description}",
+#                 "text": f'{Usuario.objects.get(matricula=notification.actor).get_full_name()} {notification.verb}',
+#                 "time": notification.timestamp
+#             }
+#             unread_notifications.append(notificacion_temp)
 
-        context["notificaciones_list"] = unread_notifications
-        return context
+#         context["notificaciones_list"] = unread_notifications
+#         return context
     
-class BaseAccessMixin(LoginRequiredMixin, ContextConRolesMixin, ContextNotificationsMixin):
+class BaseAccessMixin(LoginRequiredMixin, ContextConRolesMixin):
 
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         return super().get_context_data(**kwargs)

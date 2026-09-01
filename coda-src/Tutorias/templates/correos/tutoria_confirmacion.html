@@ -1,0 +1,15 @@
+{% extends "correos/base_notificacion.html" %}
+
+{% block contenido %}
+  <tr>
+    <td style="padding:14px 24px 20px">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #d7eadc;border-radius:8px">
+        <tr><td style="padding:11px 14px;font-size:14px;background:#edf8f0;color:#286238"><strong>Fecha confirmada:</strong> {{ fecha_actual }}</td></tr>
+        <tr><td style="padding:11px 14px;font-size:14px;border-top:1px solid #d7eadc"><strong>Alumno:</strong> {{ alumno_nombre }} · <a href="mailto:{{ alumno_email }}" style="color:#b25800">{{ alumno_email }}</a></td></tr>
+        <tr><td style="padding:11px 14px;font-size:14px;border-top:1px solid #d7eadc"><strong>Tutor:</strong> {{ tutor_nombre }} · <a href="mailto:{{ tutor_email }}" style="color:#b25800">{{ tutor_email }}</a></td></tr>
+        <tr><td style="padding:11px 14px;font-size:14px;border-top:1px solid #d7eadc"><strong>Tema(s):</strong> {{ temas }}</td></tr>
+        <tr><td style="padding:11px 14px;font-size:14px;border-top:1px solid #d7eadc"><strong>Descripción:</strong> {{ descripcion|default:"-" }}</td></tr>
+      </table>
+    </td>
+  </tr>
+{% endblock %}

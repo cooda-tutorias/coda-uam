@@ -1,130 +1,103 @@
-{% extends "Usuarios/HeaderAndFooterFachada.html"%}
-{% load widget_tweaks%}
+{% extends "Usuarios/HeaderAndFooterFachada.html" %}
+{% load widget_tweaks %}
 
-
-{% block title  %} Solicitar Tutoria {% endblock %}
+{% block title %}Solicitar tutoría{% endblock %}
 
 {% block body %}
-<!-- Estilos y Scripts de Flatpickr (CDN) -->
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/material_blue.css">
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
-<script src="https://npmcdn.com/flatpickr/dist/l10n/es.js"></script>
+  <!-- Estilos y Scripts de Flatpickr (CDN) -->
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/material_blue.css">
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://npmcdn.com/flatpickr/dist/l10n/es.js"></script>
 
-<!--Formulario Solicitud tutoria-->
-<section id="section" style="background-color: #eee;">
+  <!--Formulario Solicitud tutoria-->
+  <section id="section" style="background-color: #eee;">
     <div class="container py-5 h-100">
-        <div class="row d-flex justify-content-center align-items-center h-100">
-            <div class="col-lg-8 col-xl-6">
-                <div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
-                    <form method="post">{% csrf_token %}
-                        <div class="card-body py-4 px-4 text-body">
+      <div class="row d-flex justify-content-center align-items-center h-100">
+        <div class="col-lg-8 col-xl-6">
+          <div class="card border-top border-bottom border-4"
+               style="border-color: #F08200 !important">
+            <form method="post">
+              {% csrf_token %}
+              <div class="card-body py-4 px-4 text-body">
 
-                            <!-- Mensaje contextual según rol -->
-                            {% include 'Tutorias/includes/alerta.html' %}
+                <!-- Mensaje contextual según rol -->
+                {% include 'Tutorias/includes/alerta.html' %}
 
-                            <h3 class="mb-4 text-primary text-title-bold">
-                                {{ titulo_formulario|default:"Solicitud de tutoría" }}
-                            </h3>
+                <h3 class="mb-4 text-primary text-title-bold">{{ titulo_formulario|default:"Solicitud de tutoría" }}</h3>
 
-                            <!-- Bloque general de errores del formulario -->
-                            {% if request.method == "POST" and form.non_field_errors %}
-                            <div class="alert alert-danger mb-4">
-                                {{ form.non_field_errors }}
-                            </div>
-                            {% endif %}
+                <!-- Bloque general de errores del formulario -->
+                {% if request.method == "POST" and form.non_field_errors %}
+                  <div class="alert alert-danger mb-4">{{ form.non_field_errors }}</div>
+                {% endif %}
 
-                            <!-- Tema(s) de la tutoría  -->
-                            <div
-                                class="form-group mb-4 {% if form.tema.errors %}border border-danger rounded p-2{% endif %}">
-                                <label class="mb-2 text-body-bold text-muted">Tema(s):</label>
-                                <p class="text-muted">Selecciona al menos un tema para tratar.</p>
-                                <div class="row">
-                                    {% for checkbox in form.tema %}
-                                    <div class="col-6 mb-2">
-                                        <label class="form-check-label">
-                                            {{ checkbox.tag }} {{ checkbox.choice_label }}
-                                        </label>
-                                    </div>
-                                    {% endfor %}
-                                </div>
+                <!-- Tema(s) de la tutoría  -->
+                <div class="form-group mb-4 {% if form.tema.errors %}border border-danger rounded p-2{% endif %}">
+                  <label class="mb-2 text-body-bold text-muted">Tema(s):</label>
+                  <p class="text-muted">Selecciona al menos un tema para tratar.</p>
+                  <div class="row">
+                    {% for checkbox in form.tema %}
+                      <div class="col-6 mb-2">
+                        <label class="form-check-label">{{ checkbox.tag }} {{ checkbox.choice_label }}</label>
+                      </div>
+                    {% endfor %}
+                  </div>
 
-                                <!-- Error de selección de tema -->
-                                {% if request.method == "POST" and form.tema.errors %}
-                                <div class="text-danger small mt-2">
-                                    {{ form.tema.errors.as_text|linebreaksbr }}
-                                </div>
-                                {% endif %}
-                            </div>
-
-                            <!-- Campo “Otro (especificar)” -->
-                            <div id="otro-campo-container"
-                                class="form-group mb-4 {% if form.otro_tema.errors %}border border-danger rounded p-2{% endif %}"
-                                style="display: none;">
-                                <label for="id_otro_tema" class="form-label">Especifica el tema:</label>
-                                {% render_field form.otro_tema class="form-control" id="id_otro_tema"
-                                placeholder="Describe el tema..." %}
-                                {% if request.method == "POST" and form.otro_tema.errors %}
-                                <div class="text-danger small mt-2">
-                                    {{ form.otro_tema.errors.as_text|linebreaksbr }}
-                                </div>
-                                {% endif %}
-                            </div>
-
-                            <!-- Descripción -->
-                            <div
-                                class="form-group mb-4 {% if form.descripcion.errors %}border border-danger rounded p-2{% endif %}">
-                                {% render_field form.descripcion class="form-control" id="descripcion" rows="3" %}
-                                <label class="form-label" for="descripcion">{{ info_adicional|default:"Información adicional." }}</label>
-                                {% if form.descripcion.errors %}
-                                <div class="text-danger small mt-2">
-                                    {{ form.descripcion.errors.as_text|linebreaksbr }}
-                                </div>
-                                {% endif %}
-                            </div>
-
-
-                            <!-- Campos ocultos para guardar selección -->
-                            <input type="hidden" id="id_horario_tutor" name="horario_tutor">
-                            <input type="hidden" id="id_fecha_seleccionada" name="fecha_seleccionada">
-                            <input type="hidden" id="id_franja_seleccionada" name="franja_seleccionada">
-                            <input type="hidden" id="id_fecha_sugerida" name="fecha_sugerida">
-
-                            <!-- Botón que abre el modal -->
-                            <button type="button" id="btnAbrirModalCita" class="btn btn-outline-primary">
-                                Elegir fecha cita...
-                            </button>
-
-                            {% comment %} 
-                            <!-- Botón que abre el modal -->
-                            <button type="button" id="btnAbrirModalCita" class="btn btn-outline-primary"
-                                data-bs-toggle="modal" data-bs-target="#modalAgendarCita">
-                                Elegir fecha cita...
-                            </button>
-                             {% endcomment %}
-
-                            <!-- AQUÍ INSERTA EL RESUMEN -->
-                            <div class="alert alert-info mt-3" id="resumenCita">
-                                No has seleccionado fecha aún.
-                            </div>
-
-                            <!-- Botón de envío -->
-                            <button type="submit" class="btn btn-primary btn-block mb-4 text-title">
-                                {{ texto_boton|default:"Enviar" }}
-                            </button>
-                        </div>
-                    </form>
+                  <!-- Error de selección de tema -->
+                  {% if request.method == "POST" and form.tema.errors %}
+                    <div class="text-danger small mt-2">{{ form.tema.errors.as_text|linebreaksbr }}</div>
+                  {% endif %}
                 </div>
-            </div>
+
+                <!-- Campo “Otro (especificar)” -->
+                <div id="otro-campo-container"
+                     class="form-group mb-4 {% if form.otro_tema.errors %}border border-danger rounded p-2{% endif %}"
+                     style="display: none">
+                  <label for="id_otro_tema" class="form-label">Especifica el tema:</label>
+                  {% render_field form.otro_tema class="form-control" id="id_otro_tema" placeholder="Describe el tema..." %}
+                  {% if request.method == "POST" and form.otro_tema.errors %}
+                    <div class="text-danger small mt-2">{{ form.otro_tema.errors.as_text|linebreaksbr }}</div>
+                  {% endif %}
+                </div>
+
+                <!-- Descripción -->
+                <div class="form-group mb-4 {% if form.descripcion.errors %}border border-danger rounded p-2{% endif %}">
+                  {% render_field form.descripcion class="form-control" id="descripcion" rows="3" %}
+                  <label class="form-label" for="descripcion">{{ info_adicional|default:"Información adicional." }}</label>
+                  {% if form.descripcion.errors %}
+                    <div class="text-danger small mt-2">{{ form.descripcion.errors.as_text|linebreaksbr }}</div>
+                  {% endif %}
+                </div>
+
+                <!-- Campos ocultos para guardar selección -->
+                <input type="hidden" id="id_horario_tutor" name="horario_tutor">
+                <input type="hidden" id="id_fecha_seleccionada" name="fecha_seleccionada">
+                <input type="hidden" id="id_franja_seleccionada" name="franja_seleccionada">
+                <input type="hidden" id="id_fecha_sugerida" name="fecha_sugerida">
+
+                <!-- Botón que abre el modal -->
+                <button type="button" id="btnAbrirModalCita" class="btn btn-outline-primary">Elegir fecha cita...</button>
+
+                <!-- AQUÍ INSERTA EL RESUMEN -->
+                <div class="alert alert-info mt-3" id="resumenCita">No has seleccionado fecha aún.</div>
+
+                <!-- Botón de envío -->
+                <button type="submit" class="btn btn-primary btn-block mb-4 text-title">{{ texto_boton|default:"Enviar" }}</button>
+              </div>
+            </form>
+          </div>
         </div>
+      </div>
     </div>
-</section>
+  </section>
 
-<!-- MODAL INCLUIDO -->
- {% include "Tutorias/_modal_agendar_cita.html" %}
+  <!-- MODAL INCLUIDO -->
+  {% include "Tutorias/_modal_agendar_cita.html" %}
 
-<!-- Script: mostrar/ocultar campo "Otro" -->
-<script>
+  <!-- Script: mostrar/ocultar campo "Otro" -->
+  <script>
   document.addEventListener("DOMContentLoaded", function () {
     const checkboxes = document.querySelectorAll('input[type="checkbox"]');
     const otroCampo = document.getElementById("otro-campo-container");
@@ -144,10 +117,10 @@
     verificarOtro();
     checkboxes.forEach(cb => cb.addEventListener("change", verificarOtro));
   });
-</script>
+  </script>
 
-<!-- Script 2: Manejo de Flatpickr + Modal de citas de 30 min -->
-<script>
+  <!-- Script 2: Manejo de Flatpickr + Modal de citas de 30 min -->
+  <script>
 document.addEventListener("DOMContentLoaded", function () {
     const btnAbrirModal = document.getElementById("btnAbrirModalCita");
     const campoSlotHidden = document.getElementById("id_horario_tutor");
@@ -368,9 +341,9 @@ document.addEventListener("DOMContentLoaded", function () {
         });
     }
 });
-</script>
+  </script>
 
-<style>
+  <style>
 /* =========================================================
    1. ENCABEZADO DEL CALENDARIO (Flatpickr)
    ========================================================= */
@@ -441,9 +414,9 @@ span.flatpickr-weekday {
     color: #ffffff !important;
     box-shadow: 0 2px 6px rgba(240, 130, 0, 0.35);
 }
-</style>
+  </style>
 
-{% comment %} 
+  {% comment %} 
 <!-- Script: manejar modal para seleccionar cita de horario disponible o sugerir fecha  -->
 <script>
 document.addEventListener("DOMContentLoaded", function () {
@@ -617,10 +590,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
 });
 </script>
-{% endcomment %}
+  {% endcomment %}
 
 {% endblock %}
-
 
 {% comment %} 
 <!-- Cambié mucho la funcionalidad por eso reemplacé todo el código de abajo. -->    
@@ -636,7 +608,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 });
             });
         });
-    </script>
+</script>
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {

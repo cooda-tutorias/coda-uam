@@ -1,8 +1,8 @@
-<h1>Tutorias</h1>
+<h1>Tutorías</h1>
 <ul>
-{% for tutoria in object_list %}
-    <li>{{tutoria.alumno.first_name}} {{tutoria.alumno.last_name}} {{ tutoria.alumno.second_last_name }} {{ tutoria.get_tema_display |join:", "  }} - {{ tutoria.fecha }} </li>
-{% empty %}
-    <li>Tutorias sin entradas.</li>
-{% endfor %}
+  {% for tutoria in object_list %}
+    <li>{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }} {{ tutoria.get_tema_display |join:", " }} - {{ tutoria.fecha }} </li>
+  {% empty %}
+    <li>Tutorías sin entradas.</li>
+  {% endfor %}
 </ul>

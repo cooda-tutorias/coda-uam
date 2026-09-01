@@ -1,4 +1,5 @@
 import os
+import json
 from django.conf import settings  # ✅ Asegurar que está importado
 from typing import Any, Dict
 from django.shortcuts import get_object_or_404
@@ -15,6 +16,7 @@ from django.views.generic import TemplateView, DeleteView, UpdateView
 from .models import Usuario, Tutor, Alumno, Coda, Cordinador
 from django.shortcuts import redirect
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
 from django.urls import reverse_lazy, reverse
 from django.views.generic.edit import FormView
 from .forms import FormVerAlumnos, ImportAlumnosForm
@@ -48,6 +50,91 @@ from PIL import Image, ImageDraw, ImageFont
 from .models import HorarioTutor
 from .forms import HorarioTutorForm
 from django.db import transaction
+
+from webpush.models import PushInformation, SubscriptionInfo
+
+class SettingsTutorView(BaseAccessMixin, TemplateView):
+    template_name = "Usuarios/configuraciones.html"  
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Pasamos el usuario al contexto para que funcione {{ usuario.first_name }}
+        context['usuario'] = self.request.user 
+        
+             
+        # Aquí se pasa la llave pública VAPID de WebPush
+        context['vapid_public_key'] = settings.WEBPUSH_SETTINGS['VAPID_PUBLIC_KEY']
+
+        # Verificamos si el usuario ya existe en la BD de Push
+        # Esto devuelve True o False
+        context['is_push_active'] = PushInformation.objects.filter(user=self.request.user).exists() 
+               
+        return context
+
+
+@require_POST
+@login_required
+def save_information(request):
+    try:
+        data = json.loads(request.body)
+        status_type = data.get('status_type')
+        
+        sub_data = data.get('subscription', {})
+        endpoint = sub_data.get('endpoint')
+        keys = sub_data.get('keys', {})
+        auth_key = keys.get('auth')
+        p256dh_key = keys.get('p256dh')
+        browser = data.get('browser', 'Chrome')
+
+        if not endpoint:
+            return JsonResponse({'error': 'No endpoint provided'}, status=400)
+
+        # CASO 1: DESUSCRIBIR
+        if status_type == 'unsubscribe':
+            count, _ = PushInformation.objects.filter(
+                user=request.user,
+                subscription__endpoint=endpoint
+            ).delete()
+            
+            # Opcional: Limpiar huérfanos
+            SubscriptionInfo.objects.filter(endpoint=endpoint).delete()
+            
+            print(f"✅ Suscripción eliminada para: {request.user}")
+            return HttpResponse(status=200)
+
+        # CASO 2: SUSCRIBIR
+        elif status_type == 'subscribe':
+            # Paso A: Guardamos los datos técnicos (Aquí SÍ va el browser)
+            subscription_obj, created = SubscriptionInfo.objects.update_or_create(
+                endpoint=endpoint,
+                defaults={
+                    'auth': auth_key,
+                    'p256dh': p256dh_key,
+                    'browser': browser 
+                }
+            )
+
+            # Paso B: Vinculamos al usuario (Aquí NO va el browser)
+            # PushInformation solo necesita User y Subscription
+            PushInformation.objects.get_or_create(
+                user=request.user,
+                subscription=subscription_obj,
+                defaults={
+                    'group': None 
+                }
+            )
+            
+            print(f"✅ Suscripción guardada correctamente para: {request.user}")
+            return HttpResponse(status=201)
+
+        else:
+            return JsonResponse({'error': 'Invalid status_type'}, status=400)
+
+    except Exception as e:
+        print(f"💥 Error en save_information: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return HttpResponse(status=500)
 
 
 class HorariosTutorView(BaseAccessMixin, View):
@@ -557,13 +644,13 @@ class ImportAlumnosView(CodaViewMixin, FormView):
                         print("sexo :",sexo)
                         print("tutor_id :",tutor_id)
                         print("trimestre_ingreso :",trimestre_ingreso)
-                        warnings.append(f"Alumno {matricula}: Datos obligatorios faltantes. Asegúrese de que todos los campos obligatorios de información estén presentes.")
+                        warnings.append(f"Alumno {matricula}: faltan datos obligatorios. Asegúrese de que todos los campos obligatorios de información estén presentes.")
                         continue  # Skip to the next student
 
                     # Find assigned tutor
                     tutor_asignado = Tutor.objects.filter(matricula=tutor_id).first()
                     if not tutor_asignado:
-                        warnings.append(f"Alumno {matricula}: Tutor con número económico {tutor_id} no encontrado. Aseegúrese de que el tutor esté registrado en el sistema.")
+                        warnings.append(f"Alumno {matricula}: Tutor con número económico {tutor_id} no encontrado. Asegúrese de que el tutor esté registrado en el sistema.")
                         continue
 
                     # Generate password (increment each digit of matricula by 1)
