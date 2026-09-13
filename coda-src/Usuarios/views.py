@@ -47,7 +47,6 @@ import base64
 from io import BytesIO
 from django.views import View
 from django.http import Http404
-from PIL import Image, ImageDraw, ImageFont
 
 from .models import HorarioTutor, PushDevice
 from .forms import HorarioTutorForm
@@ -429,94 +428,15 @@ class VerQRView(BaseAccessMixin, View):
         if not user.is_tutor:
             raise Http404("Solo los tutores pueden ver su QR.")
 
-        # URL destino del QR
-        url_qr = request.build_absolute_uri(
-            reverse("tutoria_insitu", kwargs={"tutor_pk": user.pk}) ##reverse("tutoria_insitu", args=[tutor_pk])
-        )
+        from .services.qr_tutor import generar_qr_tutor
+        url_qr, qr_img = generar_qr_tutor(request, user)
 
-        # Generar QR
-        qr = qrcode.QRCode(box_size=20, border=4)
-        qr.add_data(url_qr)
-        qr.make(fit=True)
-        qr_img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
-
-        qr_width, qr_height = qr_img.size
-
-        #  DISEÑO INSTITUCIONAL 
-
-        # Barra institucional
-        banner_height = 120
-        total_height = banner_height + qr_height + 50  # espacio extra abajo
-
-        final_img = Image.new("RGB", (qr_width, total_height), "white")
-        draw = ImageDraw.Draw(final_img)
-
-        # Barra superior
-        draw.rectangle([(0, 0), (qr_width, banner_height)], fill="#F08200")
-
-        # Cargar fuente Montserrat
-        font_path = os.path.join(
-            settings.BASE_DIR,
-            "Usuarios/static/fonts/Montserrat-Regular.ttf"
-        )
-
-        # ========================================
-        # Calcular ancho necesario para texto
-        # ========================================
-
-        # ========================================
-        # Texto en dos líneas
-        # ========================================
-
-        line1 = "Tutorías DCNI"
-        line2 = f"{user.first_name} {user.last_name}"
-
-        # Cargar fuente
-        try:
-            font = ImageFont.truetype(font_path, 52)
-        except:
-            font = ImageFont.load_default()
-
-        # Medir líneas
-        line1_w, line1_h = draw.textsize(line1, font=font)
-        line2_w, line2_h = draw.textsize(line2, font=font)
-
-        side_margin = 80
-
-        # Nuevo ancho: lo suficiente para el texto más largo
-        final_width = max(qr_width, line1_w + side_margin, line2_w + side_margin)
-
-        # Alturas
-        banner_height = line1_h + line2_h + 50
-        spacing_between_lines = 10  # espacio vertical entre línea 1 y línea 2
-
-        total_height = banner_height + qr_height + 50
-
-        # Crear imagen final
-        final_img = Image.new("RGB", (final_width, total_height), "white")
-        draw = ImageDraw.Draw(final_img)
-
-        # Barra superior
-        draw.rectangle([(0, 0), (final_width, banner_height)], fill="#F08200")
-
-        # Posiciones centradas
-        line1_x = (final_width - line1_w) // 2
-        line2_x = (final_width - line2_w) // 2
-
-        # Punto vertical de inicio
-        start_y = 20
-
-        # Dibujar texto centrado
-        draw.text((line1_x, start_y), line1, fill="white", font=font)
-        draw.text((line2_x, start_y + line1_h + spacing_between_lines), line2, fill="white", font=font)
-
-        # Centrar QR
-        qr_x = (final_width - qr_width) // 2
-        final_img.paste(qr_img, (qr_x, banner_height + 20))
+        from .services.tarjeta_qr import generar_tarjeta_qr
+        final_img = generar_tarjeta_qr(user.tutor, qr_img)
 
         # Exportar imagen como base64
         buffer = BytesIO()
-        final_img.save(buffer, format="PNG")
+        final_img.save(buffer, format="PNG", dpi=(300, 300))
         buffer.seek(0)
         img_base64 = base64.b64encode(buffer.getvalue()).decode()
 
@@ -574,8 +494,37 @@ class PerfilTutorView(BaseAccessMixin, DetailView):
 
         # 2. Pasar el resultado booleano al contexto
         context['user_es_tutor'] = user_es_tutor
+        context['puede_editar_perfil'] = self.puede_editar_perfil()
+        if context['puede_editar_perfil'] and 'form' not in context:
+            context['form'] = userForms.PerfilTutorForm(instance=self.object.tutor)
+        if context['puede_editar_perfil']:
+            original = userForms.PerfilTutorForm(instance=self.object.tutor)
+            for nombre in ('foto', 'cubiculo'):
+                formulario = context['form'] if nombre in context['form'].fields else original
+                context[f'{nombre}_field'] = formulario[nombre]
 
         return context
+
+    def puede_editar_perfil(self):
+        return self.request.user.has_role(TUTOR) and self.request.user.pk == self.object.pk
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if not self.puede_editar_perfil():
+            raise PermissionDenied
+        form = userForms.PerfilTutorForm(
+            request.POST, request.FILES, instance=self.object.tutor,
+        )
+        campo = request.POST.get('campo')
+        if campo in ('foto', 'cubiculo'):
+            for nombre in list(form.fields):
+                if nombre != campo:
+                    del form.fields[nombre]
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Tu perfil se actualizó correctamente.")
+            return redirect('perfil-tutor', pk=self.object.pk)
+        return self.render_to_response(self.get_context_data(form=form))
 
 class PerfilCodaView(BaseAccessMixin, DetailView):
     model = Usuario

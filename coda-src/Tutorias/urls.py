@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path("tutores/imprimir-qr/", views.imprimir_qr_tutores, name="imprimir-qr-tutores"),
     #path('', views.index, name='index'),
     # path("vertutorias/", views.ver_tutorias),
     # path("editartutoria/", views.editar_tutoria),

@@ -8,6 +8,30 @@ from .constants import ALUMNO, TUTOR, COORDINADOR, CODA, CARRERAS, ESTADOS_ALUMN
 from django.contrib.auth.forms import UserCreationForm
 
 
+class PerfilTutorForm(forms.ModelForm):
+    """Datos que un tutor puede modificar en su propio perfil."""
+
+    class Meta:
+        model = Tutor
+        fields = ["cubiculo", "foto"]
+        widgets = {
+            "cubiculo": forms.TextInput(attrs={"class": "form-control"}),
+            "foto": forms.FileInput(attrs={
+                "class": "form-control", "accept": "image/jpeg,image/png,image/webp",
+            }),
+        }
+        help_texts = {"foto": "Opcional. JPG, PNG o WebP, máximo 5 MB."}
+
+    def clean_foto(self):
+        foto = self.cleaned_data.get("foto")
+        if foto and "foto" in self.files:
+            if foto.size > 5 * 1024 * 1024:
+                raise forms.ValidationError("La imagen no debe superar los 5 MB.")
+            if foto.image.format not in {"JPEG", "PNG", "WEBP"}:
+                raise forms.ValidationError("Selecciona una imagen JPG, PNG o WebP.")
+        return foto
+
+
 class HorarioTutorForm(forms.ModelForm):
     """Formulario para crear o actualizar un horario de tutor."""
     class Meta:

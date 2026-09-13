@@ -1,60 +1,123 @@
-{% extends "Usuarios/perfil_base.html"%}
+{% extends "Usuarios/perfil_base.html" %}
 
-{% block title  %} Perfil Tutor {% endblock %}
+{% block title %}Perfil Tutor{% endblock %}
 
 {% block perfil %}
-<div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
-<div class="row g-0">
-  <div class="col-md-4 gradient-custom text-center my-4"
-    style="border-top-left-radius: .5rem; border-bottom-left-radius: .5rem;">
-    {% load static %}
-    <!-- <img src="https://mdbcdn.b-cdn.net/img/new/avatars/2.webp" alt="" class="img-fluid shadow-2-strong mt-4 mb-2"
+  <style>
+    .perfil-edit-button { color: #6c757d; line-height: 1; }
+    .perfil-edit-button:hover, .perfil-edit-button:focus { color: #F08200; }
+    #editar-cubiculo input[name="cubiculo"] { width: 12rem; min-width: 0; }
+  </style>
+  <div class="card border-top border-bottom border-4"
+       style="border-color: #F08200 !important">
+    <div class="row g-0">
+      <div class="col-md-4 gradient-custom text-center my-4"
+           style="border-top-left-radius: .5rem;
+                  border-bottom-left-radius: .5rem">
+        {% load static %}
+        <!-- <img src="https://mdbcdn.b-cdn.net/img/new/avatars/2.webp" alt="" class="img-fluid shadow-2-strong mt-4 mb-2"
       style="width: 150px; height: 150px; object-fit: cover; z-index: 1" /> -->
-      <img 
-        src="{% static 'Alumnos/img/user.png'%}"
-        alt="" class="img-fluid shadow-2-strong mt-4 mb-2"
-        style="width: 150px; height: 150px; object-fit: cover; z-index: 1"
-       />
-    <h5 class="text-black">{{ usuario.first_name }}</h5>
-    <h5 class="text-black">{{ usuario.last_name }} {{ usuario.second_last_name}}</h5>
-    <!-- <a href="#!"><i class="far fa-edit fa-lg"></i></a> -->
-  </div>
-  <div class="col-md-8">
-    <div class="card-body p-4 w-100">
-      {% if user_es_tutor %}
-      <h5>Datos Personales</h5>
-      {% elif usuario.sexo == 'F' %}
-      <h5>Datos de la tutora</h5>
-      {% else %}
-      <h5>Datos del tutor</h5>
-      {% endif %}
-      <hr class="mt-0 mb-4">
-      <div class="row pt-1 w-100">
-        <div class="col-6 mb-3 w-100">
-          <h6>Correo institucional</h6>
-          <p class="text-muted">{{ usuario.email }}</p>
-        </div>
+        <img src="{% if usuario.foto %}{{ usuario.foto.url }}{% else %}{% static 'Alumnos/img/user.png' %}{% endif %}"
+             alt="Foto de perfil de {{ usuario.first_name }}"
+             class="img-fluid shadow-2-strong mt-4 mb-2"
+             style="width: 150px;
+                    height: 150px;
+                    object-fit: cover;
+                    z-index: 1" />
+        {% if puede_editar_perfil %}
+                <button type="button" class="btn btn-link btn-sm p-0 perfil-edit-button"
+                        data-bs-toggle="collapse" data-bs-target="#editar-foto"
+                        aria-expanded="{% if foto_field.errors %}true{% else %}false{% endif %}"
+                        aria-controls="editar-foto" aria-label="Editar foto de perfil" title="Editar foto de perfil">
+                  <i class="bi bi-pencil" aria-hidden="true"></i>
+                </button>
+                <form id="editar-foto" class="collapse mt-2{% if foto_field.errors %} show{% endif %}"
+                      method="post" enctype="multipart/form-data">
+                  {% csrf_token %}
+                  <input type="hidden" name="campo" value="foto">
+                  {{ form.non_field_errors }}
+                  {{ foto_field.label_tag }}
+                  {{ foto_field }}
+                  {% if foto_field.help_text %}<div class="form-text">{{ foto_field.help_text }}</div>{% endif %}
+                  {{ foto_field.errors }}
+                  <div class="mt-2">
+                    <button type="submit" class="btn btn-primary btn-sm">Guardar</button>
+                    <button type="button" class="btn btn-link btn-sm" data-bs-toggle="collapse"
+                            data-bs-target="#editar-foto">Cancelar</button>
+                  </div>
+                </form>
+              {% endif %}
+        <h5 class="text-black">{{ usuario.first_name }}</h5>
+        <h5 class="text-black">{{ usuario.last_name }} {{ usuario.second_last_name }}</h5>
+        <!-- <a href="#!"><i class="far fa-edit fa-lg"></i></a> -->
+      </div>
+      <div class="col-md-8">
+        <div class="card-body p-4 w-100">
+          {% if user_es_tutor %}
+            <h5>Datos Personales</h5>
+          {% elif usuario.sexo == 'F' %}
+            <h5>Datos de la tutora</h5>
+          {% else %}
+            <h5>Datos del tutor</h5>
+          {% endif %}
+          <hr class="mt-0 mb-4">
+          <div class="row pt-1 w-100">
+            <div class="col-6 mb-3 w-100">
+              <h6>Correo institucional</h6>
+              <p class="text-muted">{{ usuario.email }}</p>
+            </div>
 
-        <div class="mb-3">
-          <h6>Oficina</h6>
-          <p class="text-muted">{{ usuario.tutor.cubiculo }}</p>
-        </div>
+            <div class="mb-3">
+              <h6>Oficina</h6>
+              <div id="cubiculo-lectura"{% if cubiculo_field.errors %} hidden{% endif %}>
+                <span class="text-muted">{{ usuario.tutor.cubiculo }}</span>
+                {% if puede_editar_perfil %}
+                  <button type="button" id="editar-cubiculo-button"
+                          class="btn btn-link btn-sm p-0 perfil-edit-button"
+                          aria-controls="editar-cubiculo" aria-label="Editar cubículo" title="Editar cubículo">
+                    <i class="bi bi-pencil" aria-hidden="true"></i>
+                  </button>
+                {% endif %}
+              </div>
+              {% if puede_editar_perfil %}
+                <form id="editar-cubiculo" method="post"
+                      data-original="{{ usuario.tutor.cubiculo|default_if_none:'' }}"{% if not cubiculo_field.errors %} hidden{% endif %}>
+                  {% csrf_token %}
+                  <input type="hidden" name="campo" value="cubiculo">
+                  <label for="{{ cubiculo_field.id_for_label }}" class="visually-hidden">Oficina</label>
+                  <div class="d-flex align-items-center gap-2">
+                    {{ cubiculo_field }}
+                    <button type="submit" class="btn btn-primary btn-sm" aria-label="Guardar cubículo" title="Guardar">
+                      <i class="bi bi-check-lg" aria-hidden="true"></i>
+                    </button>
+                    <button type="button" id="cancelar-cubiculo" class="btn btn-link btn-sm text-secondary"
+                            aria-label="Cancelar edición de cubículo" title="Cancelar">
+                      <i class="bi bi-x-lg" aria-hidden="true"></i>
+                    </button>
+                  </div>
+                  <div id="cubiculo-errores" role="alert">{{ form.non_field_errors }}{{ cubiculo_field.errors }}</div>
+                </form>
+              {% endif %}
+            </div>
 
-        {% if user_es_tutor %}
-        <div class="mb-3">
-          <h6>Número económico</h6>
-          <p class="text-muted">{{ usuario.tutor.matricula }}</p>
-        </div>
-        {% endif %}
+            {% if user_es_tutor %}
+              <div class="mb-3">
+                <h6>Número económico</h6>
+                <p class="text-muted">{{ usuario.tutor.matricula }}</p>
+              </div>
+            {% endif %}
 
-        <div class="mb-3">
-          <h6>Departamento</h6>
-          <p class="text-muted">{{ usuario.tutor.departamento_adscripcion }}</p>
+            <div class="mb-3">
+              <h6>Departamento</h6>
+              <p class="text-muted">{{ usuario.tutor.departamento_adscripcion }}</p>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
   </div>
-</div>
-</div>
+  {% if puede_editar_perfil %}
+    <script src="{% static 'js/perfil_tutor.js' %}" defer></script>
+  {% endif %}
 {% endblock %}
-        

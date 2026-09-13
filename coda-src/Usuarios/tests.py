@@ -41,6 +41,69 @@ from Usuarios.services.importacion_tutores import (
 Usuario = get_user_model()
 
 
+class PerfilTutorEdicionTests(TestCase):
+    def setUp(self):
+        self.media = tempfile.TemporaryDirectory()
+        self.addCleanup(self.media.cleanup)
+        self.settings_override = override_settings(MEDIA_ROOT=self.media.name)
+        self.settings_override.enable()
+        self.addCleanup(self.settings_override.disable)
+        self.tutor = Tutor.objects.create_user(
+            email="perfil@cua.uam.mx", matricula="12345", cubiculo="A-101",
+        )
+        self.url = reverse("perfil-tutor", kwargs={"pk": self.tutor.pk})
+
+    def test_tutor_edita_solo_campos_permitidos_y_conserva_foto(self):
+        self.client.force_login(self.tutor)
+        from PIL import Image
+        imagen = BytesIO()
+        Image.new("RGB", (10, 10)).save(imagen, format="PNG")
+        response = self.client.post(self.url, {
+            "cubiculo": "B-202", "email": "otro@cua.uam.mx",
+            "foto": SimpleUploadedFile("perfil.png", imagen.getvalue(), content_type="image/png"),
+        }, secure=True)
+        self.assertEqual(response.status_code, 302)
+        self.tutor.refresh_from_db()
+        self.assertEqual(self.tutor.cubiculo, "B-202")
+        self.assertEqual(self.tutor.email, "perfil@cua.uam.mx")
+        foto = self.tutor.foto.name
+        self.assertTrue(foto)
+        response = self.client.get(self.url, secure=True)
+        self.assertContains(response, 'aria-label="Editar cubículo"')
+        self.assertContains(response, self.tutor.foto.url)
+        self.client.post(self.url, {"cubiculo": "C-303"}, secure=True)
+        self.tutor.refresh_from_db()
+        self.assertEqual(self.tutor.foto.name, foto)
+
+    def test_otros_usuarios_solo_pueden_consultar(self):
+        for rol in (ALUMNO, TUTOR, COORDINADOR, CODA):
+            with self.subTest(rol=rol):
+                visitante = Usuario.objects.create_user(
+                    email=f"{rol}@cua.uam.mx", matricula=rol, rol=[rol],
+                )
+                self.client.force_login(visitante)
+                response = self.client.get(self.url, secure=True)
+                self.assertContains(response, "A-101")
+                self.assertNotContains(response, 'aria-label="Editar cubículo"')
+                self.assertNotContains(response, 'aria-label="Editar foto de perfil"')
+                response = self.client.post(self.url, {"cubiculo": "X"}, secure=True)
+                self.assertEqual(response.status_code, 403)
+        self.tutor.refresh_from_db()
+        self.assertEqual(self.tutor.cubiculo, "A-101")
+
+    def test_rechaza_imagen_invalida_sin_guardar_cubiculo(self):
+        self.client.force_login(self.tutor)
+        response = self.client.post(self.url, {
+            "cubiculo": "B-202",
+            "foto": SimpleUploadedFile("falsa.png", b"no es una imagen", content_type="image/png"),
+        }, secure=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("foto", response.context["form"].errors)
+        self.tutor.refresh_from_db()
+        self.assertEqual(self.tutor.cubiculo, "A-101")
+        self.assertFalse(self.tutor.foto)
+
+
 @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
 class PasswordResetEmailTests(TestCase):
     def test_envia_correo_personalizado_con_enlace_valido(self):
