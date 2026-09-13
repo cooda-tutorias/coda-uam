@@ -205,6 +205,70 @@ class TutorResourceTests(TestCase):
         self.assertTrue(tutor.check_password("Temporal-12345"))
         self.assertNotEqual(tutor.password, "Temporal-12345")
 
+    @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+    def test_password_omitido_o_vacio_permite_restablecer(self):
+        for indice, modo in enumerate(("sin_columna", "vacio", "nulo")):
+            with self.subTest(modo=modo):
+                matricula = str(30420 + indice)
+                dataset = self.dataset(self.fila_valida(
+                    matricula=matricula,
+                    email=f"tutor{indice}@cua.uam.mx",
+                    password=None if modo == "nulo" else "",
+                ))
+                if modo == "sin_columna":
+                    del dataset["password"]
+
+                TutorResource().import_data(dataset, dry_run=False, raise_errors=True)
+
+                tutor = Tutor.objects.get(matricula=matricula)
+                self.assertTrue(tutor.is_active)
+                self.assertTrue(tutor.has_usable_password())
+                self.assertFalse(tutor.check_password(""))
+                if modo == "sin_columna":
+                    self.assertNotIn("password", dataset.headers)
+                else:
+                    self.assertEqual(dataset.dict[0]["password"], "")
+                self.client.post(
+                    reverse("reset_password"), {"email": tutor.email}, secure=True
+                )
+                self.assertEqual(len(mail.outbox), indice + 1)
+                correo = mail.outbox[-1]
+                self.assertEqual(correo.to, [tutor.email])
+                enlace = next(
+                    line for line in correo.body.splitlines()
+                    if line.startswith("https://")
+                )
+                ruta = resolve(urlsplit(enlace).path)
+                self.assertTrue(default_token_generator.check_token(
+                    tutor, ruta.kwargs["token"]
+                ))
+
+    def test_preview_sin_password_no_crea_cuentas(self):
+        dataset = self.dataset(self.fila_valida(password=""))
+        del dataset["password"]
+
+        resultado = TutorResource().import_data(dataset, dry_run=True, raise_errors=True)
+
+        self.assertFalse(resultado.has_errors())
+        self.assertEqual(Usuario.objects.count(), 0)
+
+    def test_rechaza_password_proporcionado_invalido(self):
+        dataset = self.dataset(self.fila_valida(password="123"))
+
+        resultado = TutorResource().import_data(dataset, dry_run=False)
+
+        self.assertTrue(resultado.has_errors())
+        self.assertEqual(Usuario.objects.count(), 0)
+
+    def test_otras_columnas_siguen_siendo_obligatorias(self):
+        dataset = self.dataset(self.fila_valida())
+        del dataset["email"]
+
+        resultado = validar_y_normalizar_dataset_tutores(dataset)
+
+        self.assertFalse(resultado.es_valido)
+        self.assertIn("email", {error.campo for error in resultado.errores})
+
     def test_rechaza_tutor_existente_sin_actualizarlo(self):
         existente = Tutor.objects.create_user(
             matricula="30419",

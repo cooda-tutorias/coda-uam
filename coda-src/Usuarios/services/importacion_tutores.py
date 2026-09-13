@@ -210,9 +210,7 @@ def validar_filas_tutores(filas):
                 fila["cubiculo"],
             )
 
-        if not fila["password"]:
-            _agregar_error(resultado, numero, "password", "Es obligatoria.")
-        else:
+        if fila["password"]:
             usuario_temporal = Tutor(
                 matricula=matricula,
                 email=fila["email"],
@@ -260,7 +258,7 @@ def validar_y_normalizar_dataset_tutores(dataset):
     encabezados = list(dataset.headers or [])
     faltantes = [
         encabezado for encabezado in ENCABEZADOS_IMPORTACION_TUTORES
-        if encabezado not in encabezados
+        if encabezado != "password" and encabezado not in encabezados
     ]
     adicionales = [
         encabezado for encabezado in encabezados
@@ -301,7 +299,7 @@ def aplicar_filas_normalizadas_al_dataset(dataset, filas):
     for fila in filas:
         indice_fila = fila["numero_fila"] - 2
         valores = list(dataset[indice_fila])
-        for campo in ENCABEZADOS_IMPORTACION_TUTORES:
+        for campo in posiciones:
             valores[posiciones[campo]] = fila[campo]
         dataset[indice_fila] = valores
 
