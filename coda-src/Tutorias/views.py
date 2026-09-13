@@ -2286,9 +2286,42 @@ class VerTutoriasCodaListView(CodaViewMixin, ListView):
         context["tutor"] = tutor
         return context
 
+def tutores_administrables(user, *, solo_coordinacion=False):
+    if user.has_role("CODA") and not solo_coordinacion:
+        return Tutor.objects.all()
+    if user.has_role("COR"):
+        coord = get_object_or_404(Cordinador, pk=user.pk)
+        return Tutor.objects.filter(coordinacion=coord.coordinacion)
+    raise PermissionDenied
+
+
+@login_required
+@require_POST
+def imprimir_qr_tutores(request):
+    from .services.qr_tutores_pdf import generar_pdf_qr_tutores
+
+    autorizados = tutores_administrables(request.user)
+    valores = request.POST.getlist("tutores")
+    if not valores or any(not re.fullmatch(r"[1-9][0-9]{0,18}", v) for v in valores):
+        return HttpResponse("Selecciona tutores válidos para imprimir.", status=400)
+    ids = {int(v) for v in valores}
+    if any(pk > 9223372036854775807 for pk in ids):
+        return HttpResponse("Selecciona tutores válidos para imprimir.", status=400)
+    tutores = list(autorizados.filter(pk__in=ids).order_by(
+        "first_name", "last_name", "second_last_name", "matricula",
+    ))
+    if len(tutores) != len(ids):
+        return HttpResponse("La selección contiene tutores no disponibles o no autorizados.", status=403)
+    return FileResponse(generar_pdf_qr_tutores(request, tutores),
+                        as_attachment=True, filename="qr-tutores.pdf", content_type="application/pdf")
+
+
 class VerTutoresListView(CodaViewMixin, ListView):
     model = Tutor
     template_name = 'Tutorias/verTutores_coda.html'
+
+    def get_queryset(self):
+        return tutores_administrables(self.request.user)
 
 class VerAlumnosListView(CodaViewMixin, ListView):
     model = Alumno
@@ -2299,11 +2332,8 @@ class VerTutoresCoordListView(CordinadorViewMixin, ListView):
     template_name = 'Tutorias/verTutores_cordinador.html'
 
     def get_queryset(self) -> QuerySet[Any]:
-        coord = get_object_or_404(Cordinador, pk=self.request.user.pk)
+        return tutores_administrables(self.request.user, solo_coordinacion=True)
 
-        queryset = super().get_queryset().filter(coordinacion=coord.coordinacion)
-        return queryset
-    
 class VerTutoradosCodaListView(CodaViewMixin, ListView):
     model = Alumno
     template_name = 'Tutorias/verTutorados_coda.html'

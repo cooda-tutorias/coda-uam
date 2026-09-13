@@ -1,0 +1,15 @@
+<form id="acciones-tutores" action="{% url 'imprimir-qr-tutores' %}" method="post" class="mb-3">
+  {% csrf_token %}
+  <div class="d-flex align-items-center flex-wrap gap-3">
+    <div class="dropdown">
+      <button id="acciones-tutores-button" class="btn btn-outline-primary dropdown-toggle"
+              type="button" data-bs-toggle="dropdown" aria-expanded="false" disabled>Acciones (0)</button>
+      <ul class="dropdown-menu">
+        <li><button class="dropdown-item" type="submit">Imprimir QR</button></li>
+      </ul>
+    </div>
+    <span id="seleccion-tutores-resumen" class="small text-muted" role="status" aria-live="polite">0 seleccionados</span>
+  </div>
+  <label for="seleccionar-tutores" class="small text-muted mt-2">Seleccionar todos los resultados de la búsqueda, en todas las páginas.</label>
+  <div id="seleccion-tutores-error" class="alert alert-danger mt-2" role="alert" hidden></div>
+</form>
