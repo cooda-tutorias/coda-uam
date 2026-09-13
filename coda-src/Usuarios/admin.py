@@ -1,3 +1,6 @@
+import secrets
+import string
+
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.core.exceptions import ValidationError
@@ -31,7 +34,12 @@ class TutorResource(resources.ModelResource):
     def before_save_instance(self, instance, using_transactions, dry_run):
         password_plano = instance.password
         if not password_plano:
-            raise ValidationError("La contraseña es obligatoria.")
+            # Conservar una contraseña utilizable permite el restablecimiento
+            # estándar de Django, sin guardar ni comunicar el valor generado.
+            password_plano = ''.join(
+                secrets.choice(string.ascii_letters + string.digits)
+                for _ in range(12)
+            )
         instance.set_password(password_plano)
 
     def dehydrate_password(self, instance):
