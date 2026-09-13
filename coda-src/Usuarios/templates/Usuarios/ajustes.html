@@ -3,61 +3,56 @@
 {% block title %}Ajustes{% endblock %}
 
 {% block body %}
-    <section id="section">
-        <div class="container py-5 h-100">
-            <div class="row d-flex justify-content-center align-items-center h-100">
-                <div class="col-lg-8 col-xl-10">
-                    <div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
-                        <div class="card-body p-4 text-title">
-                            <h3 class=" mb-3 text-primary text-title-bold">Ajustes</h3>
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h5 class="mb-0 text-secondary">Documentación</h5>
-                                <a href="{% url 'cargar_plantilla' %}"><button class="btn btn-primary btn-sm text-title">Cargar Nueva Plantilla</button></a>
-                            </div>
-                            <hr class="text-secondary">
-                             <!--Inicio de table-->
-                            <div class = "table-responsive">
-                                <table class="table table-striped table-hover datatable">
-                                <thead class="">
-                                    <tr>
-                                        <th>Nombre</th>
-                                        <th>Template</th>
-                                        <th></th>
-                                        <th></th>
-                                    </tr>
-                                </thead>
-                                <tbody class="w-100">
-                                    {% for documento in documentos %}
-                                    <tr>
-                                        <td class="text-body">{{ documento.nombre }}</td>
-                                        <td class="text-body">{{ documento.archivo.name|slice:"11:" }}</td>
-                                        <td class="text-body-bold "><a href="{% url 'ver_plantilla' documento.id %}">Ver</a></td>
-                                        <td>
-                                            <form method="post"
-                                                  action="{% url 'eliminar_documento' documento.id %}"
-                                                  onsubmit="return confirm('¿Estás seguro de que deseas eliminar este documento?')">
-                                                {% csrf_token %}
-                                                <button type="submit"
-                                                        class="btn btn-link p-0 text-body-bold text-danger">
-                                                    Eliminar
-                                                </button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                    {% empty %}
-                                    <tr>
-                                        <td  colspan="4" class="text-center text-body">No hay documentos disponibles.</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                                </table>
-                            </div>
-                            <!--Fin de table-->
-                        </div>
-                    </div>
-                </div>
+  <section id="section">
+    <div class="container py-5 h-100">
+      <div class="row d-flex justify-content-center align-items-center h-100">
+        <div class="col-lg-8 col-xl-10">
+          <div class="card border-top border-bottom border-4"
+               style="border-color: #F08200 !important">
+            <div class="card-body p-4 text-title">
+              <h3 class="mb-3 text-primary text-title-bold">Ajustes</h3>
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0 text-secondary">Documentación</h5>
+                <a href="{% url 'cargar_plantilla' %}"><button class="btn btn-primary btn-sm text-title">Cargar Nueva Plantilla</button></a>
+              </div>
+              <hr class="text-secondary">
+              <!--Inicio de table-->
+              <div class="table-responsive">
+                <table class="table table-striped table-hover datatable">
+                  <thead class="">
+                    <tr>
+                      <th>Nombre</th>
+                      <th>Template</th>
+                      <th></th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody class="w-100">
+                    {% for documento in documentos %}
+                      <tr>
+                        <td class="text-body">{{ documento.nombre }}</td>
+                        <td class="text-body">{{ documento.archivo.name|slice:"11:" }}</td>
+                        <td class="text-body-bold"><a href="{% url 'ver_plantilla' documento.id %}">Ver</a></td>
+                        <td>
+                          <form method="post"
+                                action="{% url 'eliminar_documento' documento.id %}"
+                                onsubmit="return confirm('¿Estás seguro de que deseas eliminar este documento?')">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-link p-0 text-body-bold text-danger">Eliminar</button>
+                          </form>
+                        </td>
+                      </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              <!--Fin de table-->
             </div>
+          </div>
         </div>
-    </section>
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
+      </div>
+    </div>
+  </section>
+  <script type="text/javascript"
+          src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
 {% endblock %}
