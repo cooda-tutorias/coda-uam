@@ -105,9 +105,18 @@ def _tutoria_es_reportable(tutoria):
     Se utiliza estado_alumno_historico porque alumno.estado representa
     el estado actual y puede haber cambiado después de la tutoría.
     """
+    # return (
+    #     tutoria.asistencia is True
+    #     and tutoria.estado_alumno_historico == ESTADO_ALUMNO_ACTIVO
+    # )
+
+    # No se requiere que el alumno esté activo, sólo que haya asistido a la tutoría.
+    # Hay algunos estados que no son "activo" pero que sí se consideran válidos para incluir la tutoría en la carta anual.
+    # Por ejemplo: 
+    #  Un alumno "Sin carga académica" pudo haber solicitado tutoría porque ya inscribirá materias en el siguiente trimestre.
+    #  Un alumno "Egresado potencial" pudo haber solicitado tutoría para pedir información y firma para el servicio social.            
     return (
         tutoria.asistencia is True
-        and tutoria.estado_alumno_historico == ESTADO_ALUMNO_ACTIVO
     )
 
 # Aquí se filtran tutorías (ej: asistencia, estado)
@@ -364,7 +373,7 @@ def generar_docx_reporte_tutorias_brindadas(
     mostrar_col_notas,
     tema_dict,
 ):
-    open_plantilla = docx.Document(plantilla.archivo)
+    open_plantilla = docx.Document(plantilla.archivo_fuente)
 
     if not open_plantilla.tables:
         return redirect('Reporte-tutorias', pk=tutor.pk)

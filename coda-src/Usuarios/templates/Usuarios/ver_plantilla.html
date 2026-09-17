@@ -1,158 +1,74 @@
 {% extends "Usuarios/HeaderAndFooterFachada.html" %}
-
-{% block title %}Ajustes{% endblock %}
-
+{% load widget_tweaks %}
+{% block title %}Editar plantilla{% endblock %}
 {% block body %}
-    <section id="section" style="background-color: #eee;">
-        <div class="container py-5 h-100">
-            <div class="row d-flex justify-content-center align-items-center h-100">
-                <div class="col-lg-8 col-xl-10">
-                    <div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
-                        <div class="card-body p-4">
-                            <h3 class=" mb-3 text-primary text-title-bold">Ver plantilla</h3>
-                            <div class="d-flex justify-content-between align-items-center mb-3">
-                                <h6 class="mb-0 text-secondary text-title">Puedes sustituir esta plantilla subiendo un nuevo documento.</h6>
-                            </div>
-                            {% load widget_tweaks %}
-
-                            <form method="post" enctype="multipart/form-data">
-                                {% csrf_token %}
-                                
-                                <!-- Contenedor de dos columnas -->
-                                <div class="row mb-3">
-                                    <!-- Columna izquierda -->
-                                    <div class="col-5">
-                                        <!-- Caja de texto para el nombre del archivo fuente (solo lectura) -->
-                                        <div class="form-outline mb-3">
-                                            <input type="text" class="form-control" id="nombre_fuente" value="{{ nombre_fuente }}" readonly>
-                                            <label class="form-label" for="nombre_fuente">Nombre del documento fuente</label>
-                                        </div>
-
-                                        <!-- Caja de texto para el nuevo nombre del documento -->
-                                        <div class="form-outline mb-3">
-                                            {% render_field form.nombre type="text" class="form-control" id="nombre" %}
-                                            <label class="form-label" for="nombre">Nombre del documento</label>
-                                        </div>
-
-                                        <!-- Área para arrastrar y soltar el archivo -->
-                                        <div id="drop-area" style="border: 2px dashed #ccc; border-radius: 10px; padding: 40px; text-align: center;">
-                                            <input type="file" id="fileElem" name="archivo" style="display:none" onchange="handleFiles(this.files)">
-                                            <div id="upload-instructions">
-                                                <div class="upload-icon" style="color:#F08200">
-                                                    <i class="fas fa-file-upload"></i>
-                                                </div>
-                                                <label for="fileElem" style="cursor:pointer; color:#F08200; display: inline;">Link</label>
-                                                <p style="display: inline; margin-left: 5px;">or drag and drop</p>
-                                                <p style="font-size: 12px; color: #666;">DOCX (max. 3MB)</p>
-                                            </div>
-
-                                            <!-- Mostrar el archivo adjunto -->
-                                            <div id="file-display" style="display: none; margin-top: 20px;">
-                                                <i class="fas fa-check-circle" style="color: green; margin-right: 10px;"></i>
-                                                <span id="file-name"></span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <!-- Columna derecha: Mostrar el archivo subido previamente -->
-                                    <div class="col-7 text-body">
-                                        {% if archivo_url %}
-                                            {% if archivo_url|lower|slice:"-4:" == ".pdf" %}
-                                                <!-- Mostrar PDF -->
-                                                <iframe src="{{ archivo_url }}" width="100%" height="500px" style="border: none;"></iframe>
-
-                                            {% elif archivo_url|lower|slice:"-4:" == ".png" or archivo_url|lower|slice:"-4:" == ".jpg" or archivo_url|lower|slice:"-5:" == ".jpeg" or archivo_url|lower|slice:"-4:" == ".gif" %}
-                                                <!-- Mostrar imagen -->
-                                                <img src="{{ archivo_url }}" alt="Documento actual" style="max-width: 100%; height: auto;">
-
-                                            {% elif archivo_url|lower|slice:"-5:" == ".docx" %}
-                                                <!-- Mostrar .DOCX con Google Docs Viewer -->
-                                                <iframe src="https://docs.google.com/gview?url={{ archivo_url }}&embedded=true" width="100%" height="500px" style="border: none;"></iframe>
-
-                                            {% else %}
-                                                <!-- Mostrar enlace para descargar -->
-                                                <a href="{{ archivo_url }}" class="btn btn-primary text-title" download>
-                                                    <i class="fas fa-download"></i> Descargar documento
-                                                </a>
-                                            {% endif %}
-                                        {% else %}
-                                            <p class="text-body">No hay un documento cargado actualmente.</p>
-                                        {% endif %}
-                                    </div>
-
-                                
-                                <!-- Botones -->
-                                <div class="d-grid gap-2 d-md-flex justify-content-center mt-4 text-title">
-                                    <a href="{% url 'ajustes' %}"><button type="button" class="btn btn-outline-primary">Cancelar</button></a>
-                                    <button type="submit" class="btn btn-primary">Guardar</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
+  <div class="container py-5" style="max-width: 800px">
+    <div class="card border-top border-4"
+         style="border-color: #F08200 !important">
+      <div class="card-body p-4">
+        <h3 class="text-primary">Editar plantilla</h3>
+        <p class="text-muted">Modifica sus datos o sustituye el archivo Word.</p>
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+          <div class="row g-4">
+            <div class="col-12">
+              <div class="mb-4"><label class="form-label" for="id_tipo">Tipo de plantilla</label>{% render_field form.tipo class="form-select" %}</div>
+              <div class="mb-3"><label class="form-label" for="id_nombre">Nombre</label>{% render_field form.nombre class="form-control" %}</div>
+              <div class="mb-4">
+                <p class="mb-1 fw-bold">Archivo actual</p>
+                <p class="text-break mb-1">{{ object.nombre_archivo }}</p>
+                {% if archivo_url %}<a href="{{ archivo_url }}" download>Descargar Word</a>{% endif %}
+              </div>
+              <div class="mb-3">
+                <input type="file"
+                       name="archivo"
+                       id="archivo-nuevo"
+                       accept=".docx"
+                       class="visually-hidden"
+                       aria-label="Sustituir archivo Word">
+                <button type="button" id="sustituir-archivo" class="btn btn-outline-primary">Sustituir archivo…</button>
+                <p class="small text-muted mt-2">Opcional. Si no eliges otro, se conserva el archivo actual.</p>
+                <div id="archivo-elegido" hidden>
+                  <p class="text-break mb-1" id="nombre-elegido" role="status"></p>
+                  <button type="button" id="quitar-archivo" class="btn btn-link p-0">Quitar</button>
+                  <p class="small text-muted mt-2">Se validará al guardar.</p>
                 </div>
+              </div>
+              <p class="text-muted">Para cambiar el contenido, edita el Word y vuelve a subirlo.</p>
             </div>
-        </div>
-    </section>
 
-    <!-- manejar el arrastrar y soltar -->
-    <script>
-        var dropArea = document.getElementById('drop-area');
-        var fileDisplay = document.getElementById('file-display');
-        var fileNameDisplay = document.getElementById('file-name');
-        var fileElem = document.getElementById('fileElem');
-        var uploadInstructions = document.getElementById('upload-instructions'); // Nuevo
+          </div>
+          {% if form.errors %}
+            <div class="alert alert-danger mt-4" role="alert">
+              <strong>No se guardaron los cambios.</strong>
+              <ul class="mb-1">
+                {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+                {% for field in form %}{% for error in field.errors %}<li>{{ field.label }}: {{ error }}</li>{% endfor %}{% endfor %}
+              </ul>
+              Si estabas sustituyendo el Word, vuelve a seleccionar el archivo corregido.
+            </div>
+          {% endif %}
+          <div class="d-flex justify-content-end gap-2 mt-4">
+            <a href="{% url 'ajustes' %}" class="btn btn-outline-primary">Cancelar</a>
+            <button type="submit" class="btn btn-primary">Guardar cambios</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+{% block scripts %}
+  <script>
+(function () {
+  const archivo = document.getElementById('archivo-nuevo');
+  const elegido = document.getElementById('archivo-elegido');
+  document.getElementById('sustituir-archivo').addEventListener('click', () => archivo.click());
+  archivo.addEventListener('change', () => {
+    elegido.hidden = !archivo.files.length;
+    document.getElementById('nombre-elegido').textContent = archivo.files.length ? 'Nuevo archivo: ' + archivo.files[0].name : '';
+  });
+  document.getElementById('quitar-archivo').addEventListener('click', () => { archivo.value = ''; elegido.hidden = true; });
 
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dropArea.addEventListener(eventName, preventDefaults, false);
-        });
-
-        function preventDefaults(e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-
-        // animacion
-        ['dragenter', 'dragover'].forEach(eventName => {
-            dropArea.addEventListener(eventName, () => dropArea.style.borderColor = '#000', false);
-        });
-
-        ['dragleave', 'drop'].forEach(eventName => {
-            dropArea.addEventListener(eventName, () => dropArea.style.borderColor = '#ccc', false);
-        });
-
-        dropArea.addEventListener('drop', handleDrop, false);
-
-        function handleDrop(e) {
-            let dt = e.dataTransfer;
-            let files = dt.files;
-
-            handleFiles(files);
-            fileElem.files = files;
-        }
-
-        fileElem.addEventListener('change', function(e) {
-            handleFiles(this.files);
-        });
-
-        function handleFiles(files) {
-            if (files.length > 0) {
-                // Ocultar las indicaciones para subir el archivo
-                uploadInstructions.style.display = 'none';
-
-                // Mostrar el nombre del archivo y el ícono de confirmación
-                fileNameDisplay.textContent = files[0].name;
-                fileDisplay.style.display = 'block';
-
-                // Animación de confirmación
-                fileDisplay.style.opacity = '0';
-                setTimeout(() => {
-                    fileDisplay.style.transition = 'opacity 0.5s';
-                    fileDisplay.style.opacity = '1';
-                }, 10);
-            }
-        }
-    </script>
-
-    <!-- Incluir MDB UI Kit si es necesario -->
-    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
+})();
+  </script>
 {% endblock %}

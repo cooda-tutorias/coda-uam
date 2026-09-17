@@ -25,6 +25,7 @@ from django.http import HttpResponse
 
 from Usuarios.models import Tutor, Alumno, Documento
 from Tutorias.models import Tutoria
+from Tutorias.services.oficios import normalizar_numero_oficio
 from Tutorias.constants import TEMAS
 from Tutorias.services.docx_reportes import generar_docx_reporte_tutorias_brindadas
 
@@ -72,12 +73,6 @@ CARPETAS_LICENCIATURA = {
 def mb(num_bytes):
     return num_bytes / (1024 * 1024)
 
-
-def normalizar_numero_oficio(oficio_ingresado, fecha_documento):
-    if oficio_ingresado in (None, ""):
-        return ""
-    anio = fecha_documento.year
-    return f"DCNI_CODDAA_{int(oficio_ingresado)}_{anio}"
 
 
 def obtener_plantilla():

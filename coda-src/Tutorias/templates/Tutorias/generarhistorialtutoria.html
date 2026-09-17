@@ -43,7 +43,7 @@
                                 </div>
 
                                 <div class="form-floating mb-3">
-                                    {% render_field form.plantilla class="form-select" id="plantilla" %}
+                                    {% render_field form.plantilla class="form-select" id="plantilla" %}{{ form.plantilla.errors }}<small>{{ form.plantilla.help_text }}</small>
                                     <label for="plantilla">Plantilla</label>
                                 </div>
 

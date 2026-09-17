@@ -1,58 +1,220 @@
 {% extends "Usuarios/HeaderAndFooterFachada.html" %}
-
-{% block title %}Ajustes{% endblock %}
-
+{% block title %}Ajustes · Plantillas{% endblock %}
 {% block body %}
-  <section id="section">
-    <div class="container py-5 h-100">
-      <div class="row d-flex justify-content-center align-items-center h-100">
-        <div class="col-lg-8 col-xl-10">
-          <div class="card border-top border-bottom border-4"
-               style="border-color: #F08200 !important">
-            <div class="card-body p-4 text-title">
-              <h3 class="mb-3 text-primary text-title-bold">Ajustes</h3>
-              <div class="d-flex justify-content-between align-items-center mb-3">
-                <h5 class="mb-0 text-secondary">Documentación</h5>
-                <a href="{% url 'cargar_plantilla' %}"><button class="btn btn-primary btn-sm text-title">Cargar Nueva Plantilla</button></a>
-              </div>
-              <hr class="text-secondary">
-              <!--Inicio de table-->
-              <div class="table-responsive">
-                <table class="table table-striped table-hover datatable">
-                  <thead class="">
-                    <tr>
-                      <th>Nombre</th>
-                      <th>Template</th>
-                      <th></th>
-                      <th></th>
-                    </tr>
-                  </thead>
-                  <tbody class="w-100">
-                    {% for documento in documentos %}
-                      <tr>
-                        <td class="text-body">{{ documento.nombre }}</td>
-                        <td class="text-body">{{ documento.archivo.name|slice:"11:" }}</td>
-                        <td class="text-body-bold"><a href="{% url 'ver_plantilla' documento.id %}">Ver</a></td>
-                        <td>
-                          <form method="post"
-                                action="{% url 'eliminar_documento' documento.id %}"
-                                onsubmit="return confirm('¿Estás seguro de que deseas eliminar este documento?')">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-link p-0 text-body-bold text-danger">Eliminar</button>
-                          </form>
-                        </td>
-                      </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
-              <!--Fin de table-->
-            </div>
-          </div>
-        </div>
+  <div class="container py-5">
+    <h3 class="text-primary mb-2">Ajustes · Plantillas</h3>
+    <p class="text-muted mb-4">Selecciona una plantilla para administrarla.</p>
+    <div class="row g-4">
+      <div class="col-md-9 order-2 order-md-1">
+        {% for grupo in grupos_plantillas %}
+          <section class="mb-5" aria-labelledby="titulo-{{ grupo.tipo }}">
+            <h4 id="titulo-{{ grupo.tipo }}" class="border-bottom pb-2">{{ grupo.titulo }}</h4>
+            <div class="table-responsive">
+              <table class="table table-hover align-middle">
+                <thead>
+                  <tr>
+                    <th scope="col">Nombre</th>
+                    <th scope="col" class="text-end">Archivo</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for documento in grupo.documentos %}
+                    <tr class="fila-plantilla">
+                      <td>
+                        <label class="d-flex align-items-center gap-2 m-0 py-2"
+                               style="cursor:pointer">
+                          <input type="radio"
+                                 name="plantilla_seleccionada"
+                                 value="{{ documento.pk }}"
+                                 data-nombre="{{ documento.nombre }}"
+                                 data-tipo="{{ documento.tipo }}"
+                                 data-sistema="{{ documento.es_sistema|yesno:'true,false' }}"
+                                 data-activa="{{ documento.activa|yesno:'true,false' }}"
+                                 data-editar="{% url 'ver_plantilla' documento.pk %}"
+                                 data-eliminar="{% url 'eliminar_documento' documento.pk %}"
+                                 data-activar="{% url 'activar-plantilla' documento.pk %}">
+                          <span>{% if documento.es_sistema %}Ejemplo institucional{% else %}{{ documento.nombre }}{% endif %}
+                            {% if documento.es_sistema %}<small class="text-muted">[Solo lectura]</small>{% endif %}
+                            {% if documento.activa %}<span class="badge bg-success ms-1">Predeterminada</span>{% endif %}
+                          </span>
+                        </label>
+                      </td>
+                      <td class="text-end">
+                        {% if documento.es_sistema %}<a href="{% url 'ejemplo-plantilla' documento.clave_sistema %}">Descargar</a>
+        {% else %}<a href="{{ documento.archivo.url }}" download>Descargar</a>{% endif %}
+                        <a class="ms-3 ver-vista-previa"
+                           href="{% url 'vista-previa-plantilla' documento.pk %}"
+                           data-bs-toggle="modal" data-bs-target="#modal-vista-previa"
+                           data-nombre="{{ documento.nombre }}">Ver</a>
+          </td>
+          </tr>
+{% empty %}<tr><td colspan="2" class="text-muted">No hay plantillas disponibles.</td></tr>{% endfor %}
+  </tbody>
+  </table>
+  </div>
+  </section>
+{% endfor %}
+</div>
+<aside class="col-md-3 order-1 order-md-2">
+  <div class="sticky-top pt-2" style="top: 5rem">
+    <div class="d-grid gap-2">
+      <a class="btn btn-outline-primary"
+         id="nueva-plantilla"
+         href="{% url 'cargar_plantilla' %}">Nueva…</a>
+      <button class="btn btn-outline-secondary"
+              id="editar-plantilla"
+              type="button"
+              disabled>Editar...</button>
+      <form method="post" id="eliminar-plantilla">{% csrf_token %}<button class="btn btn-outline-danger w-100" type="submit" disabled>Eliminar…</button></form>
+      <form method="post" id="activar-plantilla">{% csrf_token %}<button class="btn btn-outline-primary w-100" type="submit" disabled>Predeterminar</button></form>
+    </div>
+    <p class="small text-muted mt-3" id="estado-seleccion" role="status">Ninguna plantilla seleccionada.</p>
+  </div>
+</aside>
+</div>
+</div>
+<div class="modal fade" id="modal-eliminar-plantilla" tabindex="-1" aria-labelledby="titulo-eliminar-plantilla" aria-describedby="mensaje-eliminar-plantilla" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="titulo-eliminar-plantilla">Eliminar plantilla</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body"><p id="mensaje-eliminar-plantilla" class="mb-0"></p></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger" id="confirmar-eliminar-plantilla">Eliminar</button>
       </div>
     </div>
-  </section>
-  <script type="text/javascript"
-          src="https://cdnjs.cloudflare.com/ajax/libs/mdb-ui-kit/6.2.0/mdb.min.js"></script>
+  </div>
+</div>
+<div class="modal fade" id="modal-vista-previa" tabindex="-1" aria-labelledby="titulo-vista-previa" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="titulo-vista-previa">Vista previa</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+      <div class="modal-body">
+        <div id="preview-estado" class="border rounded p-4 bg-light" role="status">Preparando vista previa…</div>
+        <iframe id="preview-pdf" title="Vista previa PDF de la plantilla" class="border rounded w-100" style="height:65vh" hidden></iframe>
+        <p class="small text-muted mt-2">La apariencia puede variar según las fuentes disponibles.</p>
+        <a id="preview-abrir" target="_blank" rel="noopener" hidden>Abrir vista previa en otra pestaña</a>
+        <button id="preview-reintentar" type="button" class="btn btn-link p-0" hidden>Reintentar vista previa</button>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-outline-primary" data-bs-dismiss="modal">Cerrar</button></div>
+    </div>
+  </div>
+</div>
+<style>
+  .fila-plantilla.seleccionada > td { background-color: #fff1dc; }
+  .fila-plantilla:focus-within { outline: 2px solid #b66500; outline-offset: -2px; }
+</style>
+{% endblock %}
+{% block scripts %}
+  <script>
+(function () {
+  const nueva = document.getElementById('nueva-plantilla');
+  const urlNueva = nueva.href;
+  const editar = document.getElementById('editar-plantilla');
+  const eliminar = document.getElementById('eliminar-plantilla');
+  const activar = document.getElementById('activar-plantilla');
+  let seleccion = null;
+  function actualizar(input) {
+    seleccion = input;
+    document.querySelectorAll('.fila-plantilla').forEach(fila => fila.classList.remove('seleccionada'));
+    input.closest('tr').classList.add('seleccionada');
+    const sistema = input.dataset.sistema === 'true';
+    const predeterminada = input.dataset.activa === 'true';
+    editar.disabled = sistema;
+    eliminar.querySelector('button').disabled = sistema || predeterminada;
+    activar.querySelector('button').disabled = predeterminada;
+    eliminar.action = input.dataset.eliminar;
+    activar.action = input.dataset.activar;
+    nueva.href = urlNueva + '?tipo=' + encodeURIComponent(input.dataset.tipo);
+    let texto = 'Seleccionada: ' + input.dataset.nombre + '.';
+    if (sistema) texto += ' Solo lectura. Para personalizarla, descarga una copia y usa Nueva.';
+    else if (predeterminada) texto += ' Activa otra plantilla del mismo tipo antes de eliminarla.';
+    document.getElementById('estado-seleccion').textContent = texto;
+  }
+  document.querySelectorAll('input[name="plantilla_seleccionada"]').forEach(input => {
+    input.addEventListener('change', () => actualizar(input));
+    input.closest('tr').addEventListener('click', event => {
+      if (event.target.closest('a, input, label')) return;
+      input.checked = true; actualizar(input); input.focus();
+    });
+  });
+  editar.addEventListener('click', () => { if (seleccion && !editar.disabled) window.location.href = seleccion.dataset.editar; });
+  const modalEliminar = document.getElementById('modal-eliminar-plantilla');
+  const confirmarEliminar = document.getElementById('confirmar-eliminar-plantilla');
+  let plantillaPorEliminar = null;
+  eliminar.addEventListener('submit', event => {
+    event.preventDefault();
+    if (!seleccion || eliminar.querySelector('button').disabled) return;
+    plantillaPorEliminar = seleccion;
+    confirmarEliminar.disabled = false;
+    document.getElementById('mensaje-eliminar-plantilla').textContent = '¿Eliminar la plantilla «' + seleccion.dataset.nombre + '»?';
+    bootstrap.Modal.getOrCreateInstance(modalEliminar).show(eliminar.querySelector('button'));
+  });
+  confirmarEliminar.addEventListener('click', () => {
+    if (!plantillaPorEliminar || confirmarEliminar.disabled) return;
+    if (plantillaPorEliminar.dataset.sistema === 'true' || plantillaPorEliminar.dataset.activa === 'true') return;
+    confirmarEliminar.disabled = true;
+    eliminar.action = plantillaPorEliminar.dataset.eliminar;
+    eliminar.submit();
+  });
+  modalEliminar.addEventListener('hidden.bs.modal', () => {
+    plantillaPorEliminar = null;
+    eliminar.querySelector('button').focus();
+  });
+  activar.addEventListener('submit', event => { if (!seleccion || activar.querySelector('button').disabled) event.preventDefault(); });
+  const modal = document.getElementById('modal-vista-previa');
+  const estado = document.getElementById('preview-estado');
+  const iframe = document.getElementById('preview-pdf');
+  const abrir = document.getElementById('preview-abrir');
+  const reintentar = document.getElementById('preview-reintentar');
+  let url = null, blobUrl = null, solicitud = null;
+  function limpiar() {
+    if (solicitud) solicitud.abort();
+    solicitud = null;
+    iframe.removeAttribute('src'); abrir.removeAttribute('href');
+    iframe.hidden = true; abrir.hidden = true;
+    if (blobUrl) URL.revokeObjectURL(blobUrl);
+    blobUrl = null;
+  }
+  async function cargar() {
+    limpiar();
+    const actual = new AbortController(); solicitud = actual;
+    reintentar.hidden = true; estado.hidden = false;
+    estado.textContent = 'Preparando vista previa…';
+    try {
+      const response = await fetch(url, {credentials: 'same-origin', signal: actual.signal});
+      const tipo = response.headers.get('Content-Type') || '';
+      if (!response.ok || !tipo.includes('application/pdf')) {
+        let mensaje = 'No se pudo cargar la vista previa. Puedes descargar el Word o volver a iniciar sesión.';
+        if (tipo.includes('application/json')) mensaje = (await response.json()).error || mensaje;
+        throw new Error(mensaje);
+      }
+      const blob = await response.blob();
+      if (solicitud !== actual) return;
+      blobUrl = URL.createObjectURL(blob);
+      iframe.src = blobUrl; abrir.href = blobUrl;
+      iframe.hidden = false; abrir.hidden = false; estado.hidden = true;
+    } catch (error) {
+      if (solicitud !== actual || error.name === 'AbortError') return;
+      estado.textContent = error.message; reintentar.hidden = false;
+    }
+  }
+  modal.addEventListener('show.bs.modal', event => {
+    const enlace = event.relatedTarget;
+    url = enlace.href;
+    document.getElementById('titulo-vista-previa').textContent = 'Vista previa · ' + enlace.dataset.nombre;
+    cargar();
+  });
+  modal.addEventListener('hide.bs.modal', limpiar);
+  reintentar.addEventListener('click', cargar);
+  window.addEventListener('pagehide', limpiar);
+
+})();
+  </script>
 {% endblock %}

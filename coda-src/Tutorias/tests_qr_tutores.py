@@ -76,6 +76,19 @@ class PermisosQRTutoresTests(TestCase):
         self.assertContains(response, "Acciones (0)")
         self.assertContains(response, "Imprimir QR")
 
+    def test_filtro_licenciatura_limita_filas_seleccionables(self):
+        self.client.force_login(self.coda)
+        for codigo, incluido, excluido in [('COM', self.uno, self.otro), ('MAT', self.otro, self.uno)]:
+            response = self.client.get(reverse('Tutores-Coda'), {'licenciatura': codigo}, secure=True)
+            self.assertContains(response, f'data-tutor-id="{incluido.pk}"')
+            self.assertNotContains(response, f'data-tutor-id="{excluido.pk}"')
+            self.assertEqual(response.context['licenciatura_seleccionada'], codigo)
+        response = self.client.get(reverse('Tutores-Coda'), secure=True)
+        for tutor in [self.uno, self.otro]:
+            self.assertContains(response, f'data-tutor-id="{tutor.pk}"')
+        response = self.client.get(reverse('Tutores-Coda'), {'licenciatura': 'invalida'}, secure=True)
+        self.assertFalse(response.context['object_list'].exists())
+
     def test_qr_individual_usa_servicio_compartido(self):
         self.client.force_login(self.uno)
         with patch("Usuarios.services.qr_tutor.generar_qr_tutor", wraps=generar_qr_tutor) as generar:

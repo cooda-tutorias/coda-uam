@@ -1,0 +1,87 @@
+{% extends "Usuarios/navbar_coda.html" %}
+{% load widget_tweaks %}
+{% block title %}Generar cartas de asignación{% endblock %}
+{% block body %}
+<div class="container py-5">
+  <div class="card border-top border-4" style="border-color: #F08200 !important">
+    <div class="card-body p-4">
+      <h3 class="text-primary">Generar cartas de asignación</h3>
+      <a href="{% url 'ver-alumnos' %}">Volver a Alumnos registrados</a>
+      {% if error_seleccion %}<div class="alert alert-danger mt-3">{{ error_seleccion|join:" " }}</div>{% else %}
+        <div class="alert alert-info mt-3">
+          <strong>{{ total_alumnos }} alumnos y {{ total_tutores }} tutores destinatarios.</strong>
+          Se prepararán {{ total_cartas_tutor }} cartas para tutores, una por tutor y licenciatura.<br>
+          Licenciaturas: {{ licenciaturas|join:", " }}.<br>Trimestres de ingreso: {{ trimestres|join:", " }}.
+        </div>
+        {% if sin_tutor %}
+          <div class="alert alert-warning">Hay alumnos sin tutor. Corrige su asignación o exclúyelos explícitamente antes de generar.
+            {% if seleccion_con_tutor %}<form method="post" class="mt-2">
+              {% csrf_token %}<input type="hidden" name="seleccion" value="{{ seleccion_con_tutor }}">
+              <button type="submit" class="btn btn-outline-secondary">Excluir los {{ sin_tutor|length }} alumnos sin tutor y revisar de nuevo</button>
+            </form>{% endif %}
+          </div>
+        {% endif %}
+        <details class="mb-4" open>
+          <summary>Revisar alumnos agrupados por tutor</summary>
+          {% for grupo in grupos %}
+            <div class="border rounded p-3 my-2">
+              <strong>{{ grupo.carrera }} — {% if grupo.tutor %}{{ grupo.tutor.first_name }} {{ grupo.tutor.last_name }} {{ grupo.tutor.second_last_name|default_if_none:"" }}{% else %}Sin tutor asignado{% endif %}</strong>
+              <ul class="mb-0">{% for alumno in grupo.alumnos %}<li>{{ alumno.matricula }} — {{ alumno.first_name }} {{ alumno.last_name }} {{ alumno.second_last_name|default_if_none:"" }}</li>{% endfor %}</ul>
+            </div>
+          {% endfor %}
+        </details>
+        <form method="post">
+          {% csrf_token %}{{ form.seleccion }}
+          <input type="hidden" name="accion" value="generar">
+          <div class="mb-3"><label class="form-label" for="id_destinatarios">Documentos a generar</label>{% render_field form.destinatarios class="form-select" %}</div>
+          <div class="row">
+            <div class="col-md-6 mb-3" data-tipo="alumno">
+              <label class="form-label" for="id_plantilla_alumno">Plantilla para alumnos</label>{% render_field form.plantilla_alumno class="form-select" %}<small class="form-text text-muted">{{ form.plantilla_alumno.help_text }}</small>
+              <label class="form-label mt-3" for="id_oficio_alumno">No. de oficio inicial para alumnos</label>{% render_field form.oficio_alumno class="form-control" %}
+            </div>
+            <div class="col-md-6 mb-3" data-tipo="tutor">
+              <label class="form-label" for="id_plantilla_tutor">Plantilla para tutores</label>{% render_field form.plantilla_tutor class="form-select" %}<small class="form-text text-muted">{{ form.plantilla_tutor.help_text }}</small>
+              <label class="form-label mt-3" for="id_oficio_tutor">No. de oficio inicial para tutores</label>{% render_field form.oficio_tutor class="form-control" %}
+            </div>
+          </div>
+          <div class="mb-3"><label class="form-label" for="id_fecha">Fecha de emisión</label>{% render_field form.fecha class="form-control" %}</div>
+          <p id="intervalos" class="text-body" role="status"></p>
+          <p>Los consecutivos continúan entre licenciaturas. No se reservan números de oficio: comprueba que estén disponibles.</p>
+          <p>Descargarás un ZIP por licenciatura. Si seleccionaste varias, se agruparán en un ZIP contenedor.</p>
+          {% if form.errors %}<div class="alert alert-danger" role="alert"><ul class="mb-0">
+            {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
+            {% for field in form %}{% for error in field.errors %}<li>{{ field.label }}: {{ error }}</li>{% endfor %}{% endfor %}
+          </ul></div>{% endif %}
+          <button class="btn btn-primary" type="submit" {% if sin_tutor %}disabled{% endif %}>Generar cartas y descargar ZIP</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+{% if form %}
+<script>
+(function () {
+  const tipo = document.getElementById('id_destinatarios');
+  function actualizar() {
+    const resumen = [];
+    for (const [nombre, cantidad] of [['alumno', {{ total_alumnos }}], ['tutor', {{ total_cartas_tutor }}]]) {
+      const activo = tipo.value === 'ambas' || tipo.value === nombre;
+      const grupo = document.querySelector('[data-tipo="' + nombre + '"]');
+      grupo.hidden = !activo;
+      grupo.querySelectorAll('input, select').forEach(campo => { campo.disabled = !activo; });
+      const entrada = document.getElementById('id_oficio_' + nombre);
+      const inicio = Number(entrada.value);
+      if (activo && Number.isInteger(inicio) && inicio > 0) resumen.push('Oficios para ' + nombre + 's: ' + inicio + ' a ' + (inicio + cantidad - 1));
+    }
+    document.getElementById('intervalos').textContent = resumen.join('. ');
+  }
+  tipo.addEventListener('change', actualizar);
+  document.getElementById('id_oficio_alumno').addEventListener('input', actualizar);
+  document.getElementById('id_oficio_tutor').addEventListener('input', actualizar);
+  actualizar();
+})();
+</script>
+{% endif %}
+{% endblock %}

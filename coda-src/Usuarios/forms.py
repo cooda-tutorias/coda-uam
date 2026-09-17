@@ -1,5 +1,6 @@
 from typing import Any, Mapping
 from django import forms
+from django.utils import timezone
 from django.core.files.base import File
 from django.db.models.base import Model
 from django.forms.utils import ErrorList
@@ -130,19 +131,32 @@ class ImportAlumnosForm(forms.Form):
     )
 
 class DocumentoForm(forms.ModelForm):
+    tipo = forms.ChoiceField(choices=[('', 'Selecciona el tipo de documento')] + Documento.TIPOS, label='Tipo de plantilla')
+
     class Meta:
         model = Documento
-        fields = ['nombre', 'archivo']
+        fields = ['nombre', 'tipo', 'archivo']
         widgets = {
             'nombre': forms.TextInput(attrs={'class': 'form-control'}),
-            'archivo': forms.FileInput(attrs={'class': 'form-control'}),
+            'archivo': forms.FileInput(attrs={'class': 'form-control', 'accept': '.docx'}),
         }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Hacemos que el campo "nombre" no sea obligatorio si ya existe un archivo
-        if self.instance and self.instance.archivo:
-            self.fields['nombre'].required = False
+    def clean(self):
+        datos = super().clean()
+        if self.instance.es_sistema:
+            raise forms.ValidationError('Las plantillas del sistema son de solo lectura.')
+        tipo, archivo = datos.get('tipo'), datos.get('archivo')
+        if self.instance.pk and self.instance.activa:
+            original = Documento.objects.get(pk=self.instance.pk)
+            if tipo != original.tipo:
+                self.add_error('tipo', 'Primero activa otra plantilla del tipo actual antes de cambiar esta clasificación.')
+        if tipo and archivo:
+            from .services.plantillas_documentos import validar_archivo
+            try:
+                validar_archivo(archivo, tipo)
+            except forms.ValidationError as error:
+                self.add_error('archivo', error)
+        return datos
 
 # Este formulario es para editar un usuario tipo alumno
 class FormAlumnoUpdate(forms.ModelForm):
@@ -173,6 +187,7 @@ class FormAlumnoUpdate(forms.ModelForm):
         )
 
 class FormVerAlumnos(forms.Form):
+    trimestre_ingreso = forms.ChoiceField(required=False, label="Trimestre de ingreso")
     carrera = forms.ChoiceField(
         choices=[('', 'Todas las carreras')] + CARRERAS[1:],
         required=False,
@@ -183,3 +198,11 @@ class FormVerAlumnos(forms.Form):
         required=False,
         label="Estado"
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['trimestre_ingreso'].choices = [('', 'Todos los trimestres')] + [
+            (f'{anio % 100:02d}-{periodo}', f'{anio % 100:02d}-{periodo}')
+            for anio in range(timezone.localdate().year, 2004, -1)
+            for periodo in ('O', 'P')
+        ]

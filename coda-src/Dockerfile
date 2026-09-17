@@ -1,6 +1,11 @@
 # Usa la imagen base de Python para Django
 FROM python:3.9
 
+# Conversión local de plantillas Word a PDF sin GUI y fuentes de sustitución habituales.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libreoffice-writer-nogui libreoffice-core-nogui fonts-liberation fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+
 # Python cache
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1

@@ -6,6 +6,7 @@ from django.conf import settings  # ✅ Asegurar que está importado
 from typing import Any, Dict
 from django.shortcuts import get_object_or_404
 from django.db.models.query import QuerySet
+from django.db.models import F
 from django.http import HttpResponseRedirect
 from django.shortcuts import render, HttpResponse
 from django.contrib.auth.views import LoginView, PasswordChangeView
@@ -827,6 +828,10 @@ class ajustes(CodaViewMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         documentos = Documento.objects.all()
         context['documentos'] = documentos
+        context['grupos_plantillas'] = [
+            {'tipo': tipo, 'titulo': titulo, 'activa': documentos.filter(tipo=tipo, activa=True).exists(), 'documentos': documentos.filter(tipo=tipo).order_by(F('clave_sistema').asc(nulls_last=True), 'nombre', 'pk')}
+            for tipo, titulo in Documento.TIPOS
+        ]
 
         return context
 
@@ -835,6 +840,13 @@ class CargarPlantilla(CodaViewMixin, CreateView):
     template_name = 'Usuarios/cargar_plantilla.html'
     success_url = reverse_lazy('ajustes')
     form_class = DocumentoForm  
+
+    def get_initial(self):
+        initial = super().get_initial()
+        tipo = self.request.GET.get('tipo')
+        if tipo in dict(Documento.TIPOS):
+            initial['tipo'] = tipo
+        return initial
 
     def form_valid(self, form):
         return super().form_valid(form)
@@ -846,6 +858,11 @@ def eliminar_documento(request, pk):
         raise PermissionDenied("Solo el personal CODDAA puede eliminar documentos.")
 
     documento = get_object_or_404(Documento, pk=pk)
+    if documento.es_sistema:
+        raise PermissionDenied('Las plantillas del sistema no se pueden eliminar.')
+    if documento.activa:
+        messages.error(request, 'Esta plantilla es la predeterminada. Activa otra del mismo tipo antes de eliminarla.')
+        return redirect('ajustes')
     documento.archivo.delete(save=False)
     documento.delete()
     return redirect('ajustes')
@@ -859,7 +876,10 @@ class VerPlantilla(CodaViewMixin, UpdateView):
 
     def get_object(self, queryset=None):
         documento_id = self.kwargs.get('documento_id')
-        return get_object_or_404(Documento, id=documento_id)
+        documento = get_object_or_404(Documento, id=documento_id)
+        if documento.es_sistema:
+            raise PermissionDenied('Las plantillas del sistema son de solo lectura.')
+        return documento
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -871,21 +891,75 @@ class VerAlumnosCODDAAView(CodaViewMixin, FormView):
     template_name = "Usuarios/ver_alumnos_coda.html"
     form_class = FormVerAlumnos
 
-    def form_valid(self, form):
-        carrera = form.cleaned_data.get("carrera")
-        estado = form.cleaned_data.get("estado")
-
-        alumnos = Alumno.objects.all()
-
-        if carrera:
-            alumnos = alumnos.filter(carrera=carrera)
-        if estado:
-            alumnos = alumnos.filter(estado=estado)
-
-        context = self.get_context_data(form=form, alumnos=alumnos)
-        return self.render_to_response(context)
+    def mostrar_alumnos(self, datos):
+        form = self.form_class(datos)
+        alumnos = Alumno.objects.select_related('tutor_asignado').all()
+        if form.is_valid():
+            for campo in ('carrera', 'estado', 'trimestre_ingreso'):
+                valor = form.cleaned_data.get(campo)
+                if valor:
+                    if campo == 'trimestre_ingreso':
+                        alumnos = alumnos.filter(trimestre_ingreso__iexact=valor.strip())
+                    else:
+                        alumnos = alumnos.filter(**{campo: valor})
+        else:
+            alumnos = alumnos.none()
+        return self.render_to_response(self.get_context_data(form=form, alumnos=alumnos.order_by('last_name', 'first_name', 'pk')))
 
     def get(self, request, *args, **kwargs):
-        form = self.get_form()
-        alumnos = Alumno.objects.all()  # por defecto muestra todos
-        return self.render_to_response(self.get_context_data(form=form, alumnos=alumnos));
+        return self.mostrar_alumnos(request.GET)
+
+    def post(self, request, *args, **kwargs):
+        return self.mostrar_alumnos(request.POST)
+
+
+class ActivarPlantillaView(CodaViewMixin, View):
+    def post(self, request, pk):
+        from django.db import transaction
+        from django.core.exceptions import ValidationError
+        from .services.plantillas_documentos import validar_archivo
+        with transaction.atomic():
+            # Serializar cambios de predeterminada para evitar activaciones simultáneas.
+            list(Documento.objects.select_for_update().order_by('pk'))
+            documento = get_object_or_404(Documento, pk=pk)
+            if not documento.tipo:
+                messages.error(request, 'Clasifica y valida esta plantilla antes de activarla.')
+                return redirect('ajustes')
+            try:
+                validar_archivo(documento.archivo_fuente, documento.tipo)
+            except ValidationError as error:
+                messages.error(request, ' '.join(error.messages))
+                return redirect('ajustes')
+            Documento.objects.filter(tipo=documento.tipo, activa=True).update(activa=False)
+            documento.activa = True
+            documento.save(update_fields=['activa'])
+        messages.success(request, 'Plantilla predeterminada actualizada.')
+        return redirect('ajustes')
+
+
+class EjemploPlantillaView(CodaViewMixin, View):
+    def get(self, request, tipo):
+        from pathlib import Path
+        from django.http import FileResponse, Http404
+        archivos = {'alumno': 'carta_asignacion_alumno_plantilla.docx',
+                    'tutor': 'carta_asignacion_tutor_plantilla.docx',
+                    'reporte': 'reporte_tutorias_plantilla.docx'}
+        if tipo not in archivos:
+            raise Http404
+        ruta = Path(settings.BASE_DIR) / 'plantillas_ejemplo' / archivos[tipo]
+        return FileResponse(ruta.open('rb'), as_attachment=True, filename=archivos[tipo])
+
+
+class VistaPreviaPlantillaView(CodaViewMixin, View):
+    def get(self, request, pk):
+        from .services.vista_previa_plantillas import obtener_pdf, ErrorVistaPrevia
+        documento = get_object_or_404(Documento, pk=pk)
+        try:
+            pdf = obtener_pdf(documento)
+        except ErrorVistaPrevia as error:
+            return JsonResponse({'error': str(error)}, status=503)
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = 'inline; filename="vista_previa_plantilla.pdf"'
+        response['Cache-Control'] = 'private, no-store'
+        response['X-Frame-Options'] = 'SAMEORIGIN'
+        return response

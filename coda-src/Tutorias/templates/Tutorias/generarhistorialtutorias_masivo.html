@@ -139,16 +139,10 @@
                             </div>
 
                             <div class="mb-4">
-                                <label class="form-label">Plantilla utilizada</label>
-                                <div class="form-control bg-light">
-                                    {{ plantilla_masiva_nombre }}
-                                </div>
-
-                                <small class="form-text text-muted">
-                                    Esta plantilla se usa automáticamente para la generación masiva.
-                                    Si necesitas modificarla, actualízala desde Ajustes y conserva exactamente el nombre:
-                                    <strong>{{ plantilla_masiva_nombre }}</strong>.
-                                </small>
+                                <label class="form-label" for="id_plantilla">Plantilla del reporte</label>
+                                {% render_field form.plantilla class="form-select" %}
+                                {{ form.plantilla.errors }}
+                                <small class="form-text text-muted">{{ form.plantilla.help_text }}</small>
                             </div>
 
                             <div class="mb-4">
