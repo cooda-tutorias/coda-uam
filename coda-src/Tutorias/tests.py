@@ -2680,12 +2680,12 @@ class ConfiguracionCanalesNotificacionTests(SimpleTestCase):
                 reverse(url_name)
 
 
-class CartaAnualEstadoHistoricoTests(SimpleTestCase):
+class CartaAnualAsistenciaTests(SimpleTestCase):
     """
     Pruebas de la regla de inclusión de tutorías en la carta anual.
 
-    La decisión debe depender del estado histórico guardado en la tutoría,
-    no del estado actual del alumno.
+    La decisión depende únicamente de la asistencia registrada,
+    independientemente del estado histórico o actual del alumno.
     """
 
     def test_incluye_tutoria_con_asistencia_y_estado_historico_activo(self):
@@ -2696,21 +2696,21 @@ class CartaAnualEstadoHistoricoTests(SimpleTestCase):
 
         self.assertTrue(_tutoria_es_reportable(tutoria))
 
-    def test_excluye_tutoria_con_estado_historico_no_reinscrito(self):
+    def test_incluye_tutoria_con_estado_historico_no_reinscrito(self):
         tutoria = SimpleNamespace(
             asistencia=True,
             estado_alumno_historico=2,
         )
 
-        self.assertFalse(_tutoria_es_reportable(tutoria))
+        self.assertTrue(_tutoria_es_reportable(tutoria))
 
-    def test_excluye_tutoria_con_estado_historico_sin_carga_academica(self):
+    def test_incluye_tutoria_con_estado_historico_sin_carga_academica(self):
         tutoria = SimpleNamespace(
             asistencia=True,
             estado_alumno_historico=10,
         )
 
-        self.assertFalse(_tutoria_es_reportable(tutoria))
+        self.assertTrue(_tutoria_es_reportable(tutoria))
 
     def test_excluye_tutoria_sin_asistencia(self):
         tutoria = SimpleNamespace(
@@ -2728,13 +2728,13 @@ class CartaAnualEstadoHistoricoTests(SimpleTestCase):
 
         self.assertFalse(_tutoria_es_reportable(tutoria))
 
-    def test_excluye_tutoria_sin_estado_historico(self):
+    def test_incluye_tutoria_sin_estado_historico(self):
         tutoria = SimpleNamespace(
             asistencia=True,
             estado_alumno_historico=None,
         )
 
-        self.assertFalse(_tutoria_es_reportable(tutoria))
+        self.assertTrue(_tutoria_es_reportable(tutoria))
 
     def test_incluye_si_historico_es_activo_aunque_estado_actual_no_lo_sea(self):
         alumno = SimpleNamespace(estado=2)
@@ -2747,7 +2747,7 @@ class CartaAnualEstadoHistoricoTests(SimpleTestCase):
 
         self.assertTrue(_tutoria_es_reportable(tutoria))
 
-    def test_excluye_si_historico_no_es_activo_aunque_estado_actual_si_lo_sea(self):
+    def test_incluye_si_historico_no_es_activo_aunque_estado_actual_si_lo_sea(self):
         alumno = SimpleNamespace(estado=1)
 
         tutoria = SimpleNamespace(
@@ -2756,4 +2756,4 @@ class CartaAnualEstadoHistoricoTests(SimpleTestCase):
             estado_alumno_historico=2,
         )
 
-        self.assertFalse(_tutoria_es_reportable(tutoria))
+        self.assertTrue(_tutoria_es_reportable(tutoria))
