@@ -25,22 +25,6 @@
                     {% endif %}
                   </h4>
                 </div>
-                <div style="width: 58em;
-                            display: flex;
-                            justify-content: center;
-                            /* min-width: 520px;
-                            */">
-                  <!-- Submit button -->
-                  <a onclick="submitSelected()"
-                     href="#"
-                     class="text-title text-center bg-primary rounded text-white py-2 px-2 me-3 w-auto">
-                    Generar carta(s) de notificación
-                  </a>
-                  <a href="{% url 'Reporte-create' tutor.pk %}"
-                     class="btn-small text-title text-center bg-primary rounded text-white py-2 px-2">
-                    Generar reporte de tutorados
-                  </a>
-                </div>
               </div>
 
               <!--Inicio de table-->
@@ -48,9 +32,6 @@
                 <table class="table table-striped table-hover datatable">
                   <thead>
                     <tr>
-                      <th>
-                        <input type="checkbox" name="sample" id="select-all" />
-                      </th>
                       <th class="text-title h6 text-center">Matrícula</th>
                       <th class="text-title h6 text-center">Nombre</th>
                       <th class="text-title h6 text-center">Correo</th>
@@ -64,9 +45,6 @@
                   <tbody>
                     {% for alumno in object_list %}
                       <tr>
-                        <td>
-                          <input type="checkbox" class="item-checkbox" value="{{ alumno.pk }}">
-                        </td>
                         <td class="text-body text-center">{{ alumno.matricula }}</td>
                         <td class="text-body text-center">{{ alumno.first_name }} {{ alumno.last_name }} {{ alumno.second_last_name }}</td>
                         <td class="text-body text-center">{{ alumno.email }}</td>
@@ -89,34 +67,6 @@
     </div>
   </section>
 
-  <script>
-  const selectAllCheckbox = document.getElementById('select-all');
-  const itemCheckboxes = document.querySelectorAll('.item-checkbox');
 
-  console.log(itemCheckboxes);
-  console.log(selectAllCheckbox);
-  selectAllCheckbox.addEventListener('change', function () {
-      itemCheckboxes.forEach(checkbox => {
-          checkbox.checked = selectAllCheckbox.checked;
-      });
-  });
-
-  function submitSelected() {
-      let selectedCheckboxes = document.querySelectorAll('.item-checkbox:checked');
-      let selectedIDs = Array.from(selectedCheckboxes).map(cb => cb.value);
-
-      if (selectedIDs.length === 0) {
-          alert("Por favor, seleccione al menos un alumno.");
-          return;
-      }
-
-      // Convert selected student IDs to query parameters
-      let queryString = selectedIDs.map(id => `selected_alumnos=${id}`).join("&");
-      console.log(queryString)
-
-      // Redirect to Reporte2-create with selected student IDs
-      window.location.href = `{% url 'Reporte2-create' tutor.pk %}?` + queryString;
-  }
-  </script>
 
 {% endblock %}

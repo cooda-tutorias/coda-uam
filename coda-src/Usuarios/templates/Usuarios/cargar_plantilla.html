@@ -17,6 +17,9 @@
 
                             <form method="post" enctype="multipart/form-data">
                                 {% csrf_token %}
+                                {{ form.non_field_errors }}
+                                {% for field in form %}{% if field.errors %}<div class="alert alert-danger">{{ field.label }}: {{ field.errors }}</div>{% endif %}{% endfor %}
+                                <div class="mb-3"><label class="form-label" for="id_tipo">Tipo de plantilla</label>{% render_field form.tipo class="form-select" %}</div>
                                 
                                 <!-- Nombre del documento -->
                                 <div class="form-outline mb-3 text-body">

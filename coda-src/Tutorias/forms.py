@@ -1,4 +1,6 @@
 from django import forms
+from django.utils import timezone
+from Usuarios.services.plantillas_documentos import configurar_campo
 from .models import Tutoria
 from Usuarios.models import Documento, Alumno, Tutor, HorarioTutor
 from .constants import TEMAS, ESTADO, ACEPTADO, PENDIENTE, DURACION_ASESORIA, ROLES, CARRERAS
@@ -273,81 +275,6 @@ class FormSeguimiento(forms.ModelForm):
             self.fields['estado_alumno_actual'].initial = self.instance.alumno.estado
 
 
-class FormReporte(forms.ModelForm):
-    oficio = forms.IntegerField(required=True, min_value=1)
-    fecha = forms.DateTimeField(widget=forms.DateTimeInput(attrs={'type': 'datetime-local'}))
-    plantilla = forms.ModelChoiceField(queryset=Documento.objects.all(), to_field_name='nombre', label="Selecciona una plantilla")
-    tutor = forms.CharField(widget=forms.TextInput(attrs={'readonly': 'readonly'}))
-    carrera = forms.CharField(widget=forms.TextInput(attrs={'readonly': 'readonly'}))
-
-    class Meta:
-        model = Documento
-        fields = ['oficio', 'plantilla', 'fecha']
-
-    def __init__(self, *args, tutor_instance=None, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        if tutor_instance:
-            full_name = ""
-            # Llenamos el nombre del tutor.
-            if tutor_instance.sexo:
-                if tutor_instance.sexo == "F":
-                    full_name = "Dra."
-                else:
-                    full_name = "Dr."
-                pass
-            full_name += f" {tutor_instance.first_name} {tutor_instance.last_name}"
-            if tutor_instance.second_last_name:
-                full_name += f" {tutor_instance.second_last_name}"
-            self.fields['tutor'].initial = full_name
-
-        carreras_dict = dict([
-            ("MAT", "Matemáticas Aplicadas"),
-            ("COM", "Ingeniería en Computación"),
-            ("IB", "Ingeniería Biológica"),
-            ("BM", "Biología Molecular"),
-        ])
-
-        self.fields['carrera'].initial = carreras_dict.get(tutor_instance.coordinacion, "Licenciatura desconocida")
-
-class FormCartasDeAsignacion(forms.ModelForm):
-    no_inicio = forms.IntegerField(min_value=0)
-    no_cartas = forms.IntegerField(widget=forms.TextInput(attrs={'readonly': 'readonly'}))
-    oficio = forms.CharField(required=False)
-    fecha = forms.DateTimeField(widget=forms.DateTimeInput(attrs={'type': 'datetime-local'}))
-    plantilla = forms.ModelChoiceField(queryset=Documento.objects.all(), to_field_name='nombre', label="Selecciona una plantilla")
-    tutor = forms.CharField(widget=forms.TextInput(attrs={'readonly': 'readonly'}))
-    carrera = forms.CharField(widget=forms.TextInput(attrs={'readonly': 'readonly'}))
-
-    class Meta:
-        model = Documento
-        fields = ['oficio', 'plantilla', 'fecha', 'no_inicio']
-
-    def __init__(self, *args, tutor_instance=None, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        if tutor_instance:
-            full_name = ""
-            if tutor_instance.sexo:
-                if tutor_instance.sexo == "F":
-                    full_name = "Dra."
-                else:
-                    full_name = "Dr."
-                pass
-            full_name += f" {tutor_instance.first_name} {tutor_instance.last_name}"
-            if tutor_instance.second_last_name:
-                full_name += f" {tutor_instance.second_last_name}"
-            self.fields['tutor'].initial = full_name
-
-        carreras_dict = dict([
-            ("MAT", "Matemáticas Aplicadas"),
-            ("COM", "Ingeniería en Computación"),
-            ("IB", "Ingeniería Biológica"),
-            ("BM", "Biología Molecular"),
-        ])
-
-        self.fields['carrera'].initial = carreras_dict.get(tutor_instance.coordinacion, "Licenciatura desconocida")
-
 class FormReporteDeTutorias(forms.ModelForm):
 
     oficio = forms.IntegerField(required=True, min_value=1)
@@ -363,6 +290,7 @@ class FormReporteDeTutorias(forms.ModelForm):
 
     def __init__(self, *args, tutor_instance=None, **kwargs):
         super().__init__(*args, **kwargs)
+        configurar_campo(self, 'plantilla', 'reporte')
         if tutor_instance:
                 full_name = ""
                 if tutor_instance.sexo:
@@ -380,6 +308,7 @@ class FormReporteTutoriasMasivo(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        configurar_campo(self, 'plantilla', 'reporte')
 
         self.fields["tutores"].label_from_instance = self.label_tutor
 
@@ -421,7 +350,7 @@ class FormReporteTutoriasMasivo(forms.Form):
         label="Fecha de emisión"
     )
 
-    PLANTILLA_REPORTE_TUTORIAS_MASIVO = "Reporte tutorías atendidas (carta anual)"
+    plantilla = forms.ModelChoiceField(queryset=Documento.objects.none(), label='Plantilla del reporte')
 
     col_alumno = forms.BooleanField(required=False, initial=True, label="Alumno")
     col_fecha = forms.BooleanField(required=False, initial=True, label="Fecha")
@@ -528,3 +457,30 @@ class FormVerTutorias(forms.Form):
         coerce=int,
         empty_value='',
     )
+
+
+class FormLoteAsignacion(forms.Form):
+    seleccion = forms.CharField(widget=forms.HiddenInput)
+    destinatarios = forms.ChoiceField(choices=[('ambas', 'Cartas para alumnos y tutores'), ('alumno', 'Solo cartas para alumnos'), ('tutor', 'Solo cartas para tutores')], initial='ambas', label='Documentos a generar')
+    plantilla_alumno = forms.ModelChoiceField(queryset=Documento.objects.all(), required=False, label='Plantilla para alumnos')
+    plantilla_tutor = forms.ModelChoiceField(queryset=Documento.objects.all(), required=False, label='Plantilla para tutores')
+    oficio_alumno = forms.IntegerField(min_value=1, required=False, label='No. de oficio inicial para alumnos')
+    oficio_tutor = forms.IntegerField(min_value=1, required=False, label='No. de oficio inicial para tutores')
+    fecha = forms.DateField(initial=timezone.localdate, widget=forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}), label='Fecha de emisión')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        configurar_campo(self, 'plantilla_alumno', 'alumno')
+        configurar_campo(self, 'plantilla_tutor', 'tutor')
+
+    def clean(self):
+        datos = super().clean()
+        tipos = ('alumno', 'tutor') if datos.get('destinatarios') == 'ambas' else (datos.get('destinatarios'),)
+        for tipo in tipos:
+            if tipo not in ('alumno', 'tutor'):
+                continue
+            for prefijo in ('plantilla_', 'oficio_'):
+                campo = prefijo + tipo
+                if not datos.get(campo) and campo not in self.errors:
+                    self.add_error(campo, 'Este campo es obligatorio para los documentos seleccionados.')
+        return datos

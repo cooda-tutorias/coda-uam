@@ -1,6 +1,7 @@
 {% extends "Usuarios/navbar_coda.html" %}
 
-{% block title %}Lista de tutorados{% endblock %}
+{% load widget_tweaks %}
+{% block title %}Alumnado de la DCNI{% endblock %}
 
 {% block body %}
   <section id="section"  style="background-color: #eee;">
@@ -12,18 +13,59 @@
                       width: 100%">
             <div class="card-body p-4" style="width:100%">
               <div class="d-flex w-100 justify-content-start align-items-center mb-2 text-title">
-                <h3 class="text-title-bold text-primary me-2">Alumnos Registrados</h3>
+                <h3 class="text-title-bold text-primary me-2">Alumnado de la DCNI</h3>
               </div>
+              <form method="get" class="row g-3 mb-4">
+                <div class="col-md-4"><label for="id_carrera" class="form-label">Licenciatura</label>{% render_field form.carrera class="form-select" %}</div>
+                <div class="col-md-3"><label for="id_trimestre_ingreso" class="form-label">Trimestre de ingreso</label>{% render_field form.trimestre_ingreso class="form-select" %}</div>
+                <div class="col-md-3"><label for="id_estado" class="form-label">Estado</label>{% render_field form.estado class="form-select" %}</div>
+                <div class="col-md-2 d-flex align-items-end">
+                  <button class="btn btn-primary" type="submit">Filtrar</button>
+                </div>
+                {{ form.errors }}
+              </form>
+              <form method="post"
+                    action="{% url 'cartas-asignacion-lote' %}"
+                    id="form-cartas"
+                    class="mb-4">
+                {% csrf_token %}
+                <input type="hidden" name="seleccion" id="seleccion-cartas">
+                <div class="d-flex flex-wrap align-items-center gap-3 mb-2">
+                  <div class="dropdown">
+                    <button type="button"
+                            id="acciones-alumnos"
+                            class="btn btn-outline-primary dropdown-toggle"
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false"
+                            disabled>Acciones (0)</button>
+                    <ul class="dropdown-menu">
+                      <li>
+                        <button type="submit" id="generar-cartas" class="dropdown-item" disabled>Generar cartas de asignación</button>
+                      </li>
+                    </ul>
+                  </div>
+                  <span class="text-muted" role="status" id="resumen-seleccion">0 seleccionados</span>
+                </div>
+                <small class="text-muted">La casilla superior selecciona los resultados de la búsqueda, en todas las páginas. Al cambiar los filtros de licenciatura, trimestre o estado se inicia una selección nueva.</small>
+              </form>
               <!--Inicio de table-->
               <div class="table-responsive text-body">
-                <table class="table table-striped table-hover datatable">
+                <table id="alumnos-registrados"
+                       class="table table-striped table-hover datatable">
                   <thead class="text-title">
                     <tr>
+                      <th data-orderable="false" data-searchable="false">
+                        <input type="checkbox"
+                               id="seleccionar-alumnos"
+                               class="form-check-input"
+                               aria-label="Seleccionar todos los alumnos de la búsqueda" />
+                      </th>
                       <th>Matrícula</th>
                       <th>Nombre</th>
                       <th>Correo</th>
                       <th>Correo personal</th>
                       <th>Licenciatura</th>
+                      <th>Tutor asignado</th>
                       <th>Estado</th>
                       <th>Trimestre ingreso</th>
                       <th>Acciones</th>
@@ -32,12 +74,18 @@
                   <tbody>
                     {% for alumno in alumnos %}
                       <tr>
+                        <td>
+                          <input type="checkbox"
+                                 class="seleccion-alumno form-check-input"
+                                 value="{{ alumno.pk }}"
+                                 aria-label="Seleccionar alumno {{ alumno.matricula }}">
+                        </td>
                         <td>{{ alumno.matricula }}</td>
                         <td>{{ alumno.first_name }} {{ alumno.last_name }} {{ alumno.second_last_name }}</td>
                         <td>{{ alumno.email }}</td>
                         <td>{{ alumno.correo_personal|default_if_none:"No registrado" }}</td>
                         <td>{{ alumno.get_carrera_display }}</td>
-                        <td>{{ alumno.get_estado_display }}</td>
+                        <td>{% if alumno.tutor_asignado_id %}{{ alumno.tutor_asignado.first_name }} {{ alumno.tutor_asignado.last_name }} {{ alumno.tutor_asignado.second_last_name|default_if_none:"" }}{% else %}<strong class="text-danger">Sin tutor asignado</strong>{% endif %}</td><td>{{ alumno.get_estado_display }}</td>
                         <td>{{ alumno.trimestre_ingreso }}</td>
                         <td class="text-center"><a class="text-body-bold text-primary"
    href="{% url 'editar-alumno' alumno.pk %}">Editar</a></td>
@@ -54,4 +102,46 @@
     </div>
   </section>
 
+{% endblock %}
+
+{% block scripts %}
+  <script>
+$(document).ready(function () {
+  const tabla = $('#alumnos-registrados').DataTable();
+  const seleccionados = new Set();
+  const resumen = document.getElementById('resumen-seleccion');
+  const boton = document.getElementById('generar-cartas');
+  const acciones = document.getElementById('acciones-alumnos');
+  const todos = document.getElementById('seleccionar-alumnos');
+  const idsFiltrados = () => tabla.rows({search: 'applied', page: 'all'}).nodes().toArray()
+    .map(fila => fila.querySelector('.seleccion-alumno').value);
+  function actualizar() {
+    const ids = idsFiltrados();
+    const cantidad = ids.filter(id => seleccionados.has(id)).length;
+    todos.disabled = ids.length === 0;
+    todos.checked = ids.length > 0 && cantidad === ids.length;
+    todos.indeterminate = cantidad > 0 && cantidad < ids.length;
+    tabla.rows().nodes().to$().find('.seleccion-alumno').each(function () { this.checked = seleccionados.has(this.value); });
+    const fuera = seleccionados.size - cantidad;
+    resumen.textContent = seleccionados.size + ' seleccionados' + (fuera ? '; ' + fuera + ' fuera de la búsqueda' : '');
+    acciones.textContent = 'Acciones (' + seleccionados.size + ')';
+    acciones.disabled = seleccionados.size === 0;
+    boton.disabled = seleccionados.size === 0;
+  }
+  $('#alumnos-registrados').on('change', '.seleccion-alumno', function () {
+    if (this.checked) seleccionados.add(this.value); else seleccionados.delete(this.value);
+    actualizar();
+  });
+  todos.addEventListener('change', function () {
+    idsFiltrados().forEach(id => todos.checked ? seleccionados.add(id) : seleccionados.delete(id));
+    actualizar();
+  });
+  tabla.on('draw', actualizar);
+  actualizar();
+  document.getElementById('form-cartas').addEventListener('submit', function (event) {
+    if (!seleccionados.size) { event.preventDefault(); return; }
+    document.getElementById('seleccion-cartas').value = Array.from(seleccionados).join(',');
+  });
+});
+  </script>
 {% endblock %}

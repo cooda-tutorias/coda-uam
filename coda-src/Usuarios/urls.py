@@ -6,6 +6,9 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
+    path('plantillas/<int:pk>/vista-previa/', views.VistaPreviaPlantillaView.as_view(), name='vista-previa-plantilla'),
+    path('plantillas/<int:pk>/activar/', views.ActivarPlantillaView.as_view(), name='activar-plantilla'),
+    path('plantillas/ejemplo/<str:tipo>/', views.EjemploPlantillaView.as_view(), name='ejemplo-plantilla'),
     path('', views.UsuarioLoginView.as_view(), name='login'),
     #path('perfil-test/', views.perfil_view_test, name='perfil-test'),
     path('perfil-alumno/<int:pk>/', views.PerfilAlumnoView.as_view(), name='perfil-alumno'),

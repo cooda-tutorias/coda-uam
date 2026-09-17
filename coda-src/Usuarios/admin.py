@@ -18,7 +18,23 @@ from .services.importacion_tutores import (
 from .models import Usuario, Tutor, Alumno, Coda, Cordinador, Documento
 
 #admin.site.register(Usuario, BaseUserAdmin)
-admin.site.register(Documento)
+@admin.register(Documento)
+class DocumentoAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'tipo', 'activa', 'clave_sistema')
+    exclude = ('clave_sistema',)
+
+    def get_readonly_fields(self, request, obj=None):
+        return ('nombre', 'tipo', 'archivo') if obj and obj.es_sistema else ()
+
+    def has_delete_permission(self, request, obj=None):
+        return False if obj and obj.es_sistema else super().has_delete_permission(request, obj)
+
+    def delete_queryset(self, request, queryset):
+        if queryset.exclude(clave_sistema=None).exists():
+            self.message_user(request, 'No se eliminaron registros: la selección incluye plantillas del sistema.', level='error')
+            return
+        super().delete_queryset(request, queryset)
+
 
 class TutorResource(resources.ModelResource):
 

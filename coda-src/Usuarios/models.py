@@ -267,10 +267,66 @@ class Alumno(Usuario):
         verbose_name = 'Alumno'
         verbose_name_plural = 'Alumnos'
 
+class DocumentoQuerySet(models.QuerySet):
+    def delete(self):
+        from django.core.exceptions import ValidationError
+        if self.exclude(clave_sistema=None).exists():
+            raise ValidationError('Las plantillas del sistema son de solo lectura y no se pueden eliminar.')
+        return super().delete()
+
+    def update(self, **kwargs):
+        from django.core.exceptions import ValidationError
+        if 'clave_sistema' in kwargs or (set(kwargs) - {'activa'} and self.exclude(clave_sistema=None).exists()):
+            raise ValidationError('Las plantillas del sistema son de solo lectura.')
+        return super().update(**kwargs)
+
+
 class Documento(models.Model):
+    objects = DocumentoQuerySet.as_manager()
+    clave_sistema = models.CharField(max_length=10, unique=True, null=True, blank=True, editable=False)
+
+    TIPOS = [('alumno', 'Carta para alumno'), ('tutor', 'Carta para tutor'), ('reporte', 'Reporte de tutorías')]
+    tipo = models.CharField(max_length=10, choices=TIPOS, blank=True, default='')
+    activa = models.BooleanField(default=False)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=['tipo'], condition=models.Q(activa=True), name='una_plantilla_activa_por_tipo')]
+
     nombre = models.CharField(max_length=255, unique=True)  # Nombre del archivo
     archivo = models.FileField(upload_to='documentos/')  # Ruta del archivo en el servidor
     fecha_subida = models.DateTimeField(auto_now_add=True)  # Fecha de subida
+
+    @property
+    def es_sistema(self):
+        return bool(self.clave_sistema)
+
+    @property
+    def archivo_fuente(self):
+        if not self.es_sistema:
+            return self.archivo
+        from pathlib import Path
+        from django.core.files.base import ContentFile
+        archivos = {'alumno': 'carta_asignacion_alumno_plantilla.docx',
+                    'tutor': 'carta_asignacion_tutor_plantilla.docx',
+                    'reporte': 'reporte_tutorias_plantilla.docx'}
+        nombre = archivos[self.clave_sistema]
+        return ContentFile((Path(settings.BASE_DIR) / 'plantillas_ejemplo' / nombre).read_bytes(), name=nombre)
+
+    def save(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+        anterior = type(self).objects.filter(pk=self.pk).first() if self.pk else None
+        if anterior and anterior.es_sistema:
+            if any(getattr(self, campo) != getattr(anterior, campo) for campo in ('nombre', 'tipo', 'archivo', 'clave_sistema', 'fecha_subida')):
+                raise ValidationError('Las plantillas del sistema son de solo lectura.')
+        elif self.clave_sistema:
+            raise ValidationError('Los ejemplos del sistema se registran mediante migraciones.')
+        return super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        from django.core.exceptions import ValidationError
+        if self.es_sistema or type(self).objects.filter(pk=self.pk).exclude(clave_sistema=None).exists():
+            raise ValidationError('Las plantillas del sistema no se pueden eliminar.')
+        return super().delete(*args, **kwargs)
 
     def __str__(self):
         return self.nombre

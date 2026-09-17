@@ -154,7 +154,7 @@ EMAIL_EVENT_CONFIG: dict[str, dict[str, Any]] = {
         "subject": "Registra el informe de la tutoría", "title": "La fecha de la tutoría ya pasó",
         "message": "Registra el informe y la asistencia correspondientes a la sesión.",
         "action_type": "registrar_informe", "action_text": "Registrar informe",
-        "action_url_name": "Reporte2-create", "action_url_uses_pk": True,
+        "action_url_name": "Panel-tutorias-tutor", "action_tab": "historial",
     },
     EventoTutoria.ALU_ELIGE_FECHA_PROPUESTA: {
         "template": CONFIRMATION_TEMPLATE, "recipients": ("tutor",),

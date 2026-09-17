@@ -1,7 +1,9 @@
+from .views_cartas import LoteAsignacionView
 from django.urls import path
 from . import views
 
 urlpatterns = [
+    path('cartas-asignacion/lote/', LoteAsignacionView.as_view(), name='cartas-asignacion-lote'),
     path("tutores/imprimir-qr/", views.imprimir_qr_tutores, name="imprimir-qr-tutores"),
     #path('', views.index, name='index'),
     # path("vertutorias/", views.ver_tutorias),
@@ -13,8 +15,6 @@ urlpatterns = [
     path('editar-tutoria-modal/<int:pk>/', views.TutoriaModalUpdateView.as_view(), name='Tutorias-update-modal'),
 
     path('crear-tutoria/', views.TutoriaCreateView.as_view(), name='Tutorias-create'),
-    path('crear-reporte-2/<int:pk>', views.Reporte2CreateView.as_view(), name='Reporte2-create'),
-    path('crear-reporte/<int:pk>', views.ReporteCreateView.as_view(), name='Reporte-create'),
     path('crear-reporte-historial-tutorias/<int:pk>', views.ReporteTutoriasBrindadasView.as_view(), name='Reporte-tutorias'),    
     path('generar-reporte-historial-tutorias-masivo/', views.ReporteTutoriasBrindadasMasivoView.as_view(), name='Reporte-tutorias-masivo'),
     #path('reset-password/', views.DebugTutoriasView.as_view(), name='reset_password'),
