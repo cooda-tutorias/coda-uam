@@ -7,12 +7,12 @@
   "theme_color": "#F08200",
   "icons": [
     {
-      "src": "/static/Alumnos/img/tutorias_dcni_icon2.png", 
+      "src": "/static/Alumnos/img/icono_ios_sherpa_192x192.png", 
       "sizes": "192x192",
       "type": "image/png"
     },
     {
-      "src": "/static/Alumnos/img/tutorias_dcni_icon2.png",
+      "src": "/static/Alumnos/img/icono_ios_sherpa_512x512.png",
       "sizes": "512x512",
       "type": "image/png"
     }
