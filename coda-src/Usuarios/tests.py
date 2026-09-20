@@ -14,6 +14,8 @@ from urllib.parse import urlsplit
 import json
 import tempfile
 from io import BytesIO
+from zipfile import ZipFile
+from xml.etree import ElementTree
 from unittest.mock import patch
 
 from openpyxl import Workbook, load_workbook
@@ -342,6 +344,21 @@ class TutorResourceTests(TestCase):
 
 
 class NormalizacionImportacionAlumnosTests(TestCase):
+    def test_acepta_abreviaturas_oficiales_codigos_y_nombres(self):
+        for codigo, nombre, oficial in (
+            ("COM", "Ingeniería en Computación", "LIC"),
+            ("MAT", "Matemáticas Aplicadas", "LMA"),
+            ("IB", "Ingeniería Biológica", "LIB"),
+            ("BM", "Biología Molecular", "LBM"),
+        ):
+            for valor in (codigo, nombre, oficial, f" {oficial.lower()} "):
+                with self.subTest(valor=valor):
+                    fila = normalizar_fila_alumno({"Plan de estudios": valor}, 2)
+                    self.assertEqual(fila["carrera"], codigo)
+        for valor, esperado in (("M", "M"), ("Masculino", "M"), (" f ", "F"), ("Femenino", "F")):
+            with self.subTest(sexo=valor):
+                self.assertEqual(normalizar_fila_alumno({"Sexo": valor}, 2)["sexo"], esperado)
+
     def test_normaliza_catalogos_correos_y_espacios(self):
         fila = normalizar_fila_alumno({
             "Plan de estudios": "  ingeniería EN computación ",
@@ -611,6 +628,33 @@ class ValidacionImportacionAlumnosTests(TestCase):
 
 
 class ImportAlumnosViewTests(TestCase):
+    def test_importa_con_sexo_y_correo_alterno_omitidos_o_vacios(self):
+        for omitir in (True, False):
+            with self.subTest(omitir=omitir):
+                matricula = "2223028388" if omitir else "2223028389"
+                encabezado = "Plan de estudios,Matrícula,Correo institucional,Apellido Paterno,Apellido Materno,Nombres,Núm. económico tutor,Estado académico"
+                fila = f"LIC,{matricula},{matricula}@cua.uam.mx,López,,Ana,12345,1"
+                if not omitir:
+                    encabezado += ",Sexo,Correo alterno"
+                    fila += ",,"
+                archivo = SimpleUploadedFile("alumnos.csv", f"{encabezado}\n{fila}\n".encode())
+                response = self.client.post(reverse("importar-alumnos"), {"archivo": archivo})
+                self.assertContains(response, "1 alumno importado correctamente")
+                alumno = Alumno.objects.get(matricula=matricula)
+                self.assertIsNone(alumno.sexo)
+                self.assertIsNone(alumno.correo_personal)
+                self.assertEqual(alumno.carrera, "COM")
+
+    def test_rechaza_valores_invalidos_en_columnas_opcionales(self):
+        for sexo, correo, columna in (("Desconocido", "", "Sexo"), ("F", "incorrecto", "Correo alterno")):
+            with self.subTest(columna=columna):
+                archivo = self.archivo(
+                    f"LIC,2223028388,a1@cua.uam.mx,{correo},López,,Ana,12345,1,{sexo}\n"
+                )
+                response = self.client.post(reverse("importar-alumnos"), {"archivo": archivo})
+                self.assertTrue(any(error.columna == columna for error in response.context["errores_validacion"]))
+                self.assertFalse(Alumno.objects.filter(matricula="2223028388").exists())
+
     encabezado = (
         "Plan de estudios,Matrícula,Correo institucional,Correo alterno,"
         "Apellido Paterno,Apellido Materno,Nombres,Núm. económico tutor,Estado académico,Sexo\n"
@@ -740,6 +784,30 @@ class ImportAlumnosViewTests(TestCase):
 
 
 class PlantillaImportacionAlumnosTests(TestCase):
+    def test_listas_excel_aceptan_alias_y_sexo_vacio(self):
+        contenido = generar_plantilla_importacion_alumnos()
+        libro = load_workbook(BytesIO(contenido))
+        validaciones = {v.promptTitle: v for v in libro["Alumnos"].data_validations.dataValidation}
+        planes = validaciones["Plan de estudios"].formula1.strip('"').split(",")
+        for valor in ("LIC", "LMA", "LIB", "LBM", "Ingeniería en Computación"):
+            self.assertIn(valor, planes)
+        self.assertTrue({"COM", "MAT", "IB", "BM"}.isdisjoint(planes))
+        self.assertLessEqual(len(validaciones["Plan de estudios"].formula1), 255)
+        sexo = validaciones["Sexo"]
+        # Esta versión de openpyxl pierde allowBlank al leerlo; verificar
+        # el atributo que realmente recibe Excel en el archivo generado.
+        with ZipFile(BytesIO(contenido)) as archivo:
+            hoja_xml = ElementTree.fromstring(archivo.read("xl/worksheets/sheet1.xml"))
+        ns = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+        sexo_xml = next(v for v in hoja_xml.findall("x:dataValidations/x:dataValidation", ns)
+                        if v.get("promptTitle") == "Sexo")
+        self.assertEqual(sexo_xml.get("allowBlank"), "1")
+        self.assertEqual(set(sexo.formula1.strip('"').split(",")), {"M", "F", "Masculino", "Femenino"})
+        instrucciones = " ".join(str(c.value) for fila in libro["Instrucciones"] for c in fila if c.value)
+        self.assertIn("Valor obligatorio", instrucciones)
+        self.assertIn("Sexo, Correo alterno y Nombre del tutor pueden quedar vacíos", instrucciones)
+        self.assertEqual({libro["Catálogos"].cell(row=f, column=1).value for f in range(3, 7)}, {"LIC", "LMA", "LIB", "LBM"})
+
     def setUp(self):
         self.coda = Coda.objects.create_user(
             matricula="CODTPL001",

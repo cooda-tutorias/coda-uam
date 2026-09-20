@@ -53,6 +53,7 @@ from .models import HorarioTutor, PushDevice
 from .forms import HorarioTutorForm
 from django.db import transaction
 from .services.importacion_alumnos import (
+    ABREVIATURAS_LICENCIATURAS,
     ErrorImportacionAlumnos,
     importar_alumnos_validados,
     validar_archivo_alumnos,
@@ -761,8 +762,15 @@ class ImportAlumnosView(CodaViewMixin, FormView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        abreviaturas = {
+            codigo: abreviatura
+            for abreviatura, codigo in ABREVIATURAS_LICENCIATURAS.items()
+        }
         context.update({
-            "catalogo_carreras": CARRERAS,
+            "catalogo_carreras": [
+                (abreviaturas[codigo], nombre)
+                for codigo, nombre in CARRERAS if codigo
+            ],
             "catalogo_estados": ESTADOS_ALUMNO,
             "catalogo_sexos": SEXOS,
         })

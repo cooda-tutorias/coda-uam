@@ -48,22 +48,22 @@
                             <div id="formatoImportacion" class="accordion-collapse collapse" aria-labelledby="encabezadoFormatoImportacion" data-bs-parent="#ayudaImportacion">
                                 <div class="accordion-body">
                                     <h3 class="h6">Columnas del archivo</h3>
-                                    <p class="small text-muted">Todos los encabezados obligatorios deben existir, aunque las celdas de Correo alterno y Apellido Materno pueden quedar vacías.</p>
+                                    <p class="small text-muted">Conserva todos los encabezados, excepto los indicados como «columna opcional», que puedes omitir. Los valores marcados como «No» pueden quedar vacíos.</p>
                                     <div class="table-responsive mb-4">
                                         <table class="table table-sm table-bordered align-middle mb-0">
                                             <thead class="table-light">
-                                                <tr><th>Columna</th><th>Celda obligatoria</th><th>Formato o ejemplo</th></tr>
+                                                <tr><th>Columna</th><th>Valor obligatorio</th><th>Formato o ejemplo</th></tr>
                                             </thead>
                                             <tbody>
-                                                <tr><td>Plan de estudios</td><td>Sí</td><td>Biología Molecular</td></tr>
+                                                <tr><td>Plan de estudios</td><td>Sí</td><td>Nombre completo o abreviación oficial; por ejemplo, Ingeniería en Computación o LIC</td></tr>
                                                 <tr><td>Matrícula</td><td>Sí</td><td>Texto o entero de 9 o 10 dígitos, por ejemplo 2223028388</td></tr>
                                                 <tr><td>Apellido Paterno</td><td>Sí</td><td>López</td></tr>
                                                 <tr><td>Apellido Materno</td><td>No</td><td>García</td></tr>
                                                 <tr><td>Nombres</td><td>Sí</td><td>María Fernanda</td></tr>
-                                                <tr><td>Sexo</td><td>Sí</td><td>Masculino o Femenino</td></tr>
+                                                <tr><td>Sexo</td><td>No; columna opcional</td><td>Masculino o M; Femenino o F</td></tr>
                                                 <tr><td>Estado académico</td><td>Sí</td><td>Código del 1 al 19</td></tr>
                                                 <tr><td>Correo institucional</td><td>Sí</td><td>alumno@cua.uam.mx</td></tr>
-                                                <tr><td>Correo alterno</td><td>No</td><td>Correo personal con formato válido</td></tr>
+                                                <tr><td>Correo alterno</td><td>No; columna opcional</td><td>Correo personal con formato válido</td></tr>
                                                 <tr><td>Núm. económico tutor</td><td>Sí</td><td>Entero positivo, por ejemplo 12345</td></tr>
                                                 <tr><td>Nombre del tutor</td><td>No; columna opcional</td><td>Referencia para comprobar el número económico</td></tr>
                                             </tbody>
@@ -72,10 +72,10 @@
 
                                     <div class="row g-4">
                                         <div class="col-lg-4">
-                                            <h3 class="h6">Planes de estudios</h3>
+                                            <h3 class="h6">Planes de estudio</h3>
                                             <ul class="mb-0">
-                                                {% for codigo, nombre in catalogo_carreras %}
-                                                    {% if codigo %}<li>{{ nombre }}</li>{% endif %}
+                                                {% for abreviatura, nombre in catalogo_carreras %}
+                                                    <li>{{ nombre }} o {{ abreviatura }}</li>
                                                 {% endfor %}
                                             </ul>
                                         </div>
@@ -83,7 +83,7 @@
                                             <h3 class="h6">Valores de sexo</h3>
                                             <ul class="mb-0">
                                                 {% for codigo, nombre in catalogo_sexos %}
-                                                    {% if codigo %}<li>{{ nombre }}</li>{% endif %}
+                                                    {% if codigo %}<li>{{ nombre }} o {{ codigo }}</li>{% endif %}
                                                 {% endfor %}
                                             </ul>
                                         </div>

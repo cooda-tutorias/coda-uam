@@ -14,7 +14,10 @@ from django.core.validators import validate_email
 from django.db import transaction
 from django.db.models.functions import Lower
 
-from Usuarios.constants import ALUMNO, CARRERAS, ESTADOS_ALUMNO, SEXOS
+from Usuarios.constants import (
+    ALUMNO, CARRERAS, ESTADOS_ALUMNO, SEXOS,
+    COMPUTACION, MATEMATICAS, IBIOLOGICA, BMOLECULAR,
+)
 from Usuarios.models import Alumno, Tutor, Usuario
 
 
@@ -24,13 +27,18 @@ ENCABEZADOS_IMPORTACION = (
     "Apellido Paterno",
     "Apellido Materno",
     "Nombres",
-    "Sexo",
     "Estado académico",
     "Correo institucional",
-    "Correo alterno",
     "Núm. económico tutor",
 )
-ENCABEZADOS_OPCIONALES = ("Nombre del tutor",)
+ENCABEZADOS_OPCIONALES = ("Sexo", "Correo alterno", "Nombre del tutor")
+
+ABREVIATURAS_LICENCIATURAS = {
+    "LIC": COMPUTACION,
+    "LMA": MATEMATICAS,
+    "LIB": IBIOLOGICA,
+    "LBM": BMOLECULAR,
+}
 
 TRIMESTRES_INGRESO = {
     "1": "I",
@@ -113,13 +121,18 @@ def _coincidencia_nombre(nombre_referencia: str, nombre_registrado: str) -> floa
 
 def _catalogo_normalizado(opciones) -> dict[str, tuple[Any, str]]:
     return {
-        _clave_comparacion(etiqueta): (codigo, etiqueta)
+        _clave_comparacion(valor): (codigo, etiqueta)
         for codigo, etiqueta in opciones
         if codigo != ""
+        for valor in (codigo, etiqueta)
     }
 
 
 CARRERAS_NORMALIZADAS = _catalogo_normalizado(CARRERAS)
+CARRERAS_NORMALIZADAS.update({
+    _clave_comparacion(abreviatura): (codigo, dict(CARRERAS)[codigo])
+    for abreviatura, codigo in ABREVIATURAS_LICENCIATURAS.items()
+})
 SEXOS_NORMALIZADOS = _catalogo_normalizado(SEXOS)
 
 
@@ -328,7 +341,7 @@ def validar_filas_alumnos(filas: list[dict[str, Any]]) -> ResultadoValidacionAlu
                 "No corresponde a uno de los planes de estudios permitidos.",
                 fila["carrera_nombre"],
             )
-        if fila["sexo"] is None:
+        if fila["sexo_nombre"] and fila["sexo"] is None:
             _agregar_error(
                 resultado, numero, "Sexo",
                 "No corresponde a una de las opciones permitidas.", fila["sexo_nombre"],

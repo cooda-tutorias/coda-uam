@@ -9,6 +9,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 
 from Usuarios.constants import CARRERAS, ESTADOS_ALUMNO, SEXOS
 from Usuarios.services.importacion_alumnos import (
+    ABREVIATURAS_LICENCIATURAS,
     ENCABEZADOS_IMPORTACION,
     ENCABEZADOS_OPCIONALES,
 )
@@ -23,13 +24,13 @@ EJEMPLOS_COLUMNAS = {
     "Plan de estudios": ("No", "Biología Molecular"),
     "Matrícula": ("No", "2223028388 (se recomienda formato Texto)"),
     "Correo institucional": ("No", "alumno.ejemplo@cua.uam.mx"),
-    "Correo alterno": ("Sí", "alumno.personal@example.com"),
+    "Correo alterno": ("Sí; columna opcional", "alumno.personal@example.com"),
     "Apellido Paterno": ("No", "López"),
     "Apellido Materno": ("Sí", "García"),
     "Nombres": ("No", "María Fernanda"),
     "Núm. económico tutor": ("No", "12345"),
     "Estado académico": ("No", "1"),
-    "Sexo": ("No", "Femenino"),
+    "Sexo": ("Sí; columna opcional", "Masculino o M; Femenino o F"),
     "Nombre del tutor": ("Sí; columna opcional", "José Antonio Pérez"),
 }
 
@@ -43,11 +44,11 @@ def _lista_excel(valores):
     return '"' + ",".join(str(valor) for valor in valores) + '"'
 
 
-def _agregar_validacion(hoja, columna, valores, titulo, mensaje):
+def _agregar_validacion(hoja, columna, valores, titulo, mensaje, permite_vacio=False):
     validacion = DataValidation(
         type="list",
         formula1=_lista_excel(valores),
-        allow_blank=False,
+        allow_blank=permite_vacio,
     )
     validacion.error = mensaje
     validacion.errorTitle = "Valor no permitido"
@@ -87,9 +88,10 @@ def _crear_hoja_alumnos(libro):
     _agregar_validacion(
         hoja,
         posiciones["Plan de estudios"],
-        [nombre for _, nombre in _opciones(CARRERAS)],
+        [nombre for _, nombre in _opciones(CARRERAS)]
+        + list(ABREVIATURAS_LICENCIATURAS),
         "Plan de estudios",
-        "Seleccione uno de los planes de estudios permitidos.",
+        "Use el nombre completo o la abreviación oficial (LIC, LMA, LIB, LBM).",
     )
     _agregar_validacion(
         hoja,
@@ -101,9 +103,10 @@ def _crear_hoja_alumnos(libro):
     _agregar_validacion(
         hoja,
         posiciones["Sexo"],
-        [nombre for _, nombre in _opciones(SEXOS)],
+        [valor for codigo, nombre in _opciones(SEXOS) for valor in (nombre, codigo)],
         "Sexo",
-        "Seleccione uno de los valores permitidos.",
+        "Use Masculino o M; Femenino o F. Puede dejar el valor vacío.",
+        permite_vacio=True,
     )
 
 
@@ -116,10 +119,14 @@ def _crear_hoja_instrucciones(libro):
 
     instrucciones = (
         "Capture un alumno por fila en la hoja Alumnos.",
-        "No cambie los encabezados ni el orden de la primera hoja.",
+        "Conserve los nombres de los encabezados y la hoja Alumnos como primera hoja.",
         "La matrícula puede ser texto o entero y debe contener 9 o 10 dígitos; se recomienda conservarla como texto.",
         "El tutor debe estar registrado antes de importar el archivo.",
-        "Nombre del tutor es opcional y sólo sirve para comprobar el número económico.",
+        "Sexo, Correo alterno y Nombre del tutor pueden quedar vacíos; también puede omitir esas columnas.",
+        "Apellido Materno puede quedar vacío, pero su columna debe estar presente.",
+        "Plan de estudios: use el nombre completo o la abreviación oficial LIC, LMA, LIB o LBM.",
+        "Sexo: use Masculino o M; Femenino o F.",
+        "Nombre del tutor sólo sirve para comprobar el número económico.",
         "El trimestre de ingreso se obtiene automáticamente de la matrícula.",
         "Si existe cualquier error, no se importará ningún alumno.",
     )
@@ -128,13 +135,16 @@ def _crear_hoja_instrucciones(libro):
         hoja.merge_cells(start_row=fila, start_column=1, end_row=fila, end_column=4)
 
     fila_tabla = len(instrucciones) + 5
-    encabezados = ("Columna", "Puede quedar vacía", "Ejemplo", "Observaciones")
+    encabezados = ("Columna", "Valor obligatorio", "Ejemplo", "Observaciones")
     for columna, valor in enumerate(encabezados, start=1):
         celda = hoja.cell(row=fila_tabla, column=columna, value=valor)
         celda.font = Font(color=COLOR_ENCABEZADO, bold=True)
         celda.fill = PatternFill("solid", fgColor=COLOR_PRIMARIO)
 
     observaciones = {
+        "Plan de estudios": "LIC: Ingeniería en Computación; LMA: Matemáticas Aplicadas; LIB: Ingeniería Biológica; LBM: Biología Molecular.",
+        "Sexo": "Columna opcional. Use Masculino o M; Femenino o F.",
+        "Correo alterno": "Columna opcional. Si proporciona un correo, debe tener formato válido.",
         "Matrícula": "Se recomienda conservar formato Texto; también se aceptan enteros.",
         "Núm. económico tutor": "Es el dato utilizado para asignar al tutor.",
         "Estado académico": "Consulte los códigos en la hoja Catálogos.",
@@ -147,12 +157,14 @@ def _crear_hoja_instrucciones(libro):
         puede_vacio, ejemplo = EJEMPLOS_COLUMNAS[encabezado]
         valores = (
             encabezado,
-            puede_vacio,
+            "No; columna opcional" if encabezado in ENCABEZADOS_OPCIONALES else ("No" if puede_vacio == "Sí" else "Sí"),
             ejemplo,
             observaciones.get(encabezado, ""),
         )
         for columna, valor in enumerate(valores, start=1):
-            hoja.cell(row=fila_tabla + desplazamiento, column=columna, value=valor)
+            celda = hoja.cell(row=fila_tabla + desplazamiento, column=columna, value=valor)
+            celda.alignment = Alignment(wrap_text=True, vertical="top")
+        hoja.row_dimensions[fila_tabla + desplazamiento].height = 60
 
     for columna, ancho in zip("ABCD", (32, 22, 42, 58)):
         hoja.column_dimensions[columna].width = ancho
@@ -162,8 +174,9 @@ def _crear_hoja_instrucciones(libro):
 def _crear_hoja_catalogos(libro):
     hoja = libro.create_sheet("Catálogos")
     hoja.sheet_view.showGridLines = False
+    oficiales = {codigo: abreviatura for abreviatura, codigo in ABREVIATURAS_LICENCIATURAS.items()}
     bloques = (
-        (1, "Planes de estudios", _opciones(CARRERAS)),
+        (1, "Planes de estudios", [(oficiales[codigo], nombre) for codigo, nombre in _opciones(CARRERAS)]),
         (4, "Sexo", _opciones(SEXOS)),
         (7, "Estados del alumno", _opciones(ESTADOS_ALUMNO)),
     )
@@ -177,7 +190,7 @@ def _crear_hoja_catalogos(libro):
             end_row=1,
             end_column=columna_inicial + 1,
         )
-        hoja.cell(row=2, column=columna_inicial, value="Código").font = Font(bold=True)
+        hoja.cell(row=2, column=columna_inicial, value="Abreviación oficial" if columna_inicial == 1 else "Código").font = Font(bold=True)
         hoja.cell(row=2, column=columna_inicial + 1, value="Descripción").font = Font(bold=True)
         for fila, (codigo, nombre) in enumerate(opciones, start=3):
             hoja.cell(row=fila, column=columna_inicial, value=codigo)
@@ -185,6 +198,7 @@ def _crear_hoja_catalogos(libro):
 
     for columna in ("A", "D", "G"):
         hoja.column_dimensions[columna].width = 12
+    hoja.column_dimensions["A"].width = 22
     for columna in ("B", "E", "H"):
         hoja.column_dimensions[columna].width = 52
     hoja.freeze_panes = "A3"
