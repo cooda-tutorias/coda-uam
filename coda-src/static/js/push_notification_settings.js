@@ -243,7 +243,82 @@
         return Uint8Array.from([...rawData].map(character => character.charCodeAt(0)));
     }
 
+    function registerActiveWorker() {
+        // register() puede terminar antes de la primera activación. No usamos
+        // serviceWorker.ready: la página está fuera del scope /static/js/.
+        return new Promise((resolve, reject) => {
+            let registration = null;
+            let settled = false;
+            const workers = new Set();
+            const finish = (error) => {
+                if (settled) return;
+                settled = true;
+                window.clearTimeout(timer);
+                if (registration) registration.removeEventListener("updatefound", check);
+                workers.forEach(worker => worker.removeEventListener("statechange", check));
+                if (error) reject(error);
+                else resolve(registration);
+            };
+            const check = () => {
+                if (settled) return;
+                if (registration.active && registration.active.state === "activated") {
+                    finish();
+                    return;
+                }
+                const candidates = [registration.active, registration.waiting, registration.installing]
+                    .filter(Boolean);
+                candidates.forEach(worker => {
+                    if (!workers.has(worker)) {
+                        workers.add(worker);
+                        worker.addEventListener("statechange", check);
+                    }
+                });
+                if (workers.size && [...workers].every(worker => worker.state === "redundant")) {
+                    finish(new Error("No se pudieron preparar las notificaciones. Recarga la página e inténtalo de nuevo."));
+                }
+            };
+            const timer = window.setTimeout(() => {
+                finish(new Error("La preparación de las notificaciones tardó demasiado. Revisa tu conexión e inténtalo de nuevo."));
+            }, 15000);
+            navigator.serviceWorker.register(config.serviceWorkerUrl).then(value => {
+                if (settled) return;
+                registration = value;
+                registration.addEventListener("updatefound", check);
+                check();
+            }).catch(error => {
+                console.error("No fue posible registrar el Service Worker:", error);
+                finish(new Error("No se pudieron preparar las notificaciones. Revisa tu conexión y recarga la página para intentarlo de nuevo."));
+            });
+        });
+    }
+
+    let activationInProgress = false;
     async function activateCurrentDevice() {
+        if (activationInProgress) return;
+        activationInProgress = true;
+        const button = elements.currentCard.querySelector('[data-push-action="register"]');
+        const previousText = button ? button.textContent : "";
+        const switchWasDisabled = elements.globalSwitch.disabled;
+        elements.globalSwitch.disabled = true;
+        if (button) {
+            button.disabled = true;
+            button.textContent = "Activando...";
+        }
+        setMessage("Activando...", "info");
+        try {
+            await performDeviceActivation();
+            setMessage("Este dispositivo quedó activo para recibir notificaciones.", "success");
+        } finally {
+            activationInProgress = false;
+            elements.globalSwitch.disabled = switchWasDisabled;
+            if (button) {
+                button.disabled = false;
+                button.textContent = previousText;
+            }
+        }
+    }
+
+    async function performDeviceActivation() {
         if (isIosWithoutInstallation()) throw new Error("Primero agrega el sitio a la pantalla de inicio.");
         if (!pushSupported()) throw new Error("Este navegador no admite notificaciones push.");
         if (Notification.permission === "denied") {
@@ -258,7 +333,7 @@
             throw new Error("No se concedió permiso para mostrar notificaciones.");
         }
 
-        const registration = await navigator.serviceWorker.register(config.serviceWorkerUrl);
+        const registration = await registerActiveWorker();
         localSubscription = await registration.pushManager.getSubscription();
         if (!localSubscription) {
             localSubscription = await registration.pushManager.subscribe({

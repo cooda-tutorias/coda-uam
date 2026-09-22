@@ -31,7 +31,7 @@
                       <tr>
                         <td>{{ tutoria.alumno.matricula }}</td>
                         <td>{{ tutoria.alumno.trimestre_ingreso }}</td>
-                        <td><a href="{% url 'perfil-alumno' tutoria.alumno.pk %}">{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}</a></td>
+                        <td><a href="{% url 'perfil-alumno' tutoria.alumno.pk %}">{{ tutoria.alumno.nombre_completo }}</a></td>
                         <td>{{ tutoria.alumno.email }}</td>
                         <td>{{ tutoria.alumno.get_estado_display }}</td>
                         <!-- <td class="text-body-bold"> <a href="{% url 'crear-tutoria' tutoria.alumno.pk %}">Solicitar tutoría</a> </td> -->

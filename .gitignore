@@ -186,3 +186,6 @@ coda-src/scripts/resultados_t28/*.zip
 dumps_t28/*.sql
 
 .djlintrc
+
+# Archivos temporales de bloqueo de LibreOffice
+.~lock.*#

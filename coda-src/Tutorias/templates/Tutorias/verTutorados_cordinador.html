@@ -18,10 +18,7 @@
                   {% else %}
                     Dr.
                   {% endif %}
-                  {{ tutor.first_name }} {{ tutor.last_name }}
-                  {% if tutor.second_last_name %}
-                    {{ tutor.second_last_name }}
-                  {% endif %}
+                  {{ tutor.nombre_completo }}
                 </h4>
               </div>
               <!--Inicio de table-->
@@ -42,7 +39,7 @@
                     {% for alumno in object_list %}
                       <tr>
                         <td>{{ alumno.matricula }}</td>
-                        <td>{{ alumno.first_name }} {{ alumno.last_name }} {{ alumno.second_last_name }}</td>
+                        <td>{{ alumno.nombre_completo }}</td>
                         <td>{{ alumno.email }}</td>
                         <td>{{ alumno.correo_personal|default_if_none:"No registrado" }}</td>
                         <td>{{ alumno.get_carrera_display }}</td>

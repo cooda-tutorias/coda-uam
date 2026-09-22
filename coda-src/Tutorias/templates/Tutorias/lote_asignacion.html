@@ -25,8 +25,8 @@
           <summary>Revisar alumnos agrupados por tutor</summary>
           {% for grupo in grupos %}
             <div class="border rounded p-3 my-2">
-              <strong>{{ grupo.carrera }} — {% if grupo.tutor %}{{ grupo.tutor.first_name }} {{ grupo.tutor.last_name }} {{ grupo.tutor.second_last_name|default_if_none:"" }}{% else %}Sin tutor asignado{% endif %}</strong>
-              <ul class="mb-0">{% for alumno in grupo.alumnos %}<li>{{ alumno.matricula }} — {{ alumno.first_name }} {{ alumno.last_name }} {{ alumno.second_last_name|default_if_none:"" }}</li>{% endfor %}</ul>
+              <strong>{{ grupo.carrera }} — {% if grupo.tutor %}{{ grupo.tutor.nombre_completo }}{% else %}Sin tutor asignado{% endif %}</strong>
+              <ul class="mb-0">{% for alumno in grupo.alumnos %}<li>{{ alumno.matricula }} — {{ alumno.nombre_completo }}</li>{% endfor %}</ul>
             </div>
           {% endfor %}
         </details>

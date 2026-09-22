@@ -55,7 +55,7 @@
                                         <tr>
                                             <td>{{ tutoria.pk }}</td>
                                             <td>{{ tutoria.alumno.matricula }}</td>
-                                            <td>{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}</td>
+                                            <td>{{ tutoria.alumno.nombre_completo }}</td>
                                             <td>{{ tutoria.get_estado_alumno_historico_display }}</td>
                                             <td>{{ tutoria.alumno.get_estado_display }}</td>
                                             <td>{{ tutoria.fecha|date:"Y-m-d" }}</td>

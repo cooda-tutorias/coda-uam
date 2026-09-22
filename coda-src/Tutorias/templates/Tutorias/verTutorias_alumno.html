@@ -37,12 +37,12 @@
                                                 <tr class="text-body text-center">
                                                     <td>{{ tutoria.pk }}</td>
                                                     <td>{{ tutoria.alumno.matricula }}</td>
-                                                    <td>{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}</td>
+                                                    <td>{{ tutoria.alumno.nombre_completo }}</td>
                                                     <td>{{ tutoria.fecha|date }}</td>
                                                     <td>{{ tutoria.fecha|date:"P" }}</td>
                                                     <!--Se agregó |join:", " para quitar notación de lista-->
                                                     <td>{{ tutoria.get_tema_display|join:", " }}</td>
-                                                    <td>{{ tutoria.tutor.first_name }} {{ tutoria.tutor.last_name }} {{ tutoria.tutor.second_last_name }}</td>
+                                                    <td>{{ tutoria.tutor.nombre_completo }}</td>
                                                     <td class="text-center text-body-bold">
                                                         <a href="{% url 'Tutorias-update' pk=tutoria.pk %}">Editar</a>
                                                     </td>

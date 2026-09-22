@@ -81,11 +81,11 @@
                                  aria-label="Seleccionar alumno {{ alumno.matricula }}">
                         </td>
                         <td>{{ alumno.matricula }}</td>
-                        <td>{{ alumno.first_name }} {{ alumno.last_name }} {{ alumno.second_last_name }}</td>
+                        <td>{{ alumno.nombre_completo }}</td>
                         <td>{{ alumno.email }}</td>
                         <td>{{ alumno.correo_personal|default_if_none:"No registrado" }}</td>
                         <td>{{ alumno.get_carrera_display }}</td>
-                        <td>{% if alumno.tutor_asignado_id %}{{ alumno.tutor_asignado.first_name }} {{ alumno.tutor_asignado.last_name }} {{ alumno.tutor_asignado.second_last_name|default_if_none:"" }}{% else %}<strong class="text-danger">Sin tutor asignado</strong>{% endif %}</td><td>{{ alumno.get_estado_display }}</td>
+                        <td>{% if alumno.tutor_asignado_id %}{{ alumno.tutor_asignado.nombre_completo }}{% else %}<strong class="text-danger">Sin tutor asignado</strong>{% endif %}</td><td>{{ alumno.get_estado_display }}</td>
                         <td>{{ alumno.trimestre_ingreso }}</td>
                         <td class="text-center"><a class="text-body-bold text-primary"
    href="{% url 'editar-alumno' alumno.pk %}">Editar</a></td>

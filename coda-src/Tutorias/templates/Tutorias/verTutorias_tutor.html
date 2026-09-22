@@ -72,8 +72,8 @@
               <select id="alumno-filter">
                 <option value="todos">Todos</option>
                 {% for alumno in tutorados %}
-                <option value="{{alumno.first_name}} {{alumno.last_name}} {{ alumno.second_last_name }}">
-                  {{alumno.first_name}} {{alumno.last_name}} {{ alumno.second_last_name }}</option>
+                <option value="{{ alumno.nombre_completo }}">
+                  {{ alumno.nombre_completo }}</option>
                 {% endfor %}
               </select>
             </div> -->
@@ -113,9 +113,9 @@
                   </thead>
                   <tbody id="data" class="text-body">
                     {% for tutoria in object_list %}
-                      <tr data-alumno="{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}">
+                      <tr data-alumno="{{ tutoria.alumno.nombre_completo }}">
                         <td>{{ tutoria.alumno.matricula }}</td>
-                        <td>{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}</td>
+                        <td>{{ tutoria.alumno.nombre_completo }}</td>
                         <!--<td>{{ tutoria.get_estado_alumno_historico_display }}</td>-->
                         <td>{{ tutoria.alumno.get_estado_display }}</td>
                         <td class="text-nowrap">

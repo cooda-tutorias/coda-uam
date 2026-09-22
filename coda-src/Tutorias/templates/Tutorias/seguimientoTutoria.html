@@ -24,7 +24,7 @@
                 <dl class="row mb-0 small student-info-list">
                   <dt class="col-5 text-muted">Nombre</dt>
                   <dd class="col-7 mb-2">
-                    {{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}
+                    {{ tutoria.alumno.nombre_completo }}
                   </dd>
 
                   <dt class="col-5 text-muted">Matrícula</dt>
@@ -308,7 +308,7 @@
                       <label class="form-label">Alumno</label>
                       <input type="text"
                              class="form-control"
-                             value="{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}"
+                             value="{{ tutoria.alumno.nombre_completo }}"
                              readonly>
                     </div>
                     <div class="col-12 col-md-6">

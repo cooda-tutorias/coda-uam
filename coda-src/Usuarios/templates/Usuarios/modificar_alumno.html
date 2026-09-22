@@ -99,10 +99,7 @@
                         {% for tutor in group.list %}
                           <option value="{{ tutor.pk }}"
                                   {% if tutor.pk == form.initial.tutor_asignado %}selected{% endif %}>
-                            {{ tutor.matricula }} - {{ tutor.first_name }} {{ tutor.last_name }}
-                            {% if tutor.second_last_name %}
-                              {{ tutor.second_last_name }}
-                            {% endif %}
+                            {{ tutor.matricula }} - {{ tutor.nombre_completo }}
                           </option>
                         {% endfor %}
                       </optgroup>

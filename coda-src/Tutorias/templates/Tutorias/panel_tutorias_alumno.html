@@ -492,10 +492,6 @@
                             <!-- Celda que muestra el estado de la tutoría con un badge -->
                             <td>{% include "Tutorias/includes/partials/badge_estado_historial.html" with tutoria=tutoria %}</td>
                           </tr>
-                        {% empty %}
-                          <tr>
-                            <td colspan="6" class="py-4 text-center text-muted">Aún no hay tutorías en tu historial.</td>
-                          </tr>
                         {% endfor %}
                       </tbody>
                     </table>

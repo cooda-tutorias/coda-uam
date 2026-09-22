@@ -65,7 +65,7 @@
                                  aria-label="Seleccionar a {{ tutor.nombre_completo }}">
                         </td>
                         <td>{{ tutor.matricula }}</td>
-                        <td>{{ tutor.first_name }} {{ tutor.last_name }} {% if tutor.second_last_name %}{{ tutor.second_last_name }}{% endif %}</td>
+                        <td>{{ tutor.nombre_completo }}</td>
                         <td>{{ tutor.email }}</td>
                         <td>{{ tutor.get_coordinacion_display }}</td>
                         <td><a class="text-body-bold" href="{% url 'Tutorias-Coda' tutor.pk %}">Ver Tutorías</a></td>

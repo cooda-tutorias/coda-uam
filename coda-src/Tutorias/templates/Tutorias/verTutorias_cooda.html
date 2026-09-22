@@ -20,10 +20,7 @@
                     {% else %}
                       Dr.
                     {% endif %}
-                    {{ tutor.first_name }} {{ tutor.last_name }}
-                    {% if tutor.second_last_name %}
-                      {{ tutor.second_last_name }}
-                    {% endif %}
+                    {{ tutor.nombre_completo }}
                   </h4>
                 </div>
                 <div class="d-flex w-75 justify-content-evenly align-items-center">
@@ -63,10 +60,10 @@
                   </thead>
                   <tbody>
                     {% for tutoria in object_list %}
-                      <tr data-alumno="{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }} ">
+                      <tr data-alumno="{{ tutoria.alumno.nombre_completo }} ">
                         <td class="text-body">{{ tutoria.pk }}</td>
                         <td class="text-body text-center">{{ tutoria.alumno.matricula }}</td>
-                        <td class="text-body">{{ tutoria.alumno.first_name }} {{ tutoria.alumno.last_name }} {{ tutoria.alumno.second_last_name }}</td>
+                        <td class="text-body">{{ tutoria.alumno.nombre_completo }}</td>
                         <td class="text-body">{{ tutoria.get_estado_alumno_historico_display }}</td>
                         <td class="text-body">{{ tutoria.alumno.get_estado_display }}</td>
                         <td class="text-body">{{ tutoria.fecha|date }}</td>
