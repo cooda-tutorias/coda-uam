@@ -43,7 +43,10 @@
               </td>
             </tr>
             <tr>
-              <td style="background:#f8f8f8;color:#777;font-size:12px;padding:14px 24px;border-top:1px solid #eee">Este es un correo automático del Sistema de Acompañamiento al Alumnado (CODDAA).</td>
+              <td style="background:#f8f8f8;color:#777;font-size:12px;padding:14px 24px;border-top:1px solid #eee">
+                {% if sistema_url %}<div style="margin-bottom:10px"><a href="{{ sistema_url }}" style="color:#b25800">Ir al sistema de tutorías</a></div>{% endif %}
+                Este es un correo automático del Sistema de Acompañamiento al Alumnado (CODDAA).
+              </td>
             </tr>
           </table>
         </td>

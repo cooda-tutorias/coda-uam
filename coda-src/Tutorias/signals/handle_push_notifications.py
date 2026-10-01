@@ -38,7 +38,7 @@ PUSH_EVENT_INFO: dict[EventoTutoria, dict[str, object]] = {
         "recipients": ("tutor",),
         "head": "📱 Tutoría registrada por QR",
         "body": "{actor} registró una tutoría contigo mediante código QR.",
-        "url": {"tutor": ("Panel-tutorias-tutor", "agendadas")},
+        "url": {"tutor": ("Panel-tutorias-tutor", "historial")},
     },
     EventoTutoria.ALU_SOLICITA_TUTORIA: {
         "recipients": ("tutor",),

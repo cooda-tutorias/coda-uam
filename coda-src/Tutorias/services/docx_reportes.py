@@ -7,6 +7,7 @@ from docx.enum.text import WD_BREAK
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import RGBColor, Inches
+from Tutorias.constants import REPORTADA
 
 def paragraph_replace_text(paragraph, regex, replace_str):
     while True:
@@ -92,10 +93,10 @@ def _tutoria_es_reportable(tutoria):
     """
     Determina si una tutoría debe incluirse en la carta anual.
 
-    Una tutoría se incluye únicamente cuando se registró asistencia,
+    Una tutoría se incluye únicamente cuando está reportada y el alumno asistió,
     independientemente del estado histórico o actual del alumno.
     """
-    return tutoria.asistencia is True
+    return tutoria.estado_efectivo == REPORTADA and tutoria.asistencia is True
 
 
 def _build_report_rows(tutorias, mostrar_col_alumno, mostrar_col_fecha, mostrar_col_hora, mostrar_col_tema, mostrar_col_notas, tema_dict):

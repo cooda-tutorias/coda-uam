@@ -2684,12 +2684,13 @@ class CartaAnualAsistenciaTests(SimpleTestCase):
     """
     Pruebas de la regla de inclusión de tutorías en la carta anual.
 
-    La decisión depende únicamente de la asistencia registrada,
+    La decisión exige una tutoría reportada con asistencia confirmada,
     independientemente del estado histórico o actual del alumno.
     """
 
     def test_incluye_tutoria_con_asistencia_y_estado_historico_activo(self):
         tutoria = SimpleNamespace(
+            estado_efectivo=REPORTADA,
             asistencia=True,
             estado_alumno_historico=1,
         )
@@ -2698,6 +2699,7 @@ class CartaAnualAsistenciaTests(SimpleTestCase):
 
     def test_incluye_tutoria_con_estado_historico_no_reinscrito(self):
         tutoria = SimpleNamespace(
+            estado_efectivo=REPORTADA,
             asistencia=True,
             estado_alumno_historico=2,
         )
@@ -2706,6 +2708,7 @@ class CartaAnualAsistenciaTests(SimpleTestCase):
 
     def test_incluye_tutoria_con_estado_historico_sin_carga_academica(self):
         tutoria = SimpleNamespace(
+            estado_efectivo=REPORTADA,
             asistencia=True,
             estado_alumno_historico=10,
         )
@@ -2714,6 +2717,7 @@ class CartaAnualAsistenciaTests(SimpleTestCase):
 
     def test_excluye_tutoria_sin_asistencia(self):
         tutoria = SimpleNamespace(
+            estado_efectivo=REPORTADA,
             asistencia=False,
             estado_alumno_historico=1,
         )
@@ -2722,6 +2726,7 @@ class CartaAnualAsistenciaTests(SimpleTestCase):
 
     def test_excluye_tutoria_con_asistencia_sin_registrar(self):
         tutoria = SimpleNamespace(
+            estado_efectivo=REPORTADA,
             asistencia=None,
             estado_alumno_historico=1,
         )
@@ -2730,6 +2735,7 @@ class CartaAnualAsistenciaTests(SimpleTestCase):
 
     def test_incluye_tutoria_sin_estado_historico(self):
         tutoria = SimpleNamespace(
+            estado_efectivo=REPORTADA,
             asistencia=True,
             estado_alumno_historico=None,
         )
@@ -2741,6 +2747,7 @@ class CartaAnualAsistenciaTests(SimpleTestCase):
 
         tutoria = SimpleNamespace(
             alumno=alumno,
+            estado_efectivo=REPORTADA,
             asistencia=True,
             estado_alumno_historico=1,
         )
@@ -2752,8 +2759,28 @@ class CartaAnualAsistenciaTests(SimpleTestCase):
 
         tutoria = SimpleNamespace(
             alumno=alumno,
+            estado_efectivo=REPORTADA,
             asistencia=True,
             estado_alumno_historico=2,
         )
 
         self.assertTrue(_tutoria_es_reportable(tutoria))
+
+    def test_excluye_estados_no_reportados_aunque_haya_asistencia(self):
+        for estado in (PENDIENTE, ACEPTADO, PROPUESTA, VENCIDA,
+                       REALIZADA, RECHAZADO, CANCELADO):
+            with self.subTest(estado=estado):
+                tutoria = SimpleNamespace(estado_efectivo=estado, asistencia=True)
+                self.assertFalse(_tutoria_es_reportable(tutoria))
+
+    def test_tutoria_real_requiere_reporte_y_asistencia(self):
+        tutoria = Tutoria(estado=ACEPTADO, fecha=timezone.now() - timedelta(days=1))
+        # La asistencia predeterminada no acredita que exista un reporte.
+        self.assertTrue(tutoria.asistencia)
+        self.assertFalse(_tutoria_es_reportable(tutoria))
+
+        tutoria.fecha_reporte = timezone.now()
+        self.assertTrue(_tutoria_es_reportable(tutoria))
+
+        tutoria.asistencia = False
+        self.assertFalse(_tutoria_es_reportable(tutoria))

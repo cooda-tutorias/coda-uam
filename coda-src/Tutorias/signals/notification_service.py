@@ -278,6 +278,7 @@ def _build_context(*, event: str, config: dict[str, Any], tutoria: Any, actor: A
         "mensaje": _value_for_role(config.get("message"), role),
         "accion_tipo": config.get("action_type", ""), "accion_texto": action_text,
         "accion_url": action_url, "mostrar_accion": bool(action_text and action_url),
+        "sistema_url": site_url,
         "tipo_confirmacion": config.get("confirmation_type", ""),
         "origen_agendamiento": config.get("origin", ""),
         "mostrar_calendarios": show_calendar_actions,
@@ -319,6 +320,8 @@ def _build_plain_text(context: dict[str, Any]) -> str:
     lines.extend(["", "Universidad Autónoma Metropolitana Unidad Cuajimalpa",
                   f"Dirección: {context['contact']['address']}", f"Ubicación: {context['contact']['maps_url']}",
                   f"Teléfono UAM: {context['contact']['uam_phone']}", f"Teléfono CODDAA: {context['contact']['coddaa_phone']}"])
+    if context["sistema_url"]:
+        lines.extend(["", f"Ir al sistema de tutorías: {context['sistema_url']}"])
     return "\n".join(lines)
 
 
