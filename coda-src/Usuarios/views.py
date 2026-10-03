@@ -8,6 +8,7 @@ from django.shortcuts import get_object_or_404
 from django.db.models.query import QuerySet
 from django.db.models import F
 from django.http import HttpResponseRedirect
+from django.http import FileResponse
 from django.shortcuts import render, HttpResponse
 from django.contrib.auth.views import LoginView, PasswordChangeView
 from django.contrib.auth import login
@@ -892,8 +893,27 @@ class VerPlantilla(CodaViewMixin, UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['nombre_fuente'] = self.object.nombre
-        context['archivo_url'] = self.object.archivo.url if self.object.archivo else None
+        context['archivo_url'] = (
+            reverse('descargar-documento', kwargs={'pk': self.object.pk})
+            if self.object.archivo else None
+        )
         return context
+
+
+class DescargarDocumentoView(CodaViewMixin, View):
+    def get(self, request, pk):
+        documento = get_object_or_404(Documento, pk=pk)
+        if documento.es_sistema or not documento.archivo:
+            raise Http404('El documento solicitado no está disponible.')
+
+        response = FileResponse(
+            documento.archivo.open('rb'),
+            as_attachment=True,
+            filename=documento.archivo.name.rsplit('/', 1)[-1],
+        )
+        response['Cache-Control'] = 'private, no-store'
+        response['X-Content-Type-Options'] = 'nosniff'
+        return response
 
 class VerAlumnosCODDAAView(CodaViewMixin, FormView):
     template_name = "Usuarios/ver_alumnos_coda.html"
