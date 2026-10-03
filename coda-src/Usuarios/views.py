@@ -48,6 +48,7 @@ import io
 import pandas as pd
 from .models import Documento
 from .forms import DocumentoForm
+from .views_trayectoria import can_manage_trayectoria, can_view_trayectoria
 
 # Bibliotecas para generar códigos QR
 import qrcode
@@ -583,6 +584,23 @@ class PerfilAlumnoView(ProfilePhotoContextMixin, BaseAccessMixin, DetailView):
 
     def get_queryset(self) -> QuerySet[Any]:
         return Usuario.objects.filter(rol__contains=["ALU"])  # Filter for Alumnos
+
+    def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
+        context = super().get_context_data(**kwargs)
+        alumno = self.object.alumno
+        context['can_view_trayectoria'] = can_view_trayectoria(
+            self.request.user, alumno
+        )
+        context['can_manage_trayectoria'] = can_manage_trayectoria(
+            self.request.user, alumno
+        )
+        context['trayectoria_activa'] = alumno.trayectoria_versiones.filter(
+            is_active=True
+        ).first()
+        context['trayectoria_versiones'] = list(
+            alumno.trayectoria_versiones.all()[:10]
+        )
+        return context
 
 
 class PerfilTutorView(ProfilePhotoContextMixin, BaseAccessMixin, DetailView):

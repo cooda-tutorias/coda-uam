@@ -10,6 +10,7 @@ from Usuarios.constants import ALUMNO, TUTOR
 from Usuarios.models import Alumno, Tutor, TrayectoriaVersion
 
 
+@override_settings(DEFAULT_FILE_STORAGE='custom_storages.PrivateFileSystemStorage')
 class TrayectoriaBackendTests(TestCase):
     pdf = b'%PDF-1.4\ncontenido de prueba\n%%EOF'
 
@@ -78,7 +79,11 @@ class TrayectoriaBackendTests(TestCase):
         )
         version = TrayectoriaVersion.objects.get(alumno=self.alumno)
         self.assertTrue(version.is_active)
-        self.assertEqual(version.original_filename, 'historial.pdf')
+        self.assertRegex(
+            version.original_filename,
+            rf'^trayectoria_{self.alumno.matricula}_\d{{4}}-\d{{2}}-\d{{2}}T\d{{2}}-\d{{2}}\.pdf$',
+        )
+        self.assertTrue(version.archivo.name.rsplit('/', 1)[-1].startswith(f'trayectoria_{self.alumno.matricula}_'))
         self.assertEqual(version.size_bytes, len(self.pdf))
         self.assertEqual(version.sha256, hashlib.sha256(self.pdf).hexdigest())
         self.alumno.refresh_from_db()
@@ -94,7 +99,7 @@ class TrayectoriaBackendTests(TestCase):
         primera.refresh_from_db()
         segunda = TrayectoriaVersion.objects.get(alumno=self.alumno, is_active=True)
         self.assertFalse(primera.is_active)
-        self.assertEqual(segunda.original_filename, 'segunda.pdf')
+        self.assertTrue(segunda.original_filename.startswith(f'trayectoria_{self.alumno.matricula}_'))
         self.assertEqual(
             TrayectoriaVersion.objects.filter(alumno=self.alumno, is_active=True).count(),
             1,
@@ -150,6 +155,7 @@ class TrayectoriaBackendTests(TestCase):
         response = self.client.get(self.url_ver)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/pdf')
+        self.assertEqual(response['X-Frame-Options'], 'SAMEORIGIN')
         self.assertEqual(b''.join(response.streaming_content), self.pdf)
 
         self.client.force_login(self.otro_tutor)
@@ -174,3 +180,30 @@ class TrayectoriaBackendTests(TestCase):
         self.assertFalse(TrayectoriaVersion.objects.filter(pk=segunda.pk).exists())
         self.alumno.refresh_from_db()
         self.assertEqual(self.alumno.trayectoria.name, primera.archivo.name)
+
+    def test_perfil_del_alumno_muestra_historial_y_solo_su_formulario_de_carga(self):
+        self.client.force_login(self.alumno)
+        self._subir('historial.pdf')
+
+        response = self.client.get(reverse('perfil-alumno', kwargs={'pk': self.alumno.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Historial académico')
+        self.assertContains(response, f'trayectoria_{self.alumno.matricula}_')
+        self.assertContains(response, 'Subir versión')
+        self.assertContains(response, 'id="trayectoria-dialog"')
+        self.assertContains(response, 'id="subir-trayectoria-dialog"')
+
+        self.client.force_login(self.otro_alumno)
+        response = self.client.get(reverse('perfil-alumno', kwargs={'pk': self.alumno.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'Subir versión')
+
+    def test_tutor_asignado_ve_el_historial_sin_controles_de_carga(self):
+        self.client.force_login(self.tutor)
+
+        response = self.client.get(reverse('perfil-alumno', kwargs={'pk': self.alumno.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="trayectoria-dialog"')
+        self.assertNotContains(response, 'id="subir-trayectoria-dialog"')
