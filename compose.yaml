@@ -14,11 +14,45 @@ services:
       retries: 10
     networks:
       - app_net
+  seaweedfs:
+    build:
+      context: ./coda-src
+      dockerfile: Dockerfile.seaweedfs
+      args:
+        SEAWEEDFS_VERSION: ${SEAWEEDFS_VERSION:-4.48}
+    command:
+      - mini
+      - -dir=/data
+      - -s3.port=8333
+      - -s3.cert.file=/run/seaweedfs-server-tls/server.crt
+      - -s3.key.file=/run/seaweedfs-server-tls/server.key
+    environment:
+      AWS_ACCESS_KEY_ID: ${OBJECT_STORAGE_ACCESS_KEY:-coda-app}
+      AWS_SECRET_ACCESS_KEY: ${OBJECT_STORAGE_SECRET_KEY:-coda-app-local-only}
+      S3_BUCKET: ${OBJECT_STORAGE_BUCKET_NAME:-coda-media}
+    volumes:
+      - ./data/seaweedfs:/data
+      - seaweedfs-server-tls:/run/seaweedfs-server-tls
+      - seaweedfs-ca:/run/seaweedfs-ca
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          openssl s_client -connect 127.0.0.1:8333 -servername seaweedfs
+          -CAfile /run/seaweedfs-ca/ca.crt -verify_hostname seaweedfs
+          -verify_return_error </dev/null >/dev/null 2>&1
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    networks:
+      - app_net
   web:
     build: ./coda-src
     volumes:
       - ./media:/app/media
       - ./coda-src/static:/app/static
+      - seaweedfs-ca:/run/seaweedfs-ca:ro
     ports:
       - "8000:8000"
     environment:
@@ -53,8 +87,23 @@ services:
       - POSTGRES_NAME=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - OBJECT_STORAGE_ENABLED=${OBJECT_STORAGE_ENABLED:-False}
+      - OBJECT_STORAGE_ACCESS_KEY=${OBJECT_STORAGE_ACCESS_KEY:-coda-app}
+      - OBJECT_STORAGE_SECRET_KEY=${OBJECT_STORAGE_SECRET_KEY:-coda-app-local-only}
+      - OBJECT_STORAGE_BUCKET_NAME=${OBJECT_STORAGE_BUCKET_NAME:-coda-media}
+      - OBJECT_STORAGE_ENDPOINT_URL=${OBJECT_STORAGE_ENDPOINT_URL:-https://seaweedfs:8333}
+      - OBJECT_STORAGE_CA_BUNDLE=${OBJECT_STORAGE_CA_BUNDLE:-/run/seaweedfs-ca/ca.crt}
+      - OBJECT_STORAGE_REGION=${OBJECT_STORAGE_REGION:-us-east-1}
+      - OBJECT_STORAGE_ADDRESSING_STYLE=${OBJECT_STORAGE_ADDRESSING_STYLE:-path}
+      - OBJECT_STORAGE_SIGNATURE_VERSION=${OBJECT_STORAGE_SIGNATURE_VERSION:-s3v4}
+      - OBJECT_STORAGE_USE_TLS=${OBJECT_STORAGE_USE_TLS:-True}
+      - OBJECT_STORAGE_MEDIA_PREFIX=${OBJECT_STORAGE_MEDIA_PREFIX:-media}
+      - TRAYECTORIA_MAX_UPLOAD_SIZE=${TRAYECTORIA_MAX_UPLOAD_SIZE:-104857600}
+      - FILE_UPLOAD_MAX_MEMORY_SIZE=${FILE_UPLOAD_MAX_MEMORY_SIZE:-2097152}
     depends_on:
       db:
+        condition: service_healthy
+      seaweedfs:
         condition: service_healthy
     networks:
       - app_net
@@ -62,3 +111,7 @@ services:
 networks:
   app_net:
     driver: bridge
+
+volumes:
+  seaweedfs-server-tls:
+  seaweedfs-ca:
