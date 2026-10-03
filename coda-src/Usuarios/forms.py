@@ -8,6 +8,9 @@ from django.forms.utils import ErrorList
 from .models import Tutor, Alumno, Cordinador, Usuario, Documento, HorarioTutor, TrayectoriaVersion
 from .constants import ALUMNO, TUTOR, COORDINADOR, CODA, CARRERAS, ESTADOS_ALUMNO, SEXOS
 from django.contrib.auth.forms import UserCreationForm
+from .imagenes import validar_imagen
+
+ACCEPT_IMAGENES = 'image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif,.heic,.heif,.avif'
 
 
 class PerfilTutorForm(forms.ModelForm):
@@ -19,18 +22,39 @@ class PerfilTutorForm(forms.ModelForm):
         widgets = {
             "cubiculo": forms.TextInput(attrs={"class": "form-control"}),
             "foto": forms.FileInput(attrs={
-                "class": "form-control", "accept": "image/jpeg,image/png,image/webp",
+                "class": "form-control", "accept": ACCEPT_IMAGENES,
             }),
         }
-        help_texts = {"foto": "Opcional. JPG, PNG o WebP, máximo 5 MB."}
+        help_texts = {"foto": "Opcional. JPG, PNG, WebP, HEIC o AVIF, máximo 5 MB."}
 
     def clean_foto(self):
         foto = self.cleaned_data.get("foto")
         if foto and "foto" in self.files:
             if foto.size > 5 * 1024 * 1024:
                 raise forms.ValidationError("La imagen no debe superar los 5 MB.")
-            if foto.image.format not in {"JPEG", "PNG", "WEBP"}:
-                raise forms.ValidationError("Selecciona una imagen JPG, PNG o WebP.")
+            validar_imagen(foto)
+        return foto
+
+class AvatarUploadForm(forms.ModelForm):
+    class Meta:
+        model = Usuario
+        fields = ['foto']
+        widgets = {
+            'foto': forms.FileInput(attrs={
+                'class': 'form-control',
+                'accept': ACCEPT_IMAGENES,
+            }),
+        }
+
+    def clean_foto(self):
+        foto = self.cleaned_data.get('foto')
+        if not foto:
+            raise forms.ValidationError('Selecciona una imagen.')
+
+        max_size = int(getattr(settings, 'AVATAR_MAX_UPLOAD_SIZE', 5 * 1024 * 1024))
+        if foto.size > max_size:
+            raise forms.ValidationError('La imagen no debe superar los 5 MB.')
+        validar_imagen(foto)
         return foto
 
 
