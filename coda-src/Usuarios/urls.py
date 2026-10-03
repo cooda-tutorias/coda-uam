@@ -1,6 +1,7 @@
 from django.urls import path, re_path, include
 from django.contrib import admin
 from . import views
+from . import views_private_media
 import notifications.urls
 from django.conf import settings
 from django.conf.urls.static import static
@@ -43,6 +44,8 @@ urlpatterns = [
     path('cargar_plantilla/', views.CargarPlantilla.as_view(), name='cargar_plantilla'),
     path('eliminar-documento/<int:pk>/', views.eliminar_documento, name='eliminar_documento'),
     path('ver_plantilla/<int:documento_id>/', views.VerPlantilla.as_view(), name='ver_plantilla'),
+    path('documentos/<int:pk>/descargar/', views.DescargarDocumentoView.as_view(), name='descargar-documento'),
+    path('archivos/privados/<path:nombre>', views_private_media.ArchivoPrivadoView.as_view(), name='archivo-privado'),
 
     # Agregado por Antonio LJ para tutorías in-situ.
     path("mi-qr/", views.VerQRView.as_view(), name="ver_qr_tutor"),
