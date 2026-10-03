@@ -50,8 +50,617 @@
               <p class="text-muted">Estado: {{ usuario.alumno.get_estado_display }}</p>
             </div>
           </div>
+          <section class="mt-3" aria-labelledby="trayectoria-title">
+            <hr>
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+              <div>
+                <h5 id="trayectoria-title" class="mb-1">Historial académico</h5>
+                <p class="text-muted mb-0">Versiones del documento de trayectoria del alumno.</p>
+                <p class="small text-muted mt-1 mb-0">
+                  {% if trayectoria_versiones|length == 1 %}
+                    1 versión disponible
+                  {% else %}
+                    {{ trayectoria_versiones|length }} versiones disponibles
+                  {% endif %}
+                </p>
+              </div>
+              {% if can_manage_trayectoria %}
+                <button type="button" class="btn btn-primary btn-sm" id="subir-trayectoria-btn">
+                    <i class="bi bi-upload me-1" aria-hidden="true"></i>
+                    {% if trayectoria_activa %}Subir versión{% else %}Subir PDF{% endif %}
+                </button>
+              {% endif %}
+            </div>
+
+            {% if can_view_trayectoria %}
+              <div class="table-responsive mt-3">
+                <table class="table table-sm align-middle mb-0 trayectoria-table{% if trayectoria_versiones|length > trayectoria_limite_inicial %} is-paged{% endif %}" id="trayectoria-table">
+                  <thead>
+                    <tr>
+                      <th scope="col">Archivo</th>
+                      <th scope="col">Fecha</th>
+                      <th scope="col">Estado</th>
+                      <th scope="col">Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for version in trayectoria_versiones %}
+                      <tr{% if forloop.counter > trayectoria_limite_inicial %} class="trayectoria-extra-row"{% endif %}>
+                        <td class="text-break" data-label="Archivo">{{ version.original_filename }}</td>
+                        <td data-label="Fecha">{{ version.created_at|date:'d/m/Y H:i' }}</td>
+                        <td data-label="Estado">{% if version.is_active %}Activa{% else %}Histórica{% endif %}</td>
+                        <td class="text-nowrap" data-label="Acciones">
+                          <button type="button"
+                                  class="btn btn-outline-secondary btn-sm trayectoria-row-action open-trayectoria-version"
+                                  data-view-url="{% url 'ver-trayectoria' usuario.pk %}?version_id={{ version.pk }}"
+                                  data-download-url="{% url 'ver-trayectoria' usuario.pk %}?version_id={{ version.pk }}&amp;download=1"
+                                  data-file-name="{{ version.original_filename }}"
+                                  title="Ver PDF: {{ version.original_filename }}">
+                            <i class="bi bi-eye me-1" aria-hidden="true"></i>Ver
+                          </button>
+                          {% if can_manage_trayectoria %}
+                            <button type="button"
+                                    class="btn btn-outline-danger btn-sm ms-2 trayectoria-row-action eliminar-trayectoria-version"
+                                    data-delete-url="{% url 'eliminar-version-trayectoria' usuario.pk version.pk %}"
+                                    data-file-name="{{ version.original_filename }}"
+                                    data-version-state="{% if version.is_active %}Activa{% else %}Histórica{% endif %}"
+                                    aria-label="Eliminar versión: {{ version.original_filename }}"
+                                    data-bs-toggle="tooltip"
+                                    data-bs-placement="top"
+                                    title="Eliminar esta versión permanentemente">
+                              <i class="bi bi-trash3" aria-hidden="true"></i>
+                              <span class="visually-hidden">Eliminar</span>
+                            </button>
+                          {% endif %}
+                        </td>
+                      </tr>
+                    {% empty %}
+                      {% if usuario.alumno.trayectoria %}
+                        <tr>
+                          <td class="text-break" data-label="Archivo">{{ usuario.alumno.trayectoria.name|cut:'Usuarios/trayectorias/' }}</td>
+                          <td data-label="Fecha">Anterior al historial de versiones</td>
+                          <td data-label="Estado">Legada</td>
+                          <td data-label="Acciones">
+                            <button type="button"
+                                    class="btn btn-outline-secondary btn-sm trayectoria-row-action open-trayectoria-version"
+                                    data-view-url="{% url 'ver-trayectoria' usuario.pk %}"
+                                    data-download-url="{% url 'ver-trayectoria' usuario.pk %}?download=1"
+                                    data-file-name="{{ usuario.alumno.trayectoria.name|cut:'Usuarios/trayectorias/' }}"
+                                    title="Ver PDF de trayectoria">
+                              <i class="bi bi-eye me-1" aria-hidden="true"></i>Ver PDF
+                            </button>
+                          </td>
+                        </tr>
+                      {% else %}
+                        <tr>
+                          <td colspan="4" class="text-muted">No hay versiones de trayectoria cargadas.</td>
+                        </tr>
+                      {% endif %}
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              {% if trayectoria_versiones|length > trayectoria_limite_inicial %}
+                <div class="trayectoria-history-footer d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3"
+                     data-initial="{{ trayectoria_limite_inicial }}" data-step="{{ trayectoria_paso }}" data-total="{{ trayectoria_versiones|length }}">
+                  <p class="small text-muted mb-0" id="trayectoria-history-status" role="status" aria-live="polite">
+                    Mostrando <strong id="trayectoria-shown-count">{{ trayectoria_limite_inicial }}</strong>
+                    de <strong>{{ trayectoria_versiones|length }}</strong> versiones
+                  </p>
+                  <div class="d-flex flex-wrap gap-2 trayectoria-history-actions">
+                    <button type="button" class="btn btn-outline-secondary btn-sm trayectoria-toggle-history" id="trayectoria-show-less" hidden>
+                      <i class="bi bi-chevron-up me-1" aria-hidden="true"></i>Mostrar menos
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm trayectoria-toggle-history" id="trayectoria-show-more" aria-controls="trayectoria-table">
+                      <i class="bi bi-chevron-down me-1" aria-hidden="true"></i><span id="trayectoria-show-more-label">Mostrar {{ trayectoria_paso }} más</span>
+                    </button>
+                  </div>
+                </div>
+              {% endif %}
+            {% endif %}
+          </section>
         </div>
       </div>
     </div>
   </div>
+
+  <div class="trayectoria-dialog-backdrop" id="trayectoria-dialog" aria-hidden="true">
+    <section class="trayectoria-dialog-panel" role="dialog" aria-modal="true" aria-labelledby="trayectoria-dialog-title" tabindex="-1">
+      <header class="trayectoria-dialog-header">
+        <div>
+          <h2 id="trayectoria-dialog-title" class="h6 mb-1">Trayectoria académica</h2>
+          <p class="small text-muted mb-0" id="trayectoria-dialog-file-name"></p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <details class="trayectoria-options">
+            <summary class="btn btn-outline-secondary btn-sm" aria-label="Opciones del PDF">
+              <i class="bi bi-three-dots-vertical" aria-hidden="true"></i>
+              <span class="visually-hidden">Opciones</span>
+            </summary>
+            <div class="trayectoria-options-menu">
+              <a id="trayectoria-download-link" href="#" download>
+                <i class="bi bi-download me-2" aria-hidden="true"></i>Descargar
+              </a>
+              <a id="trayectoria-new-tab-link" href="#" target="_blank" rel="noopener">
+                <i class="bi bi-box-arrow-up-right me-2" aria-hidden="true"></i>Abrir en otra pestaña
+              </a>
+            </div>
+          </details>
+          <button type="button" class="btn-close" id="trayectoria-dialog-close" aria-label="Cerrar visor"></button>
+        </div>
+      </header>
+      <iframe class="trayectoria-pdf-frame" id="trayectoria-pdf-frame" title="Visor de trayectoria académica"></iframe>
+    </section>
+  </div>
+
+  {% if can_manage_trayectoria %}
+    <div class="trayectoria-dialog-backdrop" id="subir-trayectoria-dialog" aria-hidden="true">
+      <section class="trayectoria-dialog-panel trayectoria-upload-panel" role="dialog" aria-modal="true" aria-labelledby="subir-trayectoria-title" tabindex="-1">
+        <header class="trayectoria-dialog-header">
+          <div>
+            <h2 id="subir-trayectoria-title" class="h6 mb-1">
+              {% if trayectoria_activa %}Subir nueva versión{% else %}Subir trayectoria académica{% endif %}
+            </h2>
+            <p class="small text-muted mb-0">Selecciona un documento PDF.</p>
+          </div>
+          <button type="button" class="btn-close" id="subir-trayectoria-close" aria-label="Cerrar carga"></button>
+        </header>
+        <form method="post" action="{% url 'subir-trayectoria' usuario.pk %}" enctype="multipart/form-data" id="trayectoria-upload-form">
+          {% csrf_token %}
+          <input id="trayectoria-file" class="visually-hidden" type="file" name="archivo" accept="application/pdf,.pdf">
+          <label class="trayectoria-dropzone" id="trayectoria-dropzone" for="trayectoria-file" tabindex="0">
+            <i class="bi bi-cloud-arrow-up fs-2" aria-hidden="true"></i>
+            <span class="fw-semibold">Arrastra tu PDF aquí o selecciónalo</span>
+            <span class="small text-muted">Sólo se aceptan archivos PDF.</span>
+          </label>
+          <div class="trayectoria-file-preview mt-3" id="trayectoria-file-preview" hidden>
+            <div class="d-flex align-items-center justify-content-between gap-2">
+              <div class="text-break">
+                <span class="fw-semibold" id="trayectoria-file-name"></span>
+                <span class="small text-muted ms-2" id="trayectoria-file-size"></span>
+              </div>
+              <button type="button" class="btn btn-outline-secondary btn-sm trayectoria-selection-action" id="trayectoria-file-remove"
+                      aria-label="Quitar archivo seleccionado">
+                <i class="bi bi-x-circle me-1" aria-hidden="true"></i>Quitar
+              </button>
+            </div>
+            <button type="button" class="btn btn-outline-secondary btn-sm mt-2 trayectoria-preview-action" id="trayectoria-preview-toggle" aria-expanded="false" disabled>
+              <i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>Vista previa
+            </button>
+            <iframe class="trayectoria-upload-preview" id="trayectoria-upload-preview" title="Vista previa del PDF" hidden></iframe>
+          </div>
+          <p class="small text-danger mt-2 mb-0" id="trayectoria-upload-error" role="alert" hidden></p>
+          <footer class="trayectoria-dialog-actions mt-4">
+            <button type="button" class="btn btn-outline-secondary" id="subir-trayectoria-cancel">Cancelar</button>
+            <button type="submit" class="btn btn-primary" id="trayectoria-upload-submit" disabled>Guardar versión</button>
+          </footer>
+        </form>
+      </section>
+    </div>
+
+    <div class="trayectoria-dialog-backdrop" id="eliminar-version-dialog" aria-hidden="true">
+      <section class="trayectoria-dialog-panel trayectoria-delete-panel" role="dialog" aria-modal="true" aria-labelledby="eliminar-version-title" tabindex="-1">
+        <header class="trayectoria-dialog-header">
+          <h2 id="eliminar-version-title" class="h6 mb-0">Eliminar versión</h2>
+          <button type="button" class="btn-close" id="eliminar-version-close" aria-label="Cerrar confirmación"></button>
+        </header>
+        <p class="mt-3 mb-1">¿Eliminar permanentemente esta versión del historial?</p>
+        <p class="small text-muted mb-0" id="eliminar-version-file-name"></p>
+        <p class="small text-muted" id="eliminar-version-state"></p>
+        <form method="post" action="#" id="eliminar-version-form" class="trayectoria-dialog-actions mt-4">
+          {% csrf_token %}
+          <button type="button" class="btn btn-outline-secondary" id="eliminar-version-cancel">Cancelar</button>
+          <button type="submit" class="btn btn-danger">Eliminar</button>
+        </form>
+      </section>
+    </div>
+  {% endif %}
+
+  <style>
+    .trayectoria-dialog-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 1080;
+      display: none;
+      place-items: center;
+      padding: 1rem;
+      background: rgba(20, 24, 30, 0.72);
+    }
+
+    .trayectoria-dialog-backdrop.is-open { display: grid; }
+
+    .trayectoria-dialog-panel {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      width: min(100%, 68rem);
+      max-height: min(90vh, 54rem);
+      min-width: 0;
+      overflow: hidden;
+      padding: 1rem;
+      border-radius: 6px;
+      background: #fff;
+      box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.28);
+    }
+
+    .trayectoria-dialog-header,
+    .trayectoria-dialog-actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+    }
+
+    .trayectoria-pdf-frame {
+      width: 100%;
+      min-height: 65vh;
+      margin-top: 1rem;
+      border: 1px solid #d7dce2;
+      border-radius: 4px;
+    }
+
+    .trayectoria-options { position: relative; }
+    .trayectoria-options summary { list-style: none; cursor: pointer; }
+    .trayectoria-options summary::-webkit-details-marker { display: none; }
+    .trayectoria-options-menu {
+      position: absolute;
+      top: calc(100% + 0.4rem);
+      right: 0;
+      z-index: 1;
+      display: grid;
+      min-width: 13rem;
+      padding: 0.35rem;
+      border: 1px solid #d7dce2;
+      border-radius: 4px;
+      background: #fff;
+      box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.14);
+    }
+    .trayectoria-options-menu a { padding: 0.55rem 0.65rem; color: #20252b; text-decoration: none; }
+    .trayectoria-options-menu a:hover { background: #f1f3f5; }
+
+    .trayectoria-row-action {
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+    }
+    .trayectoria-row-action:hover,
+    .trayectoria-row-action:focus-visible { transform: translateY(-1px); }
+    .open-trayectoria-version:hover,
+    .open-trayectoria-version:focus-visible {
+      color: #fff !important;
+      border-color: #285192 !important;
+      background: #285192 !important;
+      box-shadow: 0 0 0 0.2rem rgba(40, 81, 146, 0.24) !important;
+    }
+    .eliminar-trayectoria-version:hover,
+    .eliminar-trayectoria-version:focus-visible {
+      color: #fff !important;
+      border-color: #b02a37 !important;
+      background: #c92a3a !important;
+      box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.2) !important;
+    }
+    .trayectoria-table.is-paged .trayectoria-extra-row { display: none !important; }
+    .trayectoria-table.is-paged .trayectoria-extra-row.is-visible { display: table-row !important; }
+    @media (max-width: 767.98px) {
+      .trayectoria-table.is-paged .trayectoria-extra-row.is-visible { display: grid !important; }
+      .trayectoria-history-footer { flex-direction: column; align-items: stretch !important; text-align: center; }
+      .trayectoria-history-actions { flex-direction: column-reverse; }
+      .trayectoria-history-actions .btn { width: 100%; }
+    }
+    .trayectoria-selection-action:hover,
+    .trayectoria-toggle-history:hover,
+    .trayectoria-toggle-history:focus-visible,
+    .trayectoria-selection-action:focus-visible {
+      color: #fff !important;
+      border-color: #495057 !important;
+      background: #495057 !important;
+      box-shadow: 0 0 0 0.2rem rgba(73, 80, 87, 0.2) !important;
+    }
+    .trayectoria-preview-action:hover,
+    .trayectoria-preview-action:focus-visible,
+    .trayectoria-preview-action[aria-expanded="true"] {
+      color: #fff !important;
+      border-color: #285192 !important;
+      background: #285192 !important;
+      box-shadow: 0 0 0 0.2rem rgba(40, 81, 146, 0.22) !important;
+    }
+
+    .trayectoria-upload-panel,
+    .trayectoria-delete-panel { width: min(100%, 34rem); }
+    .trayectoria-upload-panel {
+      width: min(94vw, 56rem);
+      max-height: min(92vh, 60rem);
+      overflow-x: hidden;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+    .trayectoria-dropzone {
+      display: grid;
+      justify-items: center;
+      gap: 0.45rem;
+      margin-top: 1.25rem;
+      padding: 2rem 1rem;
+      border: 2px dashed #9aa5b1;
+      border-radius: 6px;
+      cursor: pointer;
+      text-align: center;
+    }
+    .trayectoria-dropzone:focus-visible,
+    .trayectoria-dropzone.is-dragging { border-color: #cb6800; background: #fff8f0; outline: none; }
+    .trayectoria-file-preview { min-width: 0; padding: 0.75rem; border: 1px solid #d7dce2; border-radius: 4px; }
+    .trayectoria-file-preview > .d-flex > div { min-width: 0; overflow-wrap: anywhere; }
+    .trayectoria-upload-preview {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      height: clamp(22rem, 62vh, 40rem);
+      min-height: 18rem;
+      margin-top: 0.5rem;
+      border: 1px solid #d7dce2;
+    }
+
+    @media (max-width: 767.98px) {
+      .trayectoria-table thead { display: none; }
+      .trayectoria-table,
+      .trayectoria-table tbody { display: block; }
+      .trayectoria-table tr {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.35rem 1rem;
+        padding: 0.75rem 0;
+        border-bottom: 1px solid #dee2e6;
+      }
+      .trayectoria-table td {
+        display: block;
+        min-width: 0;
+        padding: 0;
+        border: 0;
+        overflow-wrap: anywhere;
+      }
+      .trayectoria-table td[data-label]::before {
+        content: attr(data-label);
+        display: block;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #6c757d;
+        text-transform: uppercase;
+      }
+      .trayectoria-table td[data-label="Archivo"],
+      .trayectoria-table td[data-label="Acciones"],
+      .trayectoria-table td[colspan] { grid-column: 1 / -1; }
+      .trayectoria-table td[data-label="Archivo"] { font-weight: 600; }
+      .trayectoria-table td[data-label="Acciones"] { display: flex; flex-wrap: wrap; gap: 0.5rem; white-space: normal; }
+      .trayectoria-table td[data-label="Acciones"]::before { flex: 0 0 100%; }
+      .trayectoria-table td[data-label="Acciones"] .btn { margin-left: 0 !important; }
+    }
+
+    @media (max-width: 575.98px) {
+      .trayectoria-dialog-panel { padding: 0.75rem; }
+      .trayectoria-pdf-frame { min-height: 70vh; }
+      .trayectoria-dialog-actions .btn { flex: 1; }
+    }
+  </style>
+
+  <script>
+    (() => {
+      const modalIds = ['trayectoria-dialog', 'subir-trayectoria-dialog', 'eliminar-version-dialog'];
+      const modals = modalIds.map((id) => document.getElementById(id)).filter(Boolean);
+      let activeModal = null;
+      let previewUrl = null;
+
+      const openModal = (modal) => {
+        if (!modal) return;
+        activeModal = modal;
+        modal.classList.add('is-open');
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+        modal.querySelector('[role="dialog"]').focus();
+      };
+
+      const closeModal = (modal) => {
+        if (!modal) return;
+        modal.classList.remove('is-open');
+        modal.setAttribute('aria-hidden', 'true');
+        if (activeModal === modal) activeModal = null;
+        document.body.style.overflow = '';
+      };
+
+      modals.forEach((modal) => {
+        modal.addEventListener('click', (event) => {
+          if (event.target === modal) closeModal(modal);
+        });
+      });
+
+      document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && activeModal) closeModal(activeModal);
+      });
+
+      const viewer = document.getElementById('trayectoria-dialog');
+      const pdfFrame = document.getElementById('trayectoria-pdf-frame');
+      const fileNameLabel = document.getElementById('trayectoria-dialog-file-name');
+      const downloadLink = document.getElementById('trayectoria-download-link');
+      const newTabLink = document.getElementById('trayectoria-new-tab-link');
+
+      document.querySelectorAll('.open-trayectoria-version').forEach((button) => {
+        button.addEventListener('click', () => {
+          const viewUrl = button.dataset.viewUrl;
+          pdfFrame.src = viewUrl;
+          downloadLink.href = button.dataset.downloadUrl;
+          newTabLink.href = viewUrl;
+          fileNameLabel.textContent = button.dataset.fileName;
+          openModal(viewer);
+        });
+      });
+
+      document.getElementById('trayectoria-dialog-close')?.addEventListener('click', () => {
+        pdfFrame.src = 'about:blank';
+        closeModal(viewer);
+      });
+
+      const historyFooter = document.querySelector('.trayectoria-history-footer');
+      if (historyFooter) {
+        const historyRows = [...document.querySelectorAll('#trayectoria-table .trayectoria-extra-row')];
+        const initial = Number(historyFooter.dataset.initial);
+        const step = Number(historyFooter.dataset.step);
+        const total = Number(historyFooter.dataset.total);
+        const showMore = document.getElementById('trayectoria-show-more');
+        const showLess = document.getElementById('trayectoria-show-less');
+        const shownCount = document.getElementById('trayectoria-shown-count');
+        const moreLabel = document.getElementById('trayectoria-show-more-label');
+        let visible = initial;
+
+        const renderHistory = () => {
+          historyRows.forEach((row, index) => row.classList.toggle('is-visible', index < visible - initial));
+          shownCount.textContent = visible;
+          const remaining = total - visible;
+          showMore.hidden = remaining <= 0;
+          showLess.hidden = visible <= initial;
+          moreLabel.textContent = `Mostrar ${Math.min(step, remaining)} más`;
+        };
+
+        showMore.addEventListener('click', () => {
+          visible = Math.min(total, visible + step);
+          renderHistory();
+        });
+        showLess.addEventListener('click', () => {
+          visible = initial;
+          renderHistory();
+          document.getElementById('trayectoria-title')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+      }
+
+      const uploadDialog = document.getElementById('subir-trayectoria-dialog');
+      const uploadButton = document.getElementById('subir-trayectoria-btn');
+      const uploadForm = document.getElementById('trayectoria-upload-form');
+      const fileInput = document.getElementById('trayectoria-file');
+      const dropzone = document.getElementById('trayectoria-dropzone');
+      const filePreview = document.getElementById('trayectoria-file-preview');
+      const fileName = document.getElementById('trayectoria-file-name');
+      const fileSize = document.getElementById('trayectoria-file-size');
+      const previewButton = document.getElementById('trayectoria-preview-toggle');
+      const uploadPreview = document.getElementById('trayectoria-upload-preview');
+      const submitButton = document.getElementById('trayectoria-upload-submit');
+      const uploadError = document.getElementById('trayectoria-upload-error');
+
+      const clearPreviewUrl = () => {
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = null;
+        if (uploadPreview) uploadPreview.src = 'about:blank';
+      };
+
+      const updateSelectedFile = () => {
+        if (!fileInput) return;
+        const file = fileInput.files?.[0];
+        uploadError.hidden = true;
+        uploadError.textContent = '';
+        clearPreviewUrl();
+        if (!file) {
+          filePreview.hidden = true;
+          previewButton.setAttribute('aria-expanded', 'false');
+          previewButton.disabled = true;
+          uploadPreview.hidden = true;
+          submitButton.disabled = true;
+          return;
+        }
+        if (!file.name.toLowerCase().endsWith('.pdf') || (file.type && file.type !== 'application/pdf')) {
+          uploadError.textContent = 'Selecciona un archivo PDF válido.';
+          uploadError.hidden = false;
+          fileInput.value = '';
+          filePreview.hidden = true;
+          previewButton.setAttribute('aria-expanded', 'false');
+          previewButton.disabled = true;
+          uploadPreview.hidden = true;
+          submitButton.disabled = true;
+          return;
+        }
+        fileName.textContent = file.name;
+        fileSize.textContent = `${new Intl.NumberFormat('es-MX').format(file.size)} bytes`;
+        filePreview.hidden = false;
+        previewButton.disabled = false;
+        submitButton.disabled = false;
+        previewUrl = URL.createObjectURL(file);
+        // Los parámetros del fragmento ajustan la hoja completa al visor y ocultan el panel lateral.
+        uploadPreview.src = `${previewUrl}#view=Fit&zoom=page-fit&navpanes=0`;
+      };
+
+      uploadButton?.addEventListener('click', () => openModal(uploadDialog));
+      const closeUploadDialog = () => {
+        closeModal(uploadDialog);
+        uploadForm.reset();
+        updateSelectedFile();
+      };
+      document.getElementById('subir-trayectoria-close')?.addEventListener('click', closeUploadDialog);
+      document.getElementById('subir-trayectoria-cancel')?.addEventListener('click', closeUploadDialog);
+      fileInput?.addEventListener('change', updateSelectedFile);
+      updateSelectedFile();
+
+      dropzone?.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          fileInput.click();
+        }
+      });
+
+      previewButton?.addEventListener('click', () => {
+        const expanded = previewButton.getAttribute('aria-expanded') === 'true';
+        previewButton.setAttribute('aria-expanded', String(!expanded));
+        uploadPreview.hidden = expanded;
+      });
+
+      document.getElementById('trayectoria-file-remove')?.addEventListener('click', () => {
+        fileInput.value = '';
+        updateSelectedFile();
+      });
+
+      ['dragenter', 'dragover'].forEach((eventName) => {
+        dropzone?.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          dropzone.classList.add('is-dragging');
+        });
+      });
+      ['dragleave', 'drop'].forEach((eventName) => {
+        dropzone?.addEventListener(eventName, (event) => {
+          event.preventDefault();
+          dropzone.classList.remove('is-dragging');
+        });
+      });
+      dropzone?.addEventListener('drop', (event) => {
+        const transfer = new DataTransfer();
+        [...(event.dataTransfer?.files || [])].forEach((file) => transfer.items.add(file));
+        fileInput.files = transfer.files;
+        updateSelectedFile();
+      });
+
+      uploadForm?.addEventListener('submit', (event) => {
+        if (!fileInput.files?.length) {
+          event.preventDefault();
+          uploadError.textContent = 'Selecciona un archivo PDF antes de continuar.';
+          uploadError.hidden = false;
+        }
+      });
+
+      const deleteDialog = document.getElementById('eliminar-version-dialog');
+      const deleteForm = document.getElementById('eliminar-version-form');
+      document.querySelectorAll('.eliminar-trayectoria-version').forEach((button) => {
+        button.addEventListener('click', () => {
+          deleteForm.action = button.dataset.deleteUrl;
+          document.getElementById('eliminar-version-file-name').textContent = button.dataset.fileName;
+          document.getElementById('eliminar-version-state').textContent = `Estado: ${button.dataset.versionState}`;
+          openModal(deleteDialog);
+        });
+      });
+      if (window.bootstrap?.Tooltip) {
+        document.querySelectorAll('.eliminar-trayectoria-version[data-bs-toggle="tooltip"]').forEach((button) => {
+          if (!window.bootstrap.Tooltip.getInstance(button)) {
+            new window.bootstrap.Tooltip(button, {
+              trigger: 'hover focus',
+              delay: { show: 500, hide: 100 },
+            });
+          }
+        });
+      }
+      document.getElementById('eliminar-version-close')?.addEventListener('click', () => closeModal(deleteDialog));
+      document.getElementById('eliminar-version-cancel')?.addEventListener('click', () => closeModal(deleteDialog));
+
+      window.addEventListener('pagehide', clearPreviewUrl);
+    })();
+  </script>
 {% endblock %}
