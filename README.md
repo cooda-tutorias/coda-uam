@@ -1,60 +1,121 @@
-# Instalación y configuración del servidor
-Para facilitar la instalación del entorno, el repositorio incluye archivos de configuración de contenedores de docker. A continuación se presentan dos métodos para inicializar y configurar esos contenedores (docker compose y docker manual). Asegurate de utilizar solamente **uno** de los dos métodos.
-### Requisitos
+# CODA UAM
 
-- Docker (Docker compose) y Docker Desktop 
+Aplicación Django para la gestión de tutorías. Se ejecuta con Docker y está formada por tres servicios:
 
+| Servicio | Qué hace |
+|---|---|
+| `web` | Aplicación Django (puerto 8000) |
+| `db` | PostgreSQL |
+| `seaweedfs` | Almacenamiento de archivos (fotos, PDFs, documentos). Sólo es accesible desde `web` |
+
+Hay dos métodos de instalación: **Docker Compose** (recomendado) y **Docker manual**. Usa solamente uno.
+
+## Requisitos
+
+- Docker con el plugin Compose (Docker Desktop en Windows/macOS).
+- En Linux, los comandos `docker` requieren pertenecer al grupo `docker` o usar `sudo`.
+
+## Inicio rápido
+
+```sh
+cp .env.example .env          # edita los valores; ver "Variables de entorno"
+docker compose up -d --build
+docker compose exec web python manage.py migrate
+docker compose exec web python manage.py createsuperuser
+```
+
+Abre `http://localhost:8000`. Para detener todo: `docker compose down`.
+
+Siempre usa `--build` al levantar: `web` y `seaweedfs` se construyen desde este repositorio, y sin `--build` Docker puede reutilizar una imagen vieja.
+
+## Versionado y actualizaciones
+
+Nada se actualiza solo. Cada pieza tiene una versión fija, para que el proyecto se comporte igual hoy y dentro de seis meses. Para actualizar algo, se cambia un número y se reconstruye.
+
+| Pieza | Dónde está la versión | Cómo actualizar |
+|---|---|---|
+| Código de la aplicación | Git (rama `main`) | `git pull` y luego `docker compose up -d --build` |
+| Base de datos (esquema) | Migraciones en `coda-src/*/migrations/` | `docker compose exec web python manage.py migrate` después de cada `git pull` |
+| Python y Django | `coda-src/Dockerfile` y `coda-src/requirements.txt` | Cambiar la versión, reconstruir y correr las pruebas |
+| PostgreSQL | `image: postgres:17` en `compose.yaml` | No cambies de versión mayor sobre `data/db` sin respaldo y migración de datos |
+| SeaweedFS | `SEAWEEDFS_VERSION` en `.env` | Ver abajo |
+
+### Actualizar SeaweedFS
+
+1. Respalda `data/seaweedfs`.
+2. Cambia `SEAWEEDFS_VERSION` en `.env` (por ejemplo `4.48` a la versión nueva).
+3. Ejecuta `docker compose up -d --build seaweedfs`.
+4. Espera a que `docker compose ps` muestre `healthy`, y revisa que una foto de perfil y un PDF de trayectoria sigan abriendo.
+5. Si falla, regresa el número anterior y vuelve a ejecutar el paso 3.
+
+Por qué no se usa `latest`: SeaweedFS puede cambiar sus opciones entre versiones, y el servicio guarda las que usó en `data/seaweedfs/mini.options`. Con `latest`, una actualización inesperada podría romper el proyecto sin que nadie haya tocado el código.
+
+### Qué se regenera en cada arranque
+
+- **Certificado TLS de SeaweedFS:** se emite uno nuevo en cada inicio del contenedor (válido 30 días), firmado por una CA interna que persiste en el volumen `seaweedfs-server-tls`. No hay que renovar nada a mano.
+- **Archivos antiguos:** las versiones de trayectoria se conservan como historial y no se sobrescriben; no hay migración de archivos entre versiones de SeaweedFS.
+
+## Variables de entorno
+
+Copia `.env.example` a `.env` y revisa al menos:
+
+- `DJANGO_SECRET_KEY`: genera una con `python3 -c 'import secrets; print(secrets.token_hex(100))'`.
+- `EMAIL_HOST_PASSWORD` y `EMAIL_DOMAIN`.
+- `POSTGRES_PASSWORD` y `RDS_PASSWORD` (deben coincidir).
+- `OBJECT_STORAGE_*` y `SEAWEEDFS_VERSION`: déjalos como vienen para desarrollo local.
+- No subas `.env` a Git.
+
+## Almacenamiento de archivos con SeaweedFS
+
+SeaweedFS es el backend S3-compatible de archivos de la aplicación (fotos, documentos y trayectorias) y se puede usar en pruebas de integración y producción. El modo de despliegue depende del entorno:
+
+### Pruebas automatizadas
+
+La configuración `ssocial.settings_test` usa SQLite en memoria y almacenamiento local temporal. La suite unitaria no necesita conectarse a SeaweedFS ni descargar servicios externos; los tests del cliente S3 usan respuestas simuladas.
+
+### Desarrollo y pruebas de integración
+
+Compose levanta `weed mini` en un solo nodo, crea el bucket de `S3_BUCKET` y conserva sus datos en `data/seaweedfs`. El gateway S3 sólo escucha HTTPS dentro de la red privada de Compose. En cada inicio se emite un certificado servidor nuevo firmado por una CA interna persistente. Esta configuración sirve para desarrollo y pruebas de integración; no representa una topología de alta disponibilidad.
+
+1. Copia `.env.example` a `.env`. Las credenciales incluidas son únicamente valores locales de ejemplo; usa valores propios.
+2. Deja `OBJECT_STORAGE_ENABLED=True`, `OBJECT_STORAGE_USE_TLS=True`, `OBJECT_STORAGE_ENDPOINT_URL=https://seaweedfs:8333` y `OBJECT_STORAGE_CA_BUNDLE=/run/seaweedfs-ca/ca.crt`.
+3. Ejecuta `docker compose up --build`. El endpoint S3 no publica puertos al host y el bucket no permite acceso anónimo.
+4. Para ejecutar pruebas funcionales sin escribir fixtures en el bucket compartido, usa `docker compose run --rm --no-deps -e OBJECT_STORAGE_ENABLED=False web python manage.py test Usuarios Tutorias`.
+
+### Producción
+
+En producción la aplicación se conecta por HTTPS interno a una instalación SeaweedFS administrada y persistente; no uses el `weed mini` de Compose como sustituto de la topología productiva. El despliegue genera/rota el certificado servidor y monta la CA interna en Django para validar TLS. Configura `DJANGO_ENV=production`, `OBJECT_STORAGE_ENABLED=True` y `OBJECT_STORAGE_USE_TLS=True`:
+
+- `OBJECT_STORAGE_ENDPOINT_URL`: endpoint S3 interno accesible desde Django.
+- `OBJECT_STORAGE_CA_BUNDLE`: ruta al certificado CA interno que Django usa para validar el servidor SeaweedFS.
+- `OBJECT_STORAGE_ACCESS_KEY` y `OBJECT_STORAGE_SECRET_KEY`: credenciales de aplicación privadas, distintas de las credenciales administrativas.
+- `OBJECT_STORAGE_BUCKET_NAME`: bucket privado usado por la aplicación.
+
+Todas las lecturas y descargas de fotos, PDFs y documentos pasan por vistas autenticadas de Django; el navegador no recibe el endpoint ni credenciales de SeaweedFS. Los datos deben residir en almacenamiento persistente con respaldos y una política de disponibilidad adecuada al servicio. No publiques el endpoint interno ni uses las credenciales de ejemplo en producción.
 
 ## Docker compose
-Usando el plugin compose (integrado en docker), podemos configurar el entorno de manera sencilla y utilizando menos comandos que con la configuración manual. 
-
-### Instalación y configuración del entorno
-La configuración del entorno se hace en el archivo `compose.yaml` encontrado en la raiz de este repositorio.
-
-1. Genera un nuevo archivo `.env` tomando como referecia el archivo `.env.example`, cambia los valores y personalizalos según sea necesario para un despliegue local toma especial enfásis en  las variable de entorno `DJANGO_SECRET_KEY`,  `EMAIL_HOST_PASSWORD` y `EMAIL_DOMAIN`.
-- Para `DJANGO_SECRET_KEY` se puede usar la biblioteca de python secrets y generar un token de 100 caracteres.
-```sh
-python3 -c 'import secrets; print(secrets.token_hex(100))'
-```
-
-2. Para el despliegue en producción es necesario que verifiqeus que las variables de entorno estén correctamente aplicadas, sino estás trabajando sobre el archivo `compose.yaml`, no realices cambios
-
-3. Finalmente, desde la carpeta raíz (coda-uam), ejecuta el comando `docker compose up` para iniciar y correr los contenedores correspondientes al entorno.
-
-4. Para detener la ejecución del entorno, utiliza el comando `docker compose down`
+Detalle de los pasos del inicio rápido. La configuración del entorno está en `compose.yaml`; no lo modifiques para cambiar valores, usa `.env`.
 
 ### Inicialización de base de datos
-Para poder acceder al admin de django, es necesario crear un superusuario. Para esto, nos conectamos al contenedor de nuestro servidor llamado `web` 
-
-1. Desde terminal ejecuta el comando `docker ps` para ver tus contenedores activos.
-```
-CONTAINER ID   IMAGE          COMMAND                  CREATED         STATUS         PORTS                                       NAMES
-2845f8985f73   coda-uam-web   "./docker-entrypoint…"   5 seconds ago   Up 4 seconds   0.0.0.0:8000->8000/tcp, :::8000->8000/tcp   coda-uam-web-1
-f502f0615497   postgres       "docker-entrypoint.s…"   5 seconds ago   Up 4 seconds   5432/tcp                                    coda-uam-db-1
-```
-
-2. Busca el contenedor llamado `coda-uam-web` y copia el `CONTAINER ID` que aparece.
-
-3. Ejecuta el comanto `docker compose exec -it <CONTAINER_ID> python python manage.py migrate` para generar las tablas necesarias para el proyecto cuando se está generando el contenedor nuevo.
-
-4. Ejecuta el comando `docker exec -it <CONTAINER_ID> python manage.py createsuperuser` colocando el ID que copiaste en lugar de `<CONTAINER_ID>`
-```sh
-docker exec -it 2845f8985f73 python manage.py createsuperuser
-```
-
-5. Llena los datos para crear un superusuario
-
-6. Para esquema de pruebas, requeriras realizar el levantamiento de todos los perfiles de usuario, pide apoyo al `Product Owner / Poject Manager ` para que te apoye en el llenado de la base de datos.
-
-### Migraciones al actualizar el código
-
-Si ya tienes el entorno corriendo y se incorporó una nueva funcionalidad que modifica los modelos (por ejemplo, nuevos campos), debes ejecutar las migraciones manualmente para aplicar los cambios a la base de datos:
+Para entrar al admin de Django necesitas un superusuario. Los comandos se ejecutan en el servicio `web`, sin necesidad de copiar IDs de contenedor:
 
 ```sh
 docker compose exec web python manage.py migrate
+docker compose exec web python manage.py createsuperuser
 ```
 
-> **Nota:** Las tutorías creadas **antes** de correr una migración que agrega nuevos campos opcionales mostrarán `Sin registro` en esos campos. Esto es normal y esperado — el dato simplemente no estaba disponible cuando se creó el registro. Las tutorías nuevas capturarán el dato automáticamente.
+Para un esquema de pruebas necesitarás perfiles de todos los roles; pide apoyo al `Product Owner / Project Manager` para llenar la base de datos.
+
+### Migraciones al actualizar el código
+
+Después de cada `git pull` (o cuando una funcionalidad cambia los modelos) ejecuta:
+
+```sh
+docker compose up -d --build
+docker compose exec web python manage.py migrate
+```
+
+> **Nota:** Las tutorías creadas **antes** de una migración que agrega campos opcionales mostrarán `Sin registro` en esos campos. Es normal; las tutorías nuevas capturan el dato automáticamente.
 
 
 ## Docker manual
