@@ -2,11 +2,10 @@
 
 
 {% block body %}
-  <!--Perfil-->
-  <section  class="vh-100" style="background-color: #eee;">
-    <div class="container py-5 h-100">
-      <div class="row d-flex justify-content-center align-items-center h-75">
-        <div class="col col-lg-6 mb-4 mb-lg-0">
+  <section class="py-4 py-md-5" style="background-color: #eee; min-height: calc(100vh - 150px);">
+    <div class="container h-100">
+      <div class="row justify-content-center align-items-start">
+        <div class="col-12 col-xl-10 mb-4 mb-lg-0">
           {% block perfil %}
 
           {% endblock %}
@@ -14,5 +13,51 @@
       </div>
     </div>
   </section>
+
+  <style>
+    .profile-section-header {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      margin-bottom: 1rem;
+      padding: 0.85rem 1rem;
+      border-bottom: 1px solid #e8edf3;
+      background: linear-gradient(135deg, #fff9f0 0%, #fff 60%);
+    }
+    .profile-section-header-icon {
+      display: flex;
+      flex: 0 0 38px;
+      width: 38px;
+      height: 38px;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      color: #f08200;
+      background: #fff0da;
+    }
+    .profile-section-title {
+      margin: 0 0 0.15rem;
+      color: #f08200;
+      font-family: 'Montserrat-Bold', sans-serif;
+      font-size: 1.05rem;
+    }
+    .profile-section-subtitle { margin: 0; color: #64748b; font-size: 0.82rem; }
+    .profile-side-panel { min-width: 0; padding: 1.5rem !important; }
+    .profile-side-panel img { width: 140px !important; height: 140px !important; }
+    @media (min-width: 992px) {
+      .profile-side-panel {
+        position: sticky;
+        top: 88px;
+        align-self: flex-start;
+        justify-content: flex-start;
+        max-height: calc(100vh - 104px);
+        overflow-y: auto;
+      }
+    }
+  </style>
+
+  {% if can_manage_own_photo %}
+    {% include "Usuarios/avatar_upload_dialog.html" %}
+  {% endif %}
 
 {% endblock %}

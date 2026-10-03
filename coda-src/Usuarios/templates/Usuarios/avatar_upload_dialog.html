@@ -1,0 +1,306 @@
+<div class="avatar-dialog-overlay" id="avatar-upload-dialog" aria-hidden="true">
+  <section class="avatar-dialog-panel" role="dialog" aria-modal="true" aria-labelledby="avatar-upload-title" tabindex="-1">
+    <header class="avatar-dialog-header">
+      <div>
+        <h2 id="avatar-upload-title" class="h6 mb-1">Actualizar foto de perfil</h2>
+        <p class="small text-muted mb-0">La imagen se guardará centrada en formato PNG.</p>
+      </div>
+      <button type="button" class="btn-close" id="avatar-dialog-close" aria-label="Cerrar"></button>
+    </header>
+
+    <form id="avatar-upload-form" method="post" action="{% url 'cambiar-foto-perfil' %}" enctype="multipart/form-data">
+      {% csrf_token %}
+      <input id="avatar-file" class="visually-hidden" type="file" name="foto" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif,.heic,.heif,.avif" data-max-size="{{ avatar_max_upload_size }}">
+      <input id="avatar-camera-file" class="visually-hidden" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif" capture="user">
+
+      <button type="button" class="avatar-dropzone" id="avatar-dropzone" aria-label="Seleccionar o arrastrar foto de perfil">
+        <i class="bi bi-cloud-arrow-up fs-2" aria-hidden="true"></i>
+        <span class="fw-semibold">Arrastra una imagen aquí</span>
+        <span class="small text-muted">o selecciona JPG, PNG, WebP, HEIC o AVIF</span>
+      </button>
+
+      <div class="avatar-camera-panel mt-3" id="avatar-camera-panel" hidden>
+        <video class="avatar-camera-video" id="avatar-camera-video" autoplay playsinline muted></video>
+        <div class="d-flex justify-content-end gap-2 mt-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="avatar-camera-cancel">Cancelar cámara</button>
+          <button type="button" class="btn btn-primary btn-sm" id="avatar-camera-capture">Capturar foto</button>
+        </div>
+      </div>
+      <p class="small text-muted mt-2 mb-0" id="avatar-camera-status" role="status"></p>
+
+      <div class="avatar-file-preview mt-3" id="avatar-preview" hidden>
+        <img class="avatar-preview-image" id="avatar-preview-image" alt="Vista previa de la nueva foto">
+        <div class="min-w-0">
+          <p class="fw-semibold text-break mb-1" id="avatar-file-name"></p>
+          <p class="small text-muted mb-0" id="avatar-file-size"></p>
+        </div>
+        <button type="button" class="btn btn-outline-secondary btn-sm avatar-selection-action ms-auto" id="avatar-remove-file"
+                aria-label="Quitar archivo seleccionado">
+          <i class="bi bi-x-circle me-1" aria-hidden="true"></i>Quitar
+        </button>
+      </div>
+      <p class="small text-danger mt-2 mb-0" id="avatar-error" role="alert" hidden></p>
+
+      <footer class="avatar-dialog-actions mt-4">
+        <button type="button" class="btn btn-outline-secondary" id="avatar-dialog-cancel">Cancelar</button>
+        <div class="d-flex gap-2">
+          <button type="button" class="btn btn-outline-primary avatar-camera-action" id="avatar-camera-open">
+            <i class="bi bi-camera me-1" aria-hidden="true"></i>Tomar foto
+          </button>
+          <button type="submit" class="btn btn-primary" id="avatar-upload-submit" disabled>Guardar foto</button>
+        </div>
+      </footer>
+    </form>
+  </section>
+</div>
+
+<style>
+  body.avatar-dialog-open { overflow: hidden; }
+  .avatar-dialog-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1090;
+    display: none;
+    place-items: center;
+    padding: 1rem;
+    background: rgba(21, 26, 33, 0.58);
+  }
+  .avatar-dialog-overlay.is-open { display: grid; }
+  .avatar-dialog-panel {
+    width: min(100%, 36rem);
+    max-height: min(92vh, 48rem);
+    overflow-y: auto;
+    padding: 1.25rem;
+    border: 1px solid #d8dde5;
+    border-radius: 6px;
+    background: #fff;
+    box-shadow: 0 1rem 3rem rgba(25, 31, 40, 0.24);
+  }
+  .avatar-dialog-header,
+  .avatar-dialog-actions { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+  .avatar-dialog-actions { flex-wrap: wrap; }
+  .avatar-dropzone {
+    width: 100%;
+    display: grid;
+    justify-items: center;
+    gap: 0.45rem;
+    margin-top: 1.25rem;
+    padding: 1.75rem 1rem;
+    border: 2px dashed #aeb8c2;
+    border-radius: 6px;
+    background: #fff;
+    color: #303943;
+    cursor: pointer;
+    text-align: center;
+  }
+  .avatar-dropzone:hover,
+  .avatar-dropzone:focus-visible,
+  .avatar-dropzone.is-dragging { border-color: #f08200; background: #fff8f0; outline: none; }
+  .avatar-camera-panel { padding: 0.75rem; border-radius: 6px; background: #171b20; }
+  .avatar-camera-video { display: block; width: 100%; max-height: 20rem; border-radius: 4px; background: #101418; object-fit: cover; }
+  .avatar-file-preview { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem; border: 1px solid #d7dce2; border-radius: 4px; }
+  .avatar-camera-action {
+    color: #285192 !important;
+    border-color: #285192 !important;
+  }
+  .avatar-camera-action:hover,
+  .avatar-camera-action:focus-visible {
+    color: #fff !important;
+    border-color: #285192 !important;
+    background: #285192 !important;
+    box-shadow: 0 0 0 0.2rem rgba(40, 81, 146, 0.22) !important;
+  }
+  .avatar-selection-action:hover,
+  .avatar-selection-action:focus-visible {
+    color: #fff !important;
+    border-color: #495057 !important;
+    background: #495057 !important;
+    box-shadow: 0 0 0 0.2rem rgba(73, 80, 87, 0.2) !important;
+  }
+  .avatar-preview-image { width: 4rem; height: 4rem; flex: 0 0 auto; border-radius: 50%; object-fit: cover; }
+  .avatar-dialog-panel .min-w-0 { min-width: 0; }
+  @media (max-width: 575.98px) {
+    .avatar-dialog-panel { padding: 0.9rem; }
+    .avatar-dialog-actions > div { flex: 1; }
+    .avatar-dialog-actions > div .btn { flex: 1; }
+  }
+</style>
+
+<script>
+  (() => {
+    const dialog = document.getElementById('avatar-upload-dialog');
+    const openButton = document.getElementById('open-avatar-upload-dialog');
+    const closeButton = document.getElementById('avatar-dialog-close');
+    const cancelButton = document.getElementById('avatar-dialog-cancel');
+    const form = document.getElementById('avatar-upload-form');
+    const fileInput = document.getElementById('avatar-file');
+    const cameraFileInput = document.getElementById('avatar-camera-file');
+    const dropzone = document.getElementById('avatar-dropzone');
+    const preview = document.getElementById('avatar-preview');
+    const previewImage = document.getElementById('avatar-preview-image');
+    const fileName = document.getElementById('avatar-file-name');
+    const fileSize = document.getElementById('avatar-file-size');
+    const errorMessage = document.getElementById('avatar-error');
+    const submitButton = document.getElementById('avatar-upload-submit');
+    const cameraPanel = document.getElementById('avatar-camera-panel');
+    const cameraVideo = document.getElementById('avatar-camera-video');
+    const cameraStatus = document.getElementById('avatar-camera-status');
+    let cameraStream = null;
+    let previewUrl = null;
+    let previouslyFocused = null;
+
+    if (!dialog || !openButton || !form) return;
+
+    const stopCamera = () => {
+      cameraStream?.getTracks().forEach((track) => track.stop());
+      cameraStream = null;
+      cameraVideo.srcObject = null;
+      cameraPanel.hidden = true;
+      cameraStatus.textContent = '';
+    };
+
+    const clearPreview = () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      previewUrl = null;
+      previewImage.removeAttribute('src');
+    };
+
+    const closeDialog = () => {
+      stopCamera();
+      clearPreview();
+      form.reset();
+      preview.hidden = true;
+      submitButton.disabled = true;
+      errorMessage.hidden = true;
+      dialog.classList.remove('is-open');
+      dialog.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('avatar-dialog-open');
+      previouslyFocused?.focus();
+    };
+
+    openButton.addEventListener('click', () => {
+      previouslyFocused = document.activeElement;
+      dialog.classList.add('is-open');
+      dialog.setAttribute('aria-hidden', 'false');
+      document.body.classList.add('avatar-dialog-open');
+      dropzone.focus();
+    });
+    closeButton.addEventListener('click', closeDialog);
+    cancelButton.addEventListener('click', closeDialog);
+    dialog.addEventListener('click', (event) => {
+      if (event.target === dialog) closeDialog();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && dialog.classList.contains('is-open')) closeDialog();
+    });
+
+    const assignFile = (file) => {
+      errorMessage.hidden = true;
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif', 'image/avif'];
+      const allowedExtension = /\.(jpe?g|png|webp|heic|heif|avif)$/i;
+      const maxSize = Number(fileInput.dataset.maxSize || 5242880);
+      // Algunos sistemas no informan el tipo de HEIC; la validación real se hace en el servidor.
+      const typeAllowed = allowedTypes.includes(file.type) || (!file.type && allowedExtension.test(file.name));
+      if (!typeAllowed || file.size > maxSize) {
+        errorMessage.textContent = file.size > maxSize
+          ? 'La imagen supera el tamaño máximo permitido.'
+          : 'Selecciona una imagen JPG, PNG, WebP, HEIC o AVIF.';
+        errorMessage.hidden = false;
+        return;
+      }
+      const transfer = new DataTransfer();
+      transfer.items.add(file);
+      fileInput.files = transfer.files;
+      fileName.textContent = file.name;
+      fileSize.textContent = `${new Intl.NumberFormat('es-MX').format(file.size)} bytes`;
+      clearPreview();
+      previewUrl = URL.createObjectURL(file);
+      // Los navegadores no muestran HEIC; se oculta la vista previa y se conserva el nombre.
+      previewImage.onerror = () => { previewImage.hidden = true; };
+      previewImage.hidden = false;
+      previewImage.src = previewUrl;
+      preview.hidden = false;
+      submitButton.disabled = false;
+    };
+
+    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        fileInput.click();
+      }
+    });
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files?.[0]) assignFile(fileInput.files[0]);
+    });
+    cameraFileInput.addEventListener('change', () => {
+      if (cameraFileInput.files?.[0]) assignFile(cameraFileInput.files[0]);
+      cameraFileInput.value = '';
+    });
+
+    ['dragenter', 'dragover'].forEach((eventName) => {
+      dropzone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        dropzone.classList.add('is-dragging');
+      });
+    });
+    ['dragleave', 'drop'].forEach((eventName) => {
+      dropzone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        dropzone.classList.remove('is-dragging');
+      });
+    });
+    dropzone.addEventListener('drop', (event) => {
+      const file = event.dataTransfer?.files?.[0];
+      if (file) assignFile(file);
+    });
+
+    document.getElementById('avatar-camera-open').addEventListener('click', async () => {
+      if (!navigator.mediaDevices?.getUserMedia || !window.isSecureContext) {
+        cameraStatus.textContent = 'La cámara requiere HTTPS; se abrirá el selector de archivos.';
+        cameraFileInput.click();
+        return;
+      }
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: 'user' },
+          audio: false,
+        });
+        cameraVideo.srcObject = cameraStream;
+        cameraPanel.hidden = false;
+        cameraStatus.textContent = 'Cámara activa.';
+      } catch {
+        cameraStatus.textContent = 'No se pudo abrir la cámara; selecciona una imagen.';
+        cameraFileInput.click();
+      }
+    });
+    document.getElementById('avatar-camera-cancel').addEventListener('click', stopCamera);
+    document.getElementById('avatar-camera-capture').addEventListener('click', () => {
+      if (!cameraVideo.videoWidth || !cameraVideo.videoHeight) return;
+      const canvas = document.createElement('canvas');
+      canvas.width = cameraVideo.videoWidth;
+      canvas.height = cameraVideo.videoHeight;
+      canvas.getContext('2d').drawImage(cameraVideo, 0, 0);
+      canvas.toBlob((blob) => {
+        if (blob) assignFile(new File([blob], 'foto-capturada.png', { type: 'image/png' }));
+        stopCamera();
+      }, 'image/png');
+    });
+    document.getElementById('avatar-remove-file').addEventListener('click', () => {
+      fileInput.value = '';
+      preview.hidden = true;
+      submitButton.disabled = true;
+      errorMessage.hidden = true;
+      clearPreview();
+    });
+    form.addEventListener('submit', () => {
+      submitButton.disabled = true;
+      submitButton.textContent = 'Guardando…';
+      stopCamera();
+    });
+    window.addEventListener('pagehide', () => {
+      stopCamera();
+      clearPreview();
+    });
+  })();
+</script>

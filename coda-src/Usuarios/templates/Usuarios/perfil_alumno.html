@@ -5,22 +5,26 @@
 {% block perfil %}
   <div class="card border-top border-bottom border-4"
        style="border-color: #F08200 !important">
-    <div class="d-flex flex-row">
-      <div class="d-flex p-5 flex-column justify-content-center align-items-center w-50 text-center">
+    <div class="row g-0">
+      <div class="col-12 col-lg-4 border-end">
+        <div class="text-center d-flex flex-column profile-side-panel">
         {% load static %}
-        <!-- <img src="https://mdbcdn.b-cdn.net/img/new/avatars/2.webp" class="w-75 h-50 p-3"/> -->
-        <img src="{% static 'Alumnos/img/user.png' %}"
-             alt=""
-             class="img-fluid shadow-2-strong mt-4 mb-2"
-             style="width: 150px;
-                    height: 150px;
-                    object-fit: cover;
-                    z-index: 1" />
-        <h5 class="text-black">{{ usuario.nombre_completo }}</h5>
-        <!-- <a href="#">Editar Información</a> -->
+          <img src="{% if usuario.foto %}{% url 'ver-foto-perfil' usuario.pk %}{% else %}{% static 'Alumnos/img/user.png' %}{% endif %}"
+               alt="Foto de perfil de {{ usuario.nombre_completo }}"
+               class="img-fluid shadow-2-strong mt-2 mb-3 rounded-circle mx-auto"
+               style="width: 170px; height: 170px; object-fit: cover" />
+          <h4 class="text-black mb-1">{{ usuario.first_name }}</h4>
+          <h5 class="text-black mb-2">{{ usuario.last_name }} {{ usuario.second_last_name }}</h5>
+          <p class="text-muted small mb-4">Perfil de alumno</p>
+          {% if can_manage_own_photo %}
+            <button type="button" class="btn btn-primary btn-sm w-100" id="open-avatar-upload-dialog">
+              <i class="bi bi-camera me-1" aria-hidden="true"></i>Actualizar foto
+            </button>
+          {% endif %}
+        </div>
       </div>
-      <div class="d-flex flex-column w-50">
-        <div class="w-auto card-body p-4">
+      <div class="col-12 col-md-8">
+        <div class="card-body p-3 p-lg-4 w-100">
           <h5>Datos personales</h5>
           <hr class="mt-0 mb-4">
           <div class="row pt-1">
@@ -42,7 +46,7 @@
 
             <div class="col-6 mb-3">
               <h6>Trayectoria Académica</h6>
-              <p class="text-muted">Ingreso: {{ usuario.alumno.trimestre_ingreso }}</p>
+              <p class="text-muted">Ingreso: {{ usuario.alumno.trimestre_ingreso|default:'Sin registro' }}</p>
               <p class="text-muted">Estado: {{ usuario.alumno.get_estado_display }}</p>
             </div>
           </div>

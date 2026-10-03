@@ -1,6 +1,8 @@
 import os
 import json
 import logging
+import mimetypes
+import hashlib
 from uuid import UUID
 from django.conf import settings  # ✅ Asegurar que está importado
 from typing import Any, Dict
@@ -8,6 +10,7 @@ from django.shortcuts import get_object_or_404
 from django.db.models.query import QuerySet
 from django.db.models import F
 from django.http import HttpResponseRedirect
+from django.http import HttpResponseNotModified
 from django.http import FileResponse
 from django.shortcuts import render, HttpResponse
 from django.contrib.auth.views import LoginView, PasswordChangeView
@@ -38,6 +41,9 @@ from .models import Alumno, Usuario, Tutor
 from .constants import CARRERAS, ESTADOS_ALUMNO, SEXOS, ALUMNO, CODA, COORDINADOR, TUTOR
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
+from django.core.files.base import ContentFile
+from PIL import Image, ImageOps, UnidentifiedImageError
+from .imagenes import abrir_imagen
 import io
 import pandas as pd
 from .models import Documento
@@ -466,7 +472,112 @@ def recordarcontras_view_test(request):
 
 
 ### Profile Views Updated for `Usuario`
-class PerfilAlumnoView(BaseAccessMixin, DetailView):
+def can_manage_own_photo(request_user, target_user):
+    return request_user.is_authenticated and request_user.pk == target_user.pk
+
+
+class ProfilePhotoContextMixin:
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        usuario = context.get('usuario') or context.get('object') or self.object
+        context['can_manage_own_photo'] = can_manage_own_photo(
+            self.request.user, usuario
+        )
+        context['avatar_max_upload_size'] = getattr(
+            settings, 'AVATAR_MAX_UPLOAD_SIZE', 5 * 1024 * 1024
+        )
+        return context
+
+
+def _process_avatar_to_png(uploaded_file):
+    uploaded_file.seek(0)
+    with abrir_imagen(uploaded_file) as source:
+        source.load()
+        image = ImageOps.exif_transpose(source)
+        if image.width * image.height > 40_000_000:
+            raise ValueError('La imagen tiene demasiados píxeles.')
+        if image.mode not in {'RGB', 'RGBA'}:
+            image = image.convert('RGBA')
+
+    square_size = min(image.size)
+    left = (image.width - square_size) // 2
+    top = (image.height - square_size) // 2
+    image = image.crop((left, top, left + square_size, top + square_size))
+    image = image.resize((256, 256), Image.Resampling.LANCZOS)
+
+    output = BytesIO()
+    image.save(output, format='PNG', optimize=True)
+    uploaded_file.seek(0)
+    return output.getvalue()
+
+
+class CambiarFotoPerfilView(BaseAccessMixin, View):
+    def post(self, request):
+        form = userForms.AvatarUploadForm(request.POST, request.FILES, instance=request.user)
+        if not form.is_valid():
+            for error in form.errors.get('foto', []):
+                messages.error(request, error)
+            return redirect('perfil')
+
+        previous_name = request.user.foto.name
+        previous_storage = request.user.foto.storage
+        new_name = None
+        try:
+            image_bytes = _process_avatar_to_png(form.cleaned_data['foto'])
+            image_file = ContentFile(
+                image_bytes,
+                name=f'foto_perfil_{request.user.matricula}.png',
+            )
+            request.user.foto.save(image_file.name, image_file, save=False)
+            new_name = request.user.foto.name
+            request.user.save(update_fields=['foto'])
+        except (OSError, ValueError, UnidentifiedImageError):
+            logger.exception('No se pudo procesar la foto de perfil del usuario %s.', request.user.pk)
+            if new_name and new_name != previous_name:
+                previous_storage.delete(new_name)
+            request.user.foto.name = previous_name
+            messages.error(request, 'No se pudo procesar la imagen. Revisa el formato e inténtalo de nuevo.')
+            return redirect('perfil')
+        except Exception:
+            logger.exception('No se pudo guardar la foto de perfil del usuario %s.', request.user.pk)
+            if new_name and new_name != previous_name:
+                previous_storage.delete(new_name)
+            request.user.foto.name = previous_name
+            messages.error(request, 'No se pudo guardar la imagen. Inténtalo de nuevo.')
+            return redirect('perfil')
+
+        if previous_name and previous_name != new_name:
+            transaction.on_commit(lambda: previous_storage.delete(previous_name))
+        messages.success(request, 'Tu foto de perfil se actualizó correctamente.')
+        return redirect('perfil')
+
+
+class VerFotoPerfilView(BaseAccessMixin, View):
+    def get(self, request, pk):
+        usuario = get_object_or_404(Usuario, pk=pk)
+        if not usuario.foto:
+            raise Http404('Este usuario no tiene foto de perfil.')
+
+        with usuario.foto.open('rb') as archivo:
+            contenido = archivo.read()
+        # El nombre es estable (foto_perfil_<matrícula>.png), así que el ETag se calcula del contenido.
+        etag = '"%s"' % hashlib.sha256(contenido).hexdigest()[:32]
+        if request.headers.get('If-None-Match') == etag:
+            not_modified = HttpResponseNotModified()
+            not_modified['ETag'] = etag
+            not_modified['Cache-Control'] = 'private, no-cache'
+            return not_modified
+
+        content_type = mimetypes.guess_type(usuario.foto.name)[0] or 'application/octet-stream'
+        response = HttpResponse(contenido, content_type=content_type)
+        # La URL es fija y el contenido cambia al subir otra foto: se revalida siempre.
+        response['Cache-Control'] = 'private, no-cache'
+        response['ETag'] = etag
+        response['X-Content-Type-Options'] = 'nosniff'
+        return response
+
+
+class PerfilAlumnoView(ProfilePhotoContextMixin, BaseAccessMixin, DetailView):
     model = Usuario
     template_name = 'Usuarios/perfil_alumno.html'
 
@@ -474,7 +585,7 @@ class PerfilAlumnoView(BaseAccessMixin, DetailView):
         return Usuario.objects.filter(rol__contains=["ALU"])  # Filter for Alumnos
 
 
-class PerfilTutorView(BaseAccessMixin, DetailView):
+class PerfilTutorView(ProfilePhotoContextMixin, BaseAccessMixin, DetailView):
     """Muestra el perfil público o detallado de un tutor.
 
     Permite a los alumnos y coordinadores visualizar los datos del tutor.
@@ -529,7 +640,7 @@ class PerfilTutorView(BaseAccessMixin, DetailView):
             return redirect('perfil-tutor', pk=self.object.pk)
         return self.render_to_response(self.get_context_data(form=form))
 
-class PerfilCodaView(BaseAccessMixin, DetailView):
+class PerfilCodaView(ProfilePhotoContextMixin, BaseAccessMixin, DetailView):
     model = Usuario
     template_name = 'Usuarios/perfil_cooda.html'
 
@@ -537,7 +648,7 @@ class PerfilCodaView(BaseAccessMixin, DetailView):
         return Usuario.objects.filter(rol__contains=["CODA"])  # Filter for Coda
 
 
-class PerfilCordinadorView(BaseAccessMixin, DetailView):
+class PerfilCordinadorView(ProfilePhotoContextMixin, BaseAccessMixin, DetailView):
     model = Usuario
     template_name = 'Usuarios/perfil_coordinador.html'
 

@@ -11,44 +11,22 @@
   <div class="card border-top border-bottom border-4"
        style="border-color: #F08200 !important">
     <div class="row g-0">
-      <div class="col-md-4 gradient-custom text-center my-4"
-           style="border-top-left-radius: .5rem;
-                  border-bottom-left-radius: .5rem">
+      <div class="col-12 col-lg-4 border-end">
+        <div class="text-center d-flex flex-column profile-side-panel">
         {% load static %}
-        <!-- <img src="https://mdbcdn.b-cdn.net/img/new/avatars/2.webp" alt="" class="img-fluid shadow-2-strong mt-4 mb-2"
-      style="width: 150px; height: 150px; object-fit: cover; z-index: 1" /> -->
-        <img src="{% if usuario.foto %}{{ usuario.foto.url }}{% else %}{% static 'Alumnos/img/user.png' %}{% endif %}"
+        <img src="{% if usuario.foto %}{% url 'ver-foto-perfil' usuario.pk %}{% else %}{% static 'Alumnos/img/user.png' %}{% endif %}"
              alt="Foto de perfil de {{ usuario.first_name }}"
-             class="img-fluid shadow-2-strong mt-4 mb-2"
-             style="width: 150px;
-                    height: 150px;
-                    object-fit: cover;
-                    z-index: 1" />
-        {% if puede_editar_perfil %}
-                <button type="button" class="btn btn-link btn-sm p-0 perfil-edit-button"
-                        data-bs-toggle="collapse" data-bs-target="#editar-foto"
-                        aria-expanded="{% if foto_field.errors %}true{% else %}false{% endif %}"
-                        aria-controls="editar-foto" aria-label="Editar foto de perfil" title="Editar foto de perfil">
-                  <i class="bi bi-pencil" aria-hidden="true"></i>
-                </button>
-                <form id="editar-foto" class="collapse mt-2{% if foto_field.errors %} show{% endif %}"
-                      method="post" enctype="multipart/form-data">
-                  {% csrf_token %}
-                  <input type="hidden" name="campo" value="foto">
-                  {{ form.non_field_errors }}
-                  {{ foto_field.label_tag }}
-                  {{ foto_field }}
-                  {% if foto_field.help_text %}<div class="form-text">{{ foto_field.help_text }}</div>{% endif %}
-                  {{ foto_field.errors }}
-                  <div class="mt-2">
-                    <button type="submit" class="btn btn-primary btn-sm">Guardar</button>
-                    <button type="button" class="btn btn-link btn-sm" data-bs-toggle="collapse"
-                            data-bs-target="#editar-foto">Cancelar</button>
-                  </div>
-                </form>
-              {% endif %}
-        <h5 class="text-black">{{ usuario.nombre_completo }}</h5>
-        <!-- <a href="#!"><i class="far fa-edit fa-lg"></i></a> -->
+             class="img-fluid shadow-2-strong mt-2 mb-3 rounded-circle mx-auto"
+             style="width: 170px; height: 170px; object-fit: cover" />
+          <h4 class="text-black mb-1">{{ usuario.first_name }}</h4>
+          <h5 class="text-black mb-2">{{ usuario.last_name }} {{ usuario.second_last_name }}</h5>
+          <p class="text-muted small mb-4">{% if user_es_tutor %}Perfil de tutor{% elif usuario.sexo == 'F' %}Perfil de tutora{% else %}Perfil del tutor{% endif %}</p>
+          {% if can_manage_own_photo %}
+            <button type="button" class="btn btn-primary btn-sm w-100" id="open-avatar-upload-dialog">
+              <i class="bi bi-camera me-1" aria-hidden="true"></i>Actualizar foto
+            </button>
+          {% endif %}
+        </div>
       </div>
       <div class="col-md-8">
         <div class="card-body p-4 w-100">
