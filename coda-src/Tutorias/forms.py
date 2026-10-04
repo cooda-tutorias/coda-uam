@@ -5,6 +5,7 @@ from .models import Tutoria
 from Usuarios.models import Documento, Alumno, Tutor, HorarioTutor
 from .constants import TEMAS, ESTADO, ACEPTADO, PENDIENTE, DURACION_ASESORIA, ROLES, CARRERAS
 from Usuarios.constants import ESTADOS_ALUMNO
+from .services.correos_asignacion import validar_mensaje
 
 
 def str_to_bool(value):
@@ -459,8 +460,60 @@ class FormVerTutorias(forms.Form):
     )
 
 
+class FormMensajesAsignacion(forms.Form):
+    seleccion = forms.CharField(widget=forms.HiddenInput)
+    destinatarios = forms.ChoiceField(
+        choices=[('ambas', 'Alumnos y tutores'), ('alumno', 'Solo alumnos'), ('tutor', 'Solo tutores')],
+        initial='ambas', label='Destinatarios')
+    asunto_alumno = forms.CharField(max_length=200, required=False, label='Asunto para alumnos',
+                                   initial='Carta de asignación de tutoría — {licenciatura}')
+    cuerpo_alumno = forms.CharField(required=False, label='Mensaje para alumnos',
+        widget=forms.Textarea(attrs={'rows': 9}),
+        initial='Estimado(a) {nombre_alumno}:\n\nLe enviamos adjunta su carta de asignación de tutoría. '
+                'Su acompañamiento académico estará a cargo {referencia_tutor}.\n\n'
+                'Para solicitar una tutoría, ingrese al sistema:\n{url_tutorias}\n\n'
+                'Desde el sistema podrá proponer la fecha, el horario y los temas que desea abordar. '
+                'Recibirá las notificaciones correspondientes en su correo institucional.\n\n'
+                'Para cualquier aclaración, comuníquese con CODDAA a través de coddaa@cua.uam.mx.\n\n'
+                'Reciba un cordial saludo.\n\nCODDAA\nUAM, Unidad Cuajimalpa')
+    asunto_tutor = forms.CharField(max_length=200, required=False, label='Asunto para tutores',
+                                  initial='Cartas de asignación de tutorados')
+    cuerpo_tutor = forms.CharField(required=False, label='Mensaje para tutores',
+        widget=forms.Textarea(attrs={'rows': 9}),
+        initial='{saludo_tutor} {tratamiento_tutor} {nombre_tutor}:\n\n'
+                'Le enviamos adjuntas las cartas de asignación correspondientes al alumnado '
+                'que estará bajo su acompañamiento académico.\n\n'
+                'Las solicitudes de tutoría se gestionan en:\n{url_tutorias}\n\n'
+                'Cuando el alumnado solicite una tutoría, recibirá una notificación en su correo institucional. '
+                'Desde el sistema podrá aceptar la propuesta o sugerir otra fecha y horario.\n\n'
+                'Después de realizar cada sesión, le agradeceremos registrar su seguimiento en el sistema.\n\n'
+                'Agradecemos su apoyo al alumnado durante su formación académica.\n\n'
+                'Reciba un cordial saludo.\n\nCODDAA')
+
+    def clean(self):
+        datos = super().clean()
+        tipos = ('alumno', 'tutor') if datos.get('destinatarios') == 'ambas' else (datos.get('destinatarios'),)
+        for tipo in tipos:
+            if tipo not in ('alumno', 'tutor'):
+                continue
+            for prefijo in ('asunto_', 'cuerpo_'):
+                campo = prefijo + tipo
+                if not datos.get(campo) and campo not in self.errors:
+                    self.add_error(campo, 'Este campo es obligatorio para los destinatarios seleccionados.')
+                elif datos.get(campo):
+                    try:
+                        validar_mensaje(datos[campo], tipo, asunto=prefijo == 'asunto_')
+                    except forms.ValidationError as error:
+                        self.add_error(campo, error)
+        return datos
+
+
 class FormLoteAsignacion(forms.Form):
     seleccion = forms.CharField(widget=forms.HiddenInput)
+    formato = forms.ChoiceField(choices=[('docx', 'Word (.docx)'), ('pdf', 'PDF (.pdf)')],
+                                initial='docx', required=False,
+                                widget=forms.RadioSelect(attrs={'class': 'form-check-input'}),
+                                label='Formato de las cartas')
     destinatarios = forms.ChoiceField(choices=[('ambas', 'Cartas para alumnos y tutores'), ('alumno', 'Solo cartas para alumnos'), ('tutor', 'Solo cartas para tutores')], initial='ambas', label='Documentos a generar')
     plantilla_alumno = forms.ModelChoiceField(queryset=Documento.objects.all(), required=False, label='Plantilla para alumnos')
     plantilla_tutor = forms.ModelChoiceField(queryset=Documento.objects.all(), required=False, label='Plantilla para tutores')
@@ -475,6 +528,7 @@ class FormLoteAsignacion(forms.Form):
 
     def clean(self):
         datos = super().clean()
+        datos['formato'] = datos.get('formato') or 'docx'
         tipos = ('alumno', 'tutor') if datos.get('destinatarios') == 'ambas' else (datos.get('destinatarios'),)
         for tipo in tipos:
             if tipo not in ('alumno', 'tutor'):
@@ -483,4 +537,20 @@ class FormLoteAsignacion(forms.Form):
                 campo = prefijo + tipo
                 if not datos.get(campo) and campo not in self.errors:
                     self.add_error(campo, 'Este campo es obligatorio para los documentos seleccionados.')
+        return datos
+
+
+class FormPrepararAsignacion(FormLoteAsignacion):
+    """Los destinatarios proceden del mensaje y los adjuntos siempre son PDF."""
+    def __init__(self, *args, destinatarios, **kwargs):
+        self.destinatarios_envio = destinatarios
+        super().__init__(*args, **kwargs)
+        self.fields['destinatarios'].widget = forms.HiddenInput()
+        self.fields['formato'].widget = forms.HiddenInput()
+
+    def clean(self):
+        datos = super().clean()
+        if datos.get('destinatarios') != self.destinatarios_envio:
+            self.add_error('destinatarios', 'Los destinatarios deben coincidir con los mensajes guardados.')
+        datos['formato'] = 'pdf'
         return datos

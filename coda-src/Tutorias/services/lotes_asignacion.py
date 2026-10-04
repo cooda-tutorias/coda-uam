@@ -1,12 +1,30 @@
 """Selección, agrupación y empaquetado de cartas para varias licenciaturas."""
 from collections import OrderedDict
 from io import BytesIO
+import logging
 from zipfile import ZipFile, ZIP_DEFLATED
 
 from django.core.exceptions import ValidationError
+from django.conf import settings
 from django.utils.text import slugify
 from Usuarios.models import Alumno
+from Usuarios.services.vista_previa_plantillas import convertir_pdf, ErrorVistaPrevia
 from .cartas_asignacion import cargar_plantilla, generar_carta
+
+
+logger = logging.getLogger(__name__)
+
+
+def convertir_carta_pdf(contenido):
+    """Convierte una carta usando el conversor con limpieza de temporales."""
+    try:
+        return convertir_pdf(contenido)
+    except ErrorVistaPrevia as error:
+        logger.exception('Error al convertir una carta de asignación a PDF')
+        raise ValidationError(
+            'No se pudo generar el lote en PDF. Intenta nuevamente, selecciona menos alumnos '
+            'o descarga las cartas en Word (.docx).'
+        ) from error
 
 
 def seleccionar_alumnos(valor):
@@ -33,7 +51,10 @@ def agrupar_alumnos(alumnos):
     return list(grupos.values())
 
 
-def generar_lote(alumnos, datos):
+def generar_documentos(alumnos, datos):
+    formato = datos.get('formato') or 'docx'
+    if formato not in ('docx', 'pdf'):
+        raise ValidationError('Selecciona un formato válido para las cartas.')
     if any(not alumno.tutor_asignado_id for alumno in alumnos):
         raise ValidationError('Hay alumnos sin tutor asignado. Corrige su asignación o exclúyelos antes de generar.')
     grupos = agrupar_alumnos(alumnos)
@@ -45,24 +66,37 @@ def generar_lote(alumnos, datos):
         a, t = consecutivos['alumno'], consecutivos['tutor']
         if max(a, t) < min(a + len(alumnos), t + len(grupos)):
             raise ValidationError('Los intervalos de oficios para alumnos y tutores se superponen. Cambia uno de los números iniciales.')
-    paquetes = OrderedDict()
     for grupo in grupos:
-        codigo = grupo['codigo']
+        for tipo in tipos:
+            destinatarios = [[alumno] for alumno in grupo['alumnos']] if tipo == 'alumno' else [grupo['alumnos']]
+            for seleccion in destinatarios:
+                contenido = generar_carta(plantillas[tipo], grupo['tutor'], seleccion,
+                                          consecutivos[tipo], datos['fecha'], tipo,
+                                          licenciatura=grupo['carrera'])
+                if formato == 'pdf':
+                    contenido = convertir_carta_pdf(contenido)
+                persona = seleccion[0] if tipo == 'alumno' else grupo['tutor']
+                nombre = slugify(f'{persona.matricula}_{persona.first_name}_{persona.last_name}')
+                yield {
+                    'codigo': grupo['codigo'], 'licenciatura': grupo['carrera'], 'tipo': tipo,
+                    'destinatario_id': persona.pk, 'nombre': persona.nombre_completo,
+                    'correo': persona.email, 'nombre_tutor': grupo['tutor'].nombre_completo,
+                    'sexo_tutor': grupo['tutor'].sexo, 'url_tutorias': settings.TUTORIAS_SITE_URL,
+                    'oficio': consecutivos[tipo],
+                    'ruta': f'Cartas_para_{"alumnos" if tipo == "alumno" else "tutores"}/{consecutivos[tipo]}_{nombre}.{formato}',
+                    'contenido': contenido,
+                }
+                consecutivos[tipo] += 1
+
+
+def generar_lote(alumnos, datos):
+    paquetes = OrderedDict()
+    for carta in generar_documentos(alumnos, datos):
+        codigo = carta['codigo']
         if codigo not in paquetes:
             paquetes[codigo] = BytesIO()
         with ZipFile(paquetes[codigo], 'a', ZIP_DEFLATED) as archivo:
-            for tipo in tipos:
-                destinatarios = [[alumno] for alumno in grupo['alumnos']] if tipo == 'alumno' else [grupo['alumnos']]
-                for seleccion in destinatarios:
-                    # La carta del tutor debe mencionar la licenciatura de estos alumnos,
-                    # que puede diferir de la coordinación del profesor.
-                    contenido = generar_carta(plantillas[tipo], grupo['tutor'], seleccion,
-                                              consecutivos[tipo], datos['fecha'], tipo,
-                                              licenciatura=grupo['carrera'])
-                    persona = seleccion[0] if tipo == 'alumno' else grupo['tutor']
-                    nombre = slugify(f'{persona.matricula}_{persona.first_name}_{persona.last_name}')
-                    archivo.writestr(f'Cartas_para_{"alumnos" if tipo == "alumno" else "tutores"}/{consecutivos[tipo]}_{nombre}.docx', contenido)
-                    consecutivos[tipo] += 1
+            archivo.writestr(carta['ruta'], carta['contenido'])
     if len(paquetes) == 1:
         codigo, contenido = next(iter(paquetes.items()))
         return f'Cartas_asignacion_{slugify(codigo)}.zip', contenido.getvalue()

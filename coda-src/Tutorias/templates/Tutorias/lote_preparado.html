@@ -1,0 +1,193 @@
+{% extends "Usuarios/navbar_coda.html" %}
+{% block title %}Revisar y enviar cartas{% endblock %}
+{% block body %}
+<div class="container py-5">
+  <div class="card border-top border-4" style="border-color: #F08200 !important">
+    <div class="card-body p-4">
+      <h3 class="text-primary">Cartas PDF preparadas — Revisar y enviar</h3>
+      <a href="{% url 'ver-alumnos' %}">Volver a Alumnos registrados</a>
+      {% if errores %}
+        <div class="alert alert-danger mt-3" role="alert">{{ errores|join:" " }}</div>
+      {% else %}
+        <div class="alert alert-success mt-3">Se prepararon {{ cartas|length }} cartas PDF.{% if sin_enviar %} No se han enviado correos.{% endif %}</div>
+        <p>Revisa el correo personalizado y los PDF que se adjuntarán. Los documentos estarán disponibles durante 24 horas en esta sesión.</p>
+        <p><strong>{{ total_validos }} correos destinatarios.</strong>{% if total_excluidos %} {{ total_excluidos }} destinatarios serán excluidos porque su correo no es válido.{% endif %}</p>
+        {% if grupos|length > 1 %}
+          <ul class="nav nav-tabs mb-3" role="tablist">
+            {% for grupo in grupos %}
+              <li class="nav-item" role="presentation"><button class="nav-link {% if forloop.first %}active{% endif %}" id="tab-{{ grupo.tipo }}" data-bs-toggle="tab" data-bs-target="#panel-{{ grupo.tipo }}" type="button" role="tab" aria-controls="panel-{{ grupo.tipo }}" aria-selected="{% if forloop.first %}true{% else %}false{% endif %}">{% if grupo.tipo == 'alumno' %}Alumnos{% else %}Tutores{% endif %} ({{ grupo.correos|length }})</button></li>
+            {% endfor %}
+          </ul>
+        {% endif %}
+        <div class="tab-content">
+          {% for grupo in grupos %}
+            <section class="tab-pane {% if forloop.first %}show active{% endif %}" id="panel-{{ grupo.tipo }}" {% if grupos|length > 1 %}role="tabpanel" aria-labelledby="tab-{{ grupo.tipo }}"{% endif %} data-grupo="{{ grupo.tipo }}">
+              <h4 class="fs-5">{% if grupo.tipo == 'alumno' %}Correo para alumnos{% else %}Correo para tutores{% endif %}</h4>
+              <label for="destinatario-{{ grupo.tipo }}" class="form-label">Destinatario</label>
+              <select class="form-select mb-2" id="destinatario-{{ grupo.tipo }}" data-destinatario>
+                {% for correo in grupo.correos %}<option value="{{ correo.id }}">{{ correo.nombre }} — {{ correo.correo|default:"Sin correo" }}</option>{% endfor %}
+              </select>
+              <div class="d-flex gap-2 mb-3"><button type="button" class="btn btn-outline-secondary btn-sm" data-anterior>Anterior</button><button type="button" class="btn btn-outline-secondary btn-sm" data-siguiente>Siguiente</button></div>
+              <div class="row g-3">
+                <div class="col-lg-5">
+                  <p><strong>Para:</strong> <span data-para></span></p>
+                  <p><strong>Asunto:</strong> <span data-asunto></span></p>
+                  <div class="border rounded p-3" style="white-space: pre-wrap; overflow-wrap: anywhere" data-cuerpo></div>
+                  <p class="mt-2" role="status" data-resultado></p>
+                </div>
+                <div class="col-lg-7">
+                  <label class="form-label" for="adjunto-{{ grupo.tipo }}">PDF adjunto</label>
+                  <select class="form-select mb-2" id="adjunto-{{ grupo.tipo }}" data-adjunto></select>
+                  <a data-abrir target="_blank" rel="noopener">Abrir PDF en otra pestaña</a>
+                  <iframe class="w-100 border rounded mt-2" style="height: 650px" title="Carta PDF para {% if grupo.tipo == 'alumno' %}alumno{% else %}tutor{% endif %}" data-pdf></iframe>
+                </div>
+              </div>
+            </section>
+          {% endfor %}
+        </div>
+        <h4 class="fs-5 mt-4">Estado de los correos</h4>
+        <div class="table-responsive"><table class="table table-sm">
+          <thead><tr><th>Destinatario</th><th>Correo</th><th>Estado</th></tr></thead>
+          <tbody>{% for correo in correos %}<tr><td>{{ correo.nombre }} ({% if correo.tipo == 'alumno' %}Alumno{% else %}Tutor{% endif %})</td><td>{{ correo.correo|default:"Sin correo" }}</td><td data-estado="{{ correo.id }}"></td></tr>{% endfor %}</tbody>
+        </table></div>
+        <div id="aviso-envio" class="alert alert-info" role="status" aria-live="polite">Abre al menos una carta PDF y confirma los destinatarios antes de enviar.</div>
+        <form method="post" id="form-enviar-cartas">
+          {% csrf_token %}<input type="hidden" name="token" value="{{ token }}">
+          <div class="form-check mb-3"><input class="form-check-input" type="checkbox" id="confirmar-envio" name="confirmar" value="si" required><label class="form-check-label" for="confirmar-envio">Confirmo el envío a los destinatarios con correo válido de {% if grupos|length > 1 %}ambos grupos: alumnos y tutores{% elif grupos.0.tipo == 'alumno' %}alumnos{% else %}tutores{% endif %}.</label></div>
+          <button class="btn btn-primary" id="boton-enviar-cartas" type="submit" disabled>Enviar correos{% if grupos|length > 1 %} a alumnos y tutores{% elif grupos.0.tipo == 'alumno' %} a alumnos{% else %} a tutores{% endif %}</button>
+        </form>
+        {{ correos|json_script:"datos-correos" }}
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+{% if correos %}
+<script>
+(function () {
+  const correos = JSON.parse(document.getElementById('datos-correos').textContent);
+  const paneles = Array.from(document.querySelectorAll('[data-grupo]'));
+  const formulario = document.getElementById('form-enviar-cartas');
+  const boton = document.getElementById('boton-enviar-cartas');
+  const confirmar = document.getElementById('confirmar-envio');
+  const aviso = document.getElementById('aviso-envio');
+  const textoInicial = boton.textContent;
+  const estadoUrl = '{% url "cartas-asignacion-estado" token %}';
+  const pdfBase = '{% url "carta-asignacion-preparada-pdf" token 0 %}';
+  let revisado = false, activo = false, fase = 'sin_enviar', consultando = false, estadoDisponible = false;
+  let resultados = Object.fromEntries(correos.map(correo => [correo.id, correo.resultado]));
+  const etiquetas = {pendiente: 'Pendiente', enviando: 'Enviando…', enviado: 'Enviado', fallido: 'Fallido', incierto: 'Por comprobar', excluido: 'Excluido'};
+  function correoSeleccionado(panel) {
+    return correos.find(correo => correo.id === panel.querySelector('[data-destinatario]').value);
+  }
+  function resultadoTexto(correo) {
+    const resultado = resultados[correo.id] || correo.resultado;
+    return (etiquetas[resultado.estado] || resultado.estado) + (resultado.detalle ? ': ' + resultado.detalle : '');
+  }
+  function actualizarBoton() {
+    const pendientes = correos.filter(correo => correo.valido && ['pendiente', 'fallido'].includes((resultados[correo.id] || correo.resultado).estado));
+    boton.disabled = activo || !estadoDisponible || !revisado || !confirmar.checked || pendientes.length === 0;
+    confirmar.disabled = activo;
+    boton.textContent = activo ? 'Enviando correos…' : fase === 'sin_enviar' ? textoInicial : 'Enviar correos pendientes o fallidos';
+  }
+  function mostrarPDF(panel) {
+    const correo = correoSeleccionado(panel);
+    const indice = Number(panel.querySelector('[data-adjunto]').value);
+    const adjunto = correo.adjuntos.find(archivo => archivo.indice === indice);
+    if (!adjunto) return;
+    const url = pdfBase.replace(/0\/$/, indice + '/');
+    const marco = panel.querySelector('[data-pdf]');
+    if (marco.getAttribute('src') !== url) marco.src = url;
+    panel.querySelector('[data-abrir]').href = url;
+  }
+  function mostrar(panel) {
+    const correo = correoSeleccionado(panel);
+    panel.querySelector('[data-para]').textContent = correo.correo || 'Sin correo';
+    panel.querySelector('[data-asunto]').textContent = correo.asunto;
+    panel.querySelector('[data-cuerpo]').textContent = correo.cuerpo;
+    panel.querySelector('[data-resultado]').textContent = resultadoTexto(correo);
+    const adjuntos = panel.querySelector('[data-adjunto]');
+    adjuntos.replaceChildren(...correo.adjuntos.map(archivo => new Option(archivo.licenciatura + ' — Oficio ' + archivo.oficio, archivo.indice)));
+    adjuntos.hidden = correo.adjuntos.length < 2;
+    panel.querySelector('[data-anterior]').disabled = panel.querySelector('[data-destinatario]').selectedIndex === 0;
+    const selector = panel.querySelector('[data-destinatario]');
+    panel.querySelector('[data-siguiente]').disabled = selector.selectedIndex === selector.options.length - 1;
+    if (panel.classList.contains('active')) mostrarPDF(panel);
+  }
+  paneles.forEach(panel => {
+    const selector = panel.querySelector('[data-destinatario]');
+    selector.addEventListener('change', () => mostrar(panel));
+    panel.querySelector('[data-anterior]').addEventListener('click', () => { selector.selectedIndex--; mostrar(panel); });
+    panel.querySelector('[data-siguiente]').addEventListener('click', () => { selector.selectedIndex++; mostrar(panel); });
+    panel.querySelector('[data-adjunto]').addEventListener('change', () => mostrarPDF(panel));
+    mostrar(panel);
+  });
+  document.querySelectorAll('[data-bs-toggle="tab"]').forEach(tab => {
+    tab.addEventListener('shown.bs.tab', () => mostrarPDF(document.querySelector(tab.getAttribute('data-bs-target'))));
+  });
+  function pintarResultados() {
+    correos.forEach(correo => {
+      document.querySelector('[data-estado="' + correo.id + '"]').textContent = resultadoTexto(correo);
+    });
+    paneles.forEach(panel => { panel.querySelector('[data-resultado]').textContent = resultadoTexto(correoSeleccionado(panel)); });
+    actualizarBoton();
+  }
+  async function consultar() {
+    if (consultando) return;
+    consultando = true;
+    try {
+      const respuesta = await fetch(estadoUrl, {credentials: 'same-origin', cache: 'no-store'});
+      if (!(respuesta.headers.get('Content-Type') || '').includes('application/json')) throw new Error('No se pudo consultar el envío. Vuelve a iniciar sesión y recarga la página.');
+      const estado = await respuesta.json();
+      if (!respuesta.ok) throw new Error((estado.errores || ['No se pudo consultar el envío.']).join(' '));
+      fase = estado.fase;
+      activo = ['en_cola', 'enviando'].includes(fase);
+      revisado = estado.pdf_revisado;
+      estadoDisponible = true;
+      resultados = {...Object.fromEntries(correos.map(correo => [correo.id, correo.resultado])), ...estado.correos};
+      pintarResultados();
+      aviso.className = activo ? 'alert alert-info' : 'alert alert-secondary';
+      if (activo) aviso.textContent = 'Enviando correos… Puedes seguir revisando las cartas. El estado se actualiza automáticamente.';
+      else if (fase !== 'sin_enviar') {
+        const cuentas = Object.values(resultados).reduce((total, resultado) => { total[resultado.estado] = (total[resultado.estado] || 0) + 1; return total; }, {});
+        aviso.textContent = 'Enviados: ' + (cuentas.enviado || 0) + '. Fallidos: ' + (cuentas.fallido || 0) + '. Por comprobar: ' + (cuentas.incierto || 0) + '. Pendientes: ' + (cuentas.pendiente || 0) + '. Excluidos: ' + (cuentas.excluido || 0) + '.';
+      } else aviso.textContent = revisado ? 'Confirma los destinatarios para enviar sus correos con los PDF revisados.' : 'Abre al menos una carta PDF y confirma los destinatarios antes de enviar.';
+    } catch (error) {
+      estadoDisponible = false;
+      aviso.className = 'alert alert-danger';
+      aviso.textContent = error instanceof TypeError ? 'No se pudo consultar el envío. Comprueba tu conexión.' : error.message;
+      boton.disabled = true;
+    } finally {
+      consultando = false;
+      if (activo || !revisado || !estadoDisponible) window.setTimeout(consultar, 2000);
+    }
+  }
+  confirmar.addEventListener('change', actualizarBoton);
+  formulario.addEventListener('submit', async evento => {
+    evento.preventDefault();
+    if (boton.disabled) return;
+    const datos = new FormData(formulario);
+    activo = true;
+    actualizarBoton();
+    try {
+      const respuesta = await fetch(formulario.action || window.location.href, {method: 'POST', body: datos, credentials: 'same-origin'});
+      if (!(respuesta.headers.get('Content-Type') || '').includes('application/json')) throw new Error('No se pudo confirmar el inicio del envío. Recarga la página para consultar su estado.');
+      const resultado = await respuesta.json();
+      if (!respuesta.ok) throw new Error((resultado.errores || ['No se pudo iniciar el envío.']).join(' '));
+      confirmar.checked = false;
+      await consultar();
+      window.setTimeout(consultar, 2000);
+    } catch (error) {
+      // Consultar el estado antes de permitir reintentos si se perdió la respuesta.
+      await consultar();
+      aviso.className = 'alert alert-danger';
+      aviso.textContent = error instanceof TypeError ? 'Se perdió la conexión. Comprueba el estado del lote antes de reintentar.' : error.message;
+    }
+  });
+  pintarResultados();
+  consultar();
+})();
+</script>
+{% endif %}
+{% endblock %}

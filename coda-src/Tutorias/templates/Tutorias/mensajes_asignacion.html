@@ -1,0 +1,70 @@
+{% extends "Usuarios/navbar_coda.html" %}
+{% load widget_tweaks %}
+{% block title %}Mensajes de asignación por correo{% endblock %}
+{% block body %}
+<div class="container py-5">
+  <div class="card border-top border-4" style="border-color: #F08200 !important">
+    <div class="card-body p-4">
+      <h3 class="text-primary">Enviar cartas de asignación por correo</h3>
+      <a href="{% url 'ver-alumnos' %}">Volver a Alumnos registrados</a>
+      {% if error_seleccion %}
+        <div class="alert alert-danger mt-3" role="alert">{{ error_seleccion|join:" " }}</div>
+      {% else %}
+        <div class="alert alert-info mt-3">
+          Selección: {{ total_alumnos }} alumnos y {{ total_tutores }} tutores.
+          Edita el asunto y el mensaje para cada grupo de destinatarios.
+        </div>
+        {% if sin_tutor %}<div class="alert alert-warning">{{ sin_tutor }} alumnos seleccionados no tienen tutor asignado. Revisa sus asignaciones antes de preparar el envío.</div>{% endif %}
+        {% if guardado %}<div class="alert alert-success" role="status">Borrador guardado para esta selección durante tu sesión. No se han generado cartas ni enviado correos.</div>{% endif %}
+        <form method="post" id="form-mensajes-asignacion">
+          {% csrf_token %}{{ form.seleccion }}
+          <div class="mb-3">
+            <label class="form-label" for="{{ form.destinatarios.id_for_label }}">{{ form.destinatarios.label }}</label>
+            {% render_field form.destinatarios class="form-select" %}
+          </div>
+          <div class="row">
+            <section class="col-lg-6 mb-3" data-mensaje="alumno" aria-labelledby="titulo-mensaje-alumno">
+              <h4 id="titulo-mensaje-alumno" class="fs-5">Correo para alumnos</h4>
+              <label class="form-label" for="{{ form.asunto_alumno.id_for_label }}">Asunto</label>
+              {% render_field form.asunto_alumno class="form-control mb-3" %}
+              <label class="form-label" for="{{ form.cuerpo_alumno.id_for_label }}">Mensaje</label>
+              {% render_field form.cuerpo_alumno class="form-control" %}
+              <p class="form-text">Puedes usar <code>{nombre_alumno}</code>, <code>{nombre_tutor}</code>, <code>{licenciatura}</code>, <code>{referencia_tutor}</code> y <code>{url_tutorias}</code>. La referencia incluye «del profesor Dr. …» o «de la profesora Dra. …».</p>
+            </section>
+            <section class="col-lg-6 mb-3" data-mensaje="tutor" aria-labelledby="titulo-mensaje-tutor">
+              <h4 id="titulo-mensaje-tutor" class="fs-5">Correo para tutores</h4>
+              <label class="form-label" for="{{ form.asunto_tutor.id_for_label }}">Asunto</label>
+              {% render_field form.asunto_tutor class="form-control mb-3" %}
+              <label class="form-label" for="{{ form.cuerpo_tutor.id_for_label }}">Mensaje</label>
+              {% render_field form.cuerpo_tutor class="form-control" %}
+              <p class="form-text">Puedes usar <code>{nombre_tutor}</code>, <code>{saludo_tutor}</code>, <code>{tratamiento_tutor}</code> y <code>{url_tutorias}</code>. El saludo y tratamiento se adaptan automáticamente: Estimado Dr. / Estimada Dra.</p>
+            </section>
+          </div>
+          {% if form.errors %}<div class="alert alert-danger" role="alert"><ul class="mb-0">
+            {% for field in form %}{% for error in field.errors %}<li>{{ field.label }}: {{ error }}</li>{% endfor %}{% endfor %}
+          </ul></div>{% endif %}
+          <p class="text-muted">Guardar borrador conserva los mensajes durante tu sesión. Preparar envío también guarda los mensajes y permite configurar las cartas PDF.</p>
+          <button class="btn btn-outline-primary" type="submit" name="accion" value="guardar">Guardar borrador</button>
+          <button class="btn btn-primary" type="submit" name="accion" value="preparar">Preparar envío</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+{% if form %}
+<script>
+(function () {
+  const destinatarios = document.getElementById('id_destinatarios');
+  function actualizar() {
+    document.querySelectorAll('[data-mensaje]').forEach(grupo => {
+      grupo.hidden = destinatarios.value !== 'ambas' && destinatarios.value !== grupo.dataset.mensaje;
+    });
+  }
+  destinatarios.addEventListener('change', actualizar);
+  actualizar();
+})();
+</script>
+{% endif %}
+{% endblock %}

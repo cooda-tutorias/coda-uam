@@ -1,11 +1,11 @@
 {% extends "Usuarios/navbar_coda.html" %}
 {% load widget_tweaks %}
-{% block title %}Generar cartas de asignación{% endblock %}
+{% block title %}{% if preparar_envio %}Preparar envío de cartas{% else %}Generar cartas de asignación{% endif %}{% endblock %}
 {% block body %}
 <div class="container py-5">
   <div class="card border-top border-4" style="border-color: #F08200 !important">
     <div class="card-body p-4">
-      <h3 class="text-primary">Generar cartas de asignación</h3>
+      <h3 class="text-primary">{% if preparar_envio %}Preparar envío de cartas{% else %}Generar cartas de asignación{% endif %}</h3>
       <a href="{% url 'ver-alumnos' %}">Volver a Alumnos registrados</a>
       {% if error_seleccion %}<div class="alert alert-danger mt-3">{{ error_seleccion|join:" " }}</div>{% else %}
         <div class="alert alert-info mt-3">
@@ -15,7 +15,7 @@
         </div>
         {% if sin_tutor %}
           <div class="alert alert-warning">Hay alumnos sin tutor. Corrige su asignación o exclúyelos explícitamente antes de generar.
-            {% if seleccion_con_tutor %}<form method="post" class="mt-2">
+            {% if seleccion_con_tutor and not preparar_envio %}<form method="post" class="mt-2">
               {% csrf_token %}<input type="hidden" name="seleccion" value="{{ seleccion_con_tutor }}">
               <button type="submit" class="btn btn-outline-secondary">Excluir los {{ sin_tutor|length }} alumnos sin tutor y revisar de nuevo</button>
             </form>{% endif %}
@@ -30,10 +30,21 @@
             </div>
           {% endfor %}
         </details>
-        <form method="post">
+        {% if preparar_envio %}
+          <form method="post" action="{% url 'cartas-asignacion-correo' %}" class="mb-3">
+            {% csrf_token %}{{ form.seleccion }}
+            <button class="btn btn-outline-secondary" type="submit">Volver a editar mensajes</button>
+          </form>
+        {% endif %}
+        <form method="post" id="form-generar-cartas" {% if preparar_envio %}action="{% url 'cartas-asignacion-preparar' %}"{% endif %}>
           {% csrf_token %}{{ form.seleccion }}
           <input type="hidden" name="accion" value="generar">
-          <div class="mb-3"><label class="form-label" for="id_destinatarios">Documentos a generar</label>{% render_field form.destinatarios class="form-select" %}</div>
+          {% if preparar_envio %}
+            {{ form.destinatarios }}{{ form.formato }}
+            <p>Destinatarios: {% if form.destinatarios.value == 'ambas' %}alumnos y tutores{% elif form.destinatarios.value == 'alumno' %}solo alumnos{% else %}solo tutores{% endif %}. Las cartas se prepararán en PDF.</p>
+          {% else %}
+            <div class="mb-3"><label class="form-label" for="id_destinatarios">Documentos a generar</label>{% render_field form.destinatarios class="form-select" %}</div>
+          {% endif %}
           <div class="row">
             <div class="col-md-6 mb-3" data-tipo="alumno">
               <label class="form-label" for="id_plantilla_alumno">Plantilla para alumnos</label>{% render_field form.plantilla_alumno class="form-select" %}<small class="form-text text-muted">{{ form.plantilla_alumno.help_text }}</small>
@@ -47,12 +58,25 @@
           <div class="mb-3"><label class="form-label" for="id_fecha">Fecha de emisión</label>{% render_field form.fecha class="form-control" %}</div>
           <p id="intervalos" class="text-body" role="status"></p>
           <p>Los consecutivos continúan entre licenciaturas. No se reservan números de oficio: comprueba que estén disponibles.</p>
-          <p>Descargarás un ZIP por licenciatura. Si seleccionaste varias, se agruparán en un ZIP contenedor.</p>
+          {% if not preparar_envio %}<fieldset class="mb-3">
+            <legend class="fs-6">{{ form.formato.label }}</legend>
+            {% for opcion in form.formato %}
+              <div class="form-check form-check-inline">
+                {{ opcion.tag }} <label class="form-check-label" for="{{ opcion.id_for_label }}">{{ opcion.choice_label }}</label>
+              </div>
+            {% endfor %}
+          </fieldset>
+          <p>Descargarás un ZIP por licenciatura con las cartas en el formato seleccionado. Si seleccionaste varias, se agruparán en un ZIP contenedor.</p>
+          {% else %}<p>Los PDF preparados se conservarán durante 24 horas para su revisión. Preparar un nuevo lote reemplaza el anterior. No se enviarán correos en este paso.</p>{% endif %}
           {% if form.errors %}<div class="alert alert-danger" role="alert"><ul class="mb-0">
             {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
             {% for field in form %}{% for error in field.errors %}<li>{{ field.label }}: {{ error }}</li>{% endfor %}{% endfor %}
           </ul></div>{% endif %}
-          <button class="btn btn-primary" type="submit" {% if sin_tutor %}disabled{% endif %}>Generar cartas y descargar ZIP</button>
+          <button class="btn btn-primary" type="submit" {% if sin_tutor %}disabled{% endif %}>{% if preparar_envio %}Generar PDF para revisión{% else %}Generar cartas y descargar ZIP{% endif %}</button>
+          <div id="estado-generacion" class="alert alert-info mt-3" role="status" aria-live="polite" hidden>
+            <span id="indicador-generacion" class="spinner-border spinner-border-sm me-2" aria-hidden="true" hidden></span>
+            <span id="mensaje-generacion"></span>
+          </div>
         </form>
       {% endif %}
     </div>
@@ -64,6 +88,16 @@
 <script>
 (function () {
   const tipo = document.getElementById('id_destinatarios');
+  const oficioAlumno = document.getElementById('id_oficio_alumno');
+  const oficioTutor = document.getElementById('id_oficio_tutor');
+  let oficioTutorManual = oficioTutor.value !== '';
+
+  function sugerirOficioTutor() {
+    if (tipo.value !== 'ambas' || oficioTutorManual) return;
+    const inicio = Number(oficioAlumno.value);
+    oficioTutor.value = Number.isSafeInteger(inicio) && inicio > 0
+      ? String(inicio + {{ total_alumnos }}) : '';
+  }
   function actualizar() {
     const resumen = [];
     for (const [nombre, cantidad] of [['alumno', {{ total_alumnos }}], ['tutor', {{ total_cartas_tutor }}]]) {
@@ -77,10 +111,86 @@
     }
     document.getElementById('intervalos').textContent = resumen.join('. ');
   }
-  tipo.addEventListener('change', actualizar);
-  document.getElementById('id_oficio_alumno').addEventListener('input', actualizar);
-  document.getElementById('id_oficio_tutor').addEventListener('input', actualizar);
+  tipo.addEventListener('change', function () {
+    sugerirOficioTutor();
+    actualizar();
+  });
+  oficioAlumno.addEventListener('input', function () {
+    sugerirOficioTutor();
+    actualizar();
+  });
+  oficioTutor.addEventListener('input', function () {
+    oficioTutorManual = oficioTutor.value !== '';
+    actualizar();
+  });
+  sugerirOficioTutor();
   actualizar();
+
+  const formulario = document.getElementById('form-generar-cartas');
+  const boton = formulario.querySelector('button[type="submit"]');
+  const estado = document.getElementById('estado-generacion');
+  const indicador = document.getElementById('indicador-generacion');
+  const mensaje = document.getElementById('mensaje-generacion');
+  let generando = false;
+
+  formulario.addEventListener('submit', async function (evento) {
+    evento.preventDefault();
+    if (generando || boton.disabled) return;
+    const datos = new FormData(formulario);
+    generando = true;
+    boton.disabled = true;
+    formulario.setAttribute('aria-busy', 'true');
+    estado.hidden = false;
+    estado.className = 'alert alert-info mt-3';
+    indicador.hidden = false;
+    mensaje.textContent = {% if preparar_envio %}'Generando cartas… Preparando los PDF para revisión. Mantén esta página abierta.'{% else %}'Generando cartas… Preparando los documentos y el ZIP. La descarga comenzará cuando estén listos. Mantén esta página abierta.'{% endif %};
+    try {
+      const respuesta = await fetch(formulario.action || window.location.href, {
+        method: 'POST', body: datos, credentials: 'same-origin',
+        headers: {'X-Requested-With': 'XMLHttpRequest'}
+      });
+      const contenido = respuesta.headers.get('Content-Type') || '';
+      {% if preparar_envio %}
+      if (respuesta.ok && contenido.includes('application/json')) {
+        const resultado = await respuesta.json();
+        window.location.assign(resultado.url);
+        return;
+      }
+      {% endif %}
+      if (!respuesta.ok || !contenido.includes('application/zip')) {
+        let detalle = '';
+        if (contenido.includes('text/html')) {
+          const pagina = new DOMParser().parseFromString(await respuesta.text(), 'text/html');
+          detalle = Array.from(pagina.querySelectorAll('.alert-danger')).map(alerta => alerta.textContent.trim()).join(' ');
+        }
+        throw new Error(detalle || 'No se pudo generar el lote. Intenta nuevamente. Si el problema continúa, vuelve a iniciar sesión o selecciona menos alumnos.');
+      }
+      const archivo = await respuesta.blob();
+      const disposicion = respuesta.headers.get('Content-Disposition') || '';
+      const nombre = disposicion.match(/filename="?([^";]+)"?/i);
+      const url = URL.createObjectURL(archivo);
+      const enlace = document.createElement('a');
+      enlace.href = url;
+      enlace.download = nombre ? nombre[1] : 'Cartas_asignacion.zip';
+      enlace.hidden = true;
+      document.body.appendChild(enlace);
+      enlace.click();
+      enlace.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      estado.className = 'alert alert-success mt-3';
+      mensaje.textContent = 'Las cartas están listas. La descarga del ZIP ha comenzado.';
+    } catch (error) {
+      estado.className = 'alert alert-danger mt-3';
+      mensaje.textContent = error instanceof TypeError
+        ? 'No se pudo completar la descarga. Comprueba tu conexión e intenta nuevamente.'
+        : error.message;
+    } finally {
+      indicador.hidden = true;
+      boton.disabled = false;
+      formulario.removeAttribute('aria-busy');
+      generando = false;
+    }
+  });
 })();
 </script>
 {% endif %}

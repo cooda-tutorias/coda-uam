@@ -1,8 +1,11 @@
 from datetime import date
+from copy import deepcopy
 from io import BytesIO
 from types import SimpleNamespace
 
 import docx
+from docx.shared import Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from django.core.exceptions import ValidationError
 from django.core.files.base import ContentFile
 from django.test import SimpleTestCase
@@ -67,6 +70,49 @@ class CartasAsignacionTests(SimpleTestCase):
         self.assertIn('{matricula}', str(error.exception))
         self.assertIn('{anio}', str(error.exception))
 
+    def test_filas_conservan_fuente_tamanio_alineacion_y_encabezado(self):
+        documento = self.plantilla('tutor')
+        tabla = documento.tables[0]
+        for celda in tabla.rows[0].cells:
+            celda.text = 'Encabezado'
+            celda.paragraphs[0].runs[0].bold = True
+        encabezado = tabla.rows[0]._tr.xml
+        for indice, celda in enumerate(tabla.rows[1].cells):
+            celda.text = 'Ejemplo'
+            p = celda.paragraphs[0]
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            p.runs[0].font.name = 'Arial'
+            p.runs[0].font.size = Pt(8 + indice)
+            p.add_run(' texto sobrante').font.size = Pt(20)
+            celda.add_paragraph('Párrafo sobrante')
+        contenido = generar_carta(self.bytes(documento), self.tutor, [self.alumno, self.alumno],
+                                  63, date(2026, 9, 15), 'tutor')
+        tabla = docx.Document(BytesIO(contenido)).tables[0]
+        self.assertEqual(tabla.rows[0]._tr.xml, encabezado)
+        for fila in tabla.rows[1:]:
+            self.assertEqual([c.text for c in fila.cells], ['26-O', '123', 'Ruiz', '', 'Luis'])
+            for indice, celda in enumerate(fila.cells):
+                self.assertEqual(len(celda.paragraphs), 1)
+                p = celda.paragraphs[0]
+                self.assertEqual(p.alignment, WD_ALIGN_PARAGRAPH.CENTER)
+                self.assertEqual(p.runs[0].font.name, 'Arial')
+                self.assertEqual(p.runs[0].font.size, Pt(8 + indice))
+
+    def test_celda_vacia_conserva_formato_de_marca_de_parrafo(self):
+        documento = self.plantilla('tutor')
+        celda = documento.tables[0].rows[1].cells[1]
+        modelo = documento.add_paragraph().add_run()
+        modelo.font.name = 'Calibri'
+        modelo.font.size = Pt(9)
+        formato = deepcopy(modelo._r.rPr)
+        celda.paragraphs[0]._p.get_or_add_pPr().append(formato)
+        contenido = generar_carta(self.bytes(documento), self.tutor, [self.alumno], 63,
+                                  date(2026, 9, 15), 'tutor')
+        fragmento = docx.Document(BytesIO(contenido)).tables[0].rows[1].cells[1].paragraphs[0].runs[0]
+        self.assertEqual(fragmento.text, '123')
+        self.assertEqual(fragmento.font.name, 'Calibri')
+        self.assertEqual(fragmento.font.size, Pt(9))
+
     def test_tabla_incompatible(self):
         documento = self.plantilla()
         documento.add_table(rows=1, cols=1)
@@ -101,5 +147,3 @@ class CartasAsignacionTests(SimpleTestCase):
         _replace_reporte_placeholders(documento, self.tutor,
                                      normalizar_numero_oficio(63, date(2026, 9, 15)), '2026-09-15T12:00')
         self.assertEqual(documento.paragraphs[0].text, 'Oficio No. DCNI_CODDAA_63_2026')
-
-

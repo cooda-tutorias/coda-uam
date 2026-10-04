@@ -76,6 +76,29 @@ def validar_plantilla(documento, tipo):
         raise ValidationError(errores)
 
 
+def escribir_celda_con_formato(celda, texto):
+    """Sustituye el contenido usando el formato del texto de la fila modelo."""
+    parrafo = next((p for p in celda.paragraphs if any(r.text or r._r.rPr is not None for r in p.runs)),
+                   celda.paragraphs[0])
+    fragmento = next((r for r in parrafo.runs if r.text), None)
+    if fragmento is None:
+        fragmento = next((r for r in parrafo.runs if r._r.rPr is not None), None)
+    if fragmento is None:
+        fragmento = parrafo.runs[0] if parrafo.runs else parrafo.add_run()
+    # Word puede guardar el formato de una celda vacía en la marca de párrafo.
+    if fragmento._r.rPr is None:
+        formato = parrafo._p.xpath('./w:pPr/w:rPr')
+        if formato:
+            fragmento._r.insert(0, deepcopy(formato[0]))
+    for elemento in list(parrafo._p):
+        if elemento is not parrafo._p.pPr and elemento is not fragmento._r:
+            parrafo._p.remove(elemento)
+    for elemento in list(celda._tc):
+        if elemento is not celda._tc.tcPr and elemento is not parrafo._p:
+            celda._tc.remove(elemento)
+    fragmento.text = texto
+
+
 def generar_carta(plantilla, tutor, alumnos, oficio, fecha, tipo, licenciatura=None):
     documento = docx.Document(BytesIO(plantilla))
     validar_plantilla(documento, tipo)
@@ -110,7 +133,7 @@ def generar_carta(plantilla, tutor, alumnos, oficio, fecha, tipo, licenciatura=N
             else:
                 fila = tabla.add_row()
             for celda, valor in zip(fila.cells, [alumno.trimestre_ingreso, alumno.matricula, alumno.last_name, alumno.second_last_name, alumno.first_name]):
-                celda.text = str(valor or '')
+                escribir_celda_con_formato(celda, str(valor or ''))
     for parrafo in parrafos(documento):
         for marcador, valor in valores.items():
             paragraph_replace_text(parrafo, re.compile(re.escape('{' + marcador + '}')), valor)

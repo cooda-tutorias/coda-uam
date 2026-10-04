@@ -42,6 +42,9 @@
                       <li>
                         <button type="submit" id="generar-cartas" class="dropdown-item" disabled>Generar cartas de asignación</button>
                       </li>
+                      <li>
+                        <button type="submit" id="enviar-cartas" class="dropdown-item" formaction="{% url 'cartas-asignacion-correo' %}" disabled>Enviar cartas de asignación por correo</button>
+                      </li>
                     </ul>
                   </div>
                   <span class="text-muted" role="status" id="resumen-seleccion">0 seleccionados</span>
@@ -111,6 +114,7 @@ $(document).ready(function () {
   const seleccionados = new Set();
   const resumen = document.getElementById('resumen-seleccion');
   const boton = document.getElementById('generar-cartas');
+  const botonCorreo = document.getElementById('enviar-cartas');
   const acciones = document.getElementById('acciones-alumnos');
   const todos = document.getElementById('seleccionar-alumnos');
   const idsFiltrados = () => tabla.rows({search: 'applied', page: 'all'}).nodes().toArray()
@@ -127,6 +131,7 @@ $(document).ready(function () {
     acciones.textContent = 'Acciones (' + seleccionados.size + ')';
     acciones.disabled = seleccionados.size === 0;
     boton.disabled = seleccionados.size === 0;
+    botonCorreo.disabled = seleccionados.size === 0;
   }
   $('#alumnos-registrados').on('change', '.seleccion-alumno', function () {
     if (this.checked) seleccionados.add(this.value); else seleccionados.delete(this.value);

@@ -1,9 +1,16 @@
-from .views_cartas import LoteAsignacionView
+from .views_cartas import (LoteAsignacionView, MensajesAsignacionView, PrepararAsignacionView,
+                          LotePreparadoView, CartaPreparadaPDFView)
+from .views_cartas import EstadoEnvioAsignacionView
 from django.urls import path
 from . import views
 
 urlpatterns = [
     path('cartas-asignacion/lote/', LoteAsignacionView.as_view(), name='cartas-asignacion-lote'),
+    path('cartas-asignacion/correo/', MensajesAsignacionView.as_view(), name='cartas-asignacion-correo'),
+    path('cartas-asignacion/correo/preparar/', PrepararAsignacionView.as_view(), name='cartas-asignacion-preparar'),
+    path('cartas-asignacion/correo/preparadas/', LotePreparadoView.as_view(), name='cartas-asignacion-preparadas'),
+    path('cartas-asignacion/correo/estado/<str:token>/', EstadoEnvioAsignacionView.as_view(), name='cartas-asignacion-estado'),
+    path('cartas-asignacion/correo/pdf/<str:token>/<int:indice>/', CartaPreparadaPDFView.as_view(), name='carta-asignacion-preparada-pdf'),
     path("tutores/imprimir-qr/", views.imprimir_qr_tutores, name="imprimir-qr-tutores"),
     #path('', views.index, name='index'),
     # path("vertutorias/", views.ver_tutorias),
