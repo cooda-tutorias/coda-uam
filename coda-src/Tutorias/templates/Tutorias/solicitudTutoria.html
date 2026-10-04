@@ -30,6 +30,20 @@
 
                 <h3 class="mb-4 text-primary text-title-bold">{{ titulo_formulario|default:"Solicitud de tutoría" }}</h3>
 
+                <section class="alert alert-light border mb-4" aria-label="Información académica del alumno">
+                  <h4 class="h6 mb-2">Estado académico actual</h4>
+                  <p class="mb-1">{{ estado_academico_actual|default:"Sin registro" }}</p>
+                  {% if trayectoria_reciente %}
+                    <a href="{% url 'ver-trayectoria' request.user.pk %}?version_id={{ trayectoria_reciente.pk }}"
+                       target="_blank" rel="noopener">Consultar trayectoria vigente</a>
+                    {% if trayectoria_actualizada_en %}
+                      <span class="small text-muted ms-2">Actualizada {{ trayectoria_actualizada_en|date:'d/m/Y' }}</span>
+                    {% endif %}
+                  {% else %}
+                    <p class="small text-muted mb-0">No hay una trayectoria vigente cargada.</p>
+                  {% endif %}
+                </section>
+
                 <!-- Bloque general de errores del formulario -->
                 {% if request.method == "POST" and form.non_field_errors %}
                   <div class="alert alert-danger mb-4">{{ form.non_field_errors }}</div>
