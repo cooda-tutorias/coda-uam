@@ -195,6 +195,15 @@ def proponer_fechas_tutoria(request, pk):
             if propuesta_2 is not None and propuesta_1 == propuesta_2:
                 messages.error(request, "Las dos opciones de fecha deben ser diferentes.")
                 return redirect("Panel-tutorias-tutor")
+
+            fechas_ocupadas = Tutoria.objects.filter(
+                tutor=tutoria.tutor,
+                fecha__in=propuestas,
+                estado__in=[PENDIENTE, ACEPTADO],
+            ).exclude(pk=tutoria.pk)
+            if fechas_ocupadas.exists():
+                messages.error(request, "Una de las fechas propuestas ya está ocupada.")
+                return redirect("Panel-tutorias-tutor")
                                    
             # Si hay dos propuestas, se envían al alumno para que elija. Si solo hay una, se acepta directamente.
             if propuesta_2_raw:
@@ -803,6 +812,12 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
 
         return queryset.none()
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        if issubclass(self.get_form_class(), FormTutorias):
+            kwargs['user'] = self.request.user
+        return kwargs
+
     def get_success_url(self):
         if self.request.user.has_role("ALU"):
             return reverse_lazy('Tutorias-alumno')
@@ -811,6 +826,14 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
         context["historial_cambios"] = self.object.historial_cambios.all()[:20]
+        context['tutor'] = self.object.tutor
+        context['tiene_horarios'] = HorarioTutor.objects.filter(
+            tutor=self.object.tutor, activo=True
+        ).exists()
+        context['titulo_formulario'] = 'Cambiar fecha de tutoría'
+        context['subtitulo_modal'] = (
+            'Selecciona un horario disponible o sugiere una fecha hábil.'
+        )
         return context
 
     def _build_change_summary(self, original: Tutoria, form: BaseModelForm, changed_fields: list[str]) -> str:
@@ -832,7 +855,7 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
                 new_value = ", ".join([tema_map.get(code, code) for code in new_codes])
             elif field == "fecha":
                 old_value = original.fecha.strftime('%Y-%m-%d %H:%M')
-                new_value = form.cleaned_data.get("fecha").strftime('%Y-%m-%d %H:%M')
+                new_value = form.instance.fecha.strftime('%Y-%m-%d %H:%M')
             elif field == "descripcion":
                 old_value = original.descripcion or ""
                 new_value = form.cleaned_data.get("descripcion") or ""
@@ -851,7 +874,52 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
 
     def form_valid(self, form: BaseModelForm) -> HttpResponse:
         original = self.get_object()
-        changed_fields = list(form.changed_data)
+        horario_id = self.request.POST.get('horario_tutor', '').strip()
+        franja_seleccionada = self.request.POST.get('franja_seleccionada', '').strip()
+        fecha_sugerida = self.request.POST.get('fecha_sugerida', '').strip()
+        fecha_directa = form.cleaned_data.get('fecha')
+        fecha_directa_cambiada = fecha_directa is not None and fecha_directa != original.fecha
+
+        if horario_id or fecha_sugerida or fecha_directa_cambiada:
+            try:
+                if horario_id:
+                    slot = HorarioTutor.objects.get(
+                        pk=horario_id,
+                        tutor=original.tutor,
+                        activo=True,
+                    )
+                    nueva_fecha = resolver_franja_tutor(slot, franja_seleccionada)
+                elif fecha_sugerida:
+                    nueva_fecha = convertir_fecha_local(fecha_sugerida)
+                else:
+                    nueva_fecha = fecha_directa
+
+                if not es_dia_habil(nueva_fecha):
+                    raise ValueError('La fecha seleccionada debe ser un día hábil.')
+
+                if nueva_fecha <= timezone.now():
+                    raise ValueError('La nueva fecha debe ser posterior a la fecha actual.')
+
+                if Tutoria.objects.filter(
+                    tutor=original.tutor,
+                    fecha=nueva_fecha,
+                    estado__in=[PENDIENTE, ACEPTADO],
+                ).exclude(pk=original.pk).exists():
+                    raise ValueError('Ese horario ya está ocupado. Selecciona otro.')
+
+                form.instance.fecha = nueva_fecha
+            except (HorarioTutor.DoesNotExist, TypeError, ValueError) as error:
+                form.add_error(None, str(error) or 'La fecha seleccionada no es válida.')
+                return self.form_invalid(form)
+        else:
+            form.instance.fecha = original.fecha
+
+        changed_fields = [
+            field for field in form.changed_data
+            if field not in {'horario_tutor', 'fecha_sugerida'}
+        ]
+        if form.instance.fecha != original.fecha and 'fecha' not in changed_fields:
+            changed_fields.append('fecha')
         fecha_changed_by_tutor = self.request.user.has_role("TUT") and "fecha" in changed_fields
         estado_changed_by_tutor = False
         estado_notification_event = None
@@ -1213,6 +1281,17 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
         tutor = getattr(alumno, "tutor_asignado", None)
 
         context["tutor"] = tutor
+        trayectoria_reciente = (
+            alumno.trayectoria_versiones.filter(is_active=True).first()
+            if alumno else None
+        )
+        context['trayectoria_reciente'] = trayectoria_reciente
+        context['trayectoria_actualizada_en'] = getattr(
+            trayectoria_reciente, 'created_at', None
+        )
+        context['estado_academico_actual'] = (
+            alumno.get_estado_display() if alumno else 'Sin registro'
+        )
 
         # Validar si el tutor tiene horarios de atención activos registrados
         tiene_horarios = False

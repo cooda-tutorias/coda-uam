@@ -287,6 +287,8 @@
                                           class="btn action-neutral action-edit js-abrir-editar-tutoria"
                                           data-url="{% url 'Tutorias-update-modal' pk=tutoria.pk %}"
                                           aria-label="Editar tema y descripción"
+                                          data-bs-toggle="tooltip"
+                                          data-bs-placement="top"
                                           title="Editar tema y descripción">
                                     <i class="bi bi-pencil-square" aria-hidden="true"></i>
                                   </button>
@@ -295,6 +297,9 @@
                                           class="btn action-neutral action-reschedule js-solicitar-cambio-fecha"
                                           data-tutor-id="{{ tutoria.tutor_id }}"
                                           data-action="{% url 'solicitar_cambio_fecha_tutoria' tutoria.pk %}"
+                                          aria-label="Cambiar fecha sugerida"
+                                          data-bs-toggle="tooltip"
+                                          data-bs-placement="top"
                                           title="Cambiar fecha sugerida">
                                     <i class="bi bi-calendar-event"></i>
                                   </button>
@@ -303,6 +308,8 @@
                                           data-mdb-toggle="modal"
                                           data-mdb-target="#modalCancelarAlumno-{{ tutoria.pk }}"
                                           aria-label="Cancelar tutoría"
+                                          data-bs-toggle="tooltip"
+                                          data-bs-placement="top"
                                           title="Cancelar solicitud">
                                     <i class="bi bi-x-lg"></i>
                                   </button>
@@ -412,6 +419,8 @@
                                         class="btn action-neutral action-edit js-abrir-editar-tutoria"
                                         data-url="{% url 'Tutorias-update-modal' pk=tutoria.pk %}"
                                         aria-label="Editar tema y descripción"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
                                         title="Editar tema y descripción">
                                   <i class="bi bi-pencil-square" aria-hidden="true"></i>
                                 </button>
@@ -420,6 +429,9 @@
                                         class="btn action-neutral action-reschedule js-solicitar-cambio-fecha"
                                         data-tutor-id="{{ tutoria.tutor_id }}"
                                         data-action="{% url 'solicitar_cambio_fecha_tutoria' tutoria.pk %}"
+                                        aria-label="Solicitar cambio de fecha"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
                                         title="Solicitar cambio de fecha">
                                   <i class="bi bi-calendar-event"></i>
                                 </button>
@@ -429,6 +441,8 @@
                                         data-mdb-toggle="modal"
                                         data-mdb-target="#modalCancelarAlumno-{{ tutoria.pk }}"
                                         aria-label="Cancelar tutoría"
+                                        data-bs-toggle="tooltip"
+                                        data-bs-placement="top"
                                         title="Cancelar solicitud">
                                   <i class="bi bi-x-lg"></i>
                                 </button>
@@ -754,6 +768,17 @@ document.addEventListener('DOMContentLoaded', function() {
   tooltipTriggerList.map(function (tooltipTriggerEl) {
     return new mdb.Tooltip(tooltipTriggerEl);
   });
+
+  if (window.bootstrap?.Tooltip) {
+    document.querySelectorAll('.action-group [data-bs-toggle="tooltip"]').forEach(function (button) {
+      if (!window.bootstrap.Tooltip.getInstance(button)) {
+        new window.bootstrap.Tooltip(button, {
+          trigger: 'hover focus',
+          delay: { show: 500, hide: 100 },
+        });
+      }
+    });
+  }
 
   document.querySelectorAll('[data-bs-toggle="popover"]').forEach(function (elemento) {
     bootstrap.Popover.getOrCreateInstance(elemento);
