@@ -2353,7 +2353,12 @@ class RealizarSeguimientoView(TutorViewMixin, UpdateView):
     model = Tutoria
     form_class = FormSeguimiento
     template_name = 'Tutorias/seguimientoTutoria.html'
-    success_url =  reverse_lazy('Tutorias-historial')
+
+    def get_success_url(self):
+        return (
+            f"{reverse('Panel-tutorias-tutor')}?tab=historial"
+            f"&highlight={self.object.pk}"
+        )
 
     seguimiento_fields = [
         'asistencia',
@@ -2396,7 +2401,7 @@ class RealizarSeguimientoView(TutorViewMixin, UpdateView):
         return kwargs
 
     def _has_existing_report(self, tutoria: Tutoria) -> bool:
-        return tutoria.fecha_reporte is not None
+        return tutoria.seguimiento_completado
 
     def _format_bool(self, value: Any) -> str:
         if value is True:
@@ -2527,6 +2532,7 @@ class RealizarSeguimientoView(TutorViewMixin, UpdateView):
         original_tutoria = self.get_object()
         seguimiento_completado = self._has_existing_report(original_tutoria)
         edit_confirmed = self.request.POST.get('edit_confirmed') == 'true'
+        save_confirmed = self.request.POST.get('save_confirmed') == 'true'
 
         alumno = form.instance.alumno
         estado_actual_anterior = alumno.estado
@@ -2534,10 +2540,12 @@ class RealizarSeguimientoView(TutorViewMixin, UpdateView):
         estado_actual_cambio = estado_actual_nuevo != estado_actual_anterior
 
         has_edit_changes = bool(form.changed_data) or estado_actual_cambio
-        if seguimiento_completado and has_edit_changes and not edit_confirmed:
+        if seguimiento_completado and has_edit_changes and (
+            not edit_confirmed or not save_confirmed
+        ):
             messages.error(
                 self.request,
-                'Confirma la edición del reporte para guardar cambios y enviar la notificación al alumno.',
+                'Confirma la edición y el guardado del reporte para registrar cambios y enviar la notificación al alumno.',
             )
             return self.form_invalid(form)
 
