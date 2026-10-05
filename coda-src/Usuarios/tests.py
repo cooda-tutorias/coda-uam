@@ -43,6 +43,7 @@ from Usuarios.services.importacion_tutores import (
 Usuario = get_user_model()
 
 
+@override_settings(DEFAULT_FILE_STORAGE='custom_storages.PrivateFileSystemStorage')
 class PerfilTutorEdicionTests(TestCase):
     def setUp(self):
         self.media = tempfile.TemporaryDirectory()
@@ -69,10 +70,12 @@ class PerfilTutorEdicionTests(TestCase):
         self.assertEqual(self.tutor.cubiculo, "B-202")
         self.assertEqual(self.tutor.email, "perfil@cua.uam.mx")
         foto = self.tutor.foto.name
+        self.addCleanup(self.tutor.foto.storage.delete, foto)
         self.assertTrue(foto)
         response = self.client.get(self.url, secure=True)
         self.assertContains(response, 'aria-label="Editar cubículo"')
-        self.assertContains(response, self.tutor.foto.url)
+        self.assertContains(response, reverse('ver-foto-perfil', args=[self.tutor.pk]))
+        self.assertNotContains(response, 'X-Amz-Signature')
         self.client.post(self.url, {"cubiculo": "C-303"}, secure=True)
         self.tutor.refresh_from_db()
         self.assertEqual(self.tutor.foto.name, foto)
@@ -104,6 +107,217 @@ class PerfilTutorEdicionTests(TestCase):
         self.tutor.refresh_from_db()
         self.assertEqual(self.tutor.cubiculo, "A-101")
         self.assertFalse(self.tutor.foto)
+
+
+class PerfilesLayoutTests(TestCase):
+    def setUp(self):
+        self.tutor = Tutor.objects.create_user(
+            email='perfil.layout.tutor@example.com',
+            matricula='LAYOUTT01',
+            password='password123',
+            coordinacion='COM',
+        )
+        self.alumno = Alumno.objects.create_user(
+            email='perfil.layout.alumno@example.com',
+            matricula='LAYOUTA01',
+            password='password123',
+            carrera='COM',
+            tutor_asignado=self.tutor,
+        )
+        self.coordinador = Cordinador.objects.create_user(
+            email='perfil.layout.coordinador@example.com',
+            matricula='LAYOUTC01',
+            password='password123',
+            coordinacion='COM',
+            es_tutor=False,
+        )
+        self.coda = Coda.objects.create_user(
+            email='perfil.layout.coda@example.com',
+            matricula='LAYOUTD01',
+            password='password123',
+        )
+
+    def test_todos_los_perfiles_usan_el_contenedor_responsivo_compartido(self):
+        perfiles = (
+            (self.alumno, 'perfil-alumno'),
+            (self.tutor, 'perfil-tutor'),
+            (self.coordinador, 'perfil-coordinador'),
+            (self.coda, 'perfil-coda'),
+        )
+
+        for usuario, nombre_url in perfiles:
+            with self.subTest(perfil=nombre_url):
+                self.client.force_login(usuario)
+                response = self.client.get(reverse(nombre_url, kwargs={'pk': usuario.pk}))
+
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, 'class="col-12 col-xl-10 mb-4 mb-lg-0"')
+                self.assertContains(response, 'id="open-avatar-upload-dialog"')
+                for componente in (
+                    'id="avatar-dropzone"',
+                    'id="avatar-camera-open"',
+                    'id="avatar-remove-file"',
+                    'JPG, PNG, WebP, HEIC o AVIF',
+                ):
+                    self.assertContains(response, componente)
+                self.assertNotContains(response, 'JPG, PNG o WebP')
+
+
+@override_settings(DEFAULT_FILE_STORAGE='custom_storages.PrivateFileSystemStorage')
+class FotoPerfilUploadTests(TestCase):
+    def setUp(self):
+        self.media = tempfile.TemporaryDirectory()
+        self.addCleanup(self.media.cleanup)
+        self.media_settings = override_settings(MEDIA_ROOT=self.media.name)
+        self.media_settings.enable()
+        self.addCleanup(self.media_settings.disable)
+        self.tutor = Tutor.objects.create_user(
+            email='foto.perfil.tutor@example.com',
+            matricula='FOTOTUT01',
+            password='password123',
+            coordinacion='COM',
+        )
+        self.alumno = Alumno.objects.create_user(
+            email='foto.perfil.alumno@example.com',
+            matricula='FOTOALU01',
+            password='password123',
+            carrera='COM',
+            tutor_asignado=self.tutor,
+        )
+
+    def imagen_jpeg(self):
+        imagen = BytesIO()
+        from PIL import Image
+        Image.new('RGB', (400, 200), color='orange').save(imagen, format='JPEG')
+        return imagen.getvalue()
+
+    def test_foto_nueva_se_ve_de_inmediato_y_usa_nombre_estandar(self):
+        from PIL import Image
+        self.client.force_login(self.alumno)
+        url = reverse('ver-foto-perfil', kwargs={'pk': self.alumno.pk})
+
+        def subir(color):
+            salida = BytesIO()
+            Image.new('RGB', (300, 300), color=color).save(salida, format='JPEG')
+            self.client.post(reverse('cambiar-foto-perfil'), {
+                'foto': SimpleUploadedFile('x.jpg', salida.getvalue(), content_type='image/jpeg'),
+            })
+
+        subir('red')
+        self.alumno.refresh_from_db()
+        self.assertTrue(self.alumno.foto.name.rsplit('/', 1)[-1].startswith('foto_perfil_FOTOALU01'))
+        primera = self.client.get(url)
+        self.assertEqual(primera['Cache-Control'], 'private, no-cache')
+
+        subir('blue')
+        segunda = self.client.get(url, HTTP_IF_NONE_MATCH=primera['ETag'])
+
+        self.assertEqual(segunda.status_code, 200)
+        self.assertNotEqual(segunda['ETag'], primera['ETag'])
+        self.assertNotEqual(segunda.content, primera.content)
+        self.assertEqual(self.client.get(url, HTTP_IF_NONE_MATCH=segunda['ETag']).status_code, 304)
+
+    def test_foto_se_normaliza_a_png_y_se_sirve_al_usuario_autenticado(self):
+        self.client.force_login(self.alumno)
+
+        response = self.client.post(reverse('cambiar-foto-perfil'), {
+            'foto': SimpleUploadedFile(
+                'foto.jpg', self.imagen_jpeg(), content_type='image/jpeg'
+            ),
+        })
+
+        self.assertRedirects(response, reverse('perfil'), fetch_redirect_response=False)
+        self.alumno.refresh_from_db()
+        self.assertTrue(self.alumno.foto.name.endswith('.png'))
+        with self.alumno.foto.open('rb') as guardada:
+            from PIL import Image
+            imagen = Image.open(guardada)
+            self.assertEqual(imagen.format, 'PNG')
+            self.assertEqual(imagen.size, (256, 256))
+
+        respuesta_foto = self.client.get(
+            reverse('ver-foto-perfil', kwargs={'pk': self.alumno.pk})
+        )
+        self.assertEqual(respuesta_foto.status_code, 200)
+        self.assertEqual(respuesta_foto['Content-Type'], 'image/png')
+        self.assertTrue(b'PNG' in respuesta_foto.content)
+
+    def test_rechaza_archivo_que_no_es_imagen(self):
+        self.client.force_login(self.alumno)
+
+        response = self.client.post(reverse('cambiar-foto-perfil'), {
+            'foto': SimpleUploadedFile(
+                'falsa.jpg', b'no es una imagen', content_type='image/jpeg'
+            ),
+        })
+
+        self.assertEqual(response.status_code, 302)
+        self.alumno.refresh_from_db()
+        self.assertFalse(self.alumno.foto)
+
+    def test_foto_no_se_expone_a_usuarios_anonimos(self):
+        self.client.force_login(self.alumno)
+        self.client.post(reverse('cambiar-foto-perfil'), {
+            'foto': SimpleUploadedFile(
+                'foto.jpg', self.imagen_jpeg(), content_type='image/jpeg'
+            ),
+        })
+        self.client.logout()
+
+        response = self.client.get(
+            reverse('ver-foto-perfil', kwargs={'pk': self.alumno.pk})
+        )
+
+        self.assertEqual(response.status_code, 302)
+
+    def test_url_del_campo_foto_es_proxy_autenticado(self):
+        self.client.force_login(self.alumno)
+        self.client.post(reverse('cambiar-foto-perfil'), {
+            'foto': SimpleUploadedFile(
+                'foto.jpg', self.imagen_jpeg(), content_type='image/jpeg'
+            ),
+        })
+        self.alumno.refresh_from_db()
+        url = self.alumno.foto.url
+        self.assertEqual(
+            url,
+            reverse('archivo-privado', kwargs={'nombre': self.alumno.foto.name}),
+        )
+
+        self.client.logout()
+        self.assertEqual(self.client.get(url).status_code, 302)
+
+    def test_perfiles_generan_ruta_autenticada_y_no_url_s3_firmada(self):
+        self.client.force_login(self.alumno)
+        self._subir_foto(self.alumno)
+        response_alumno = self.client.get(
+            reverse('perfil-alumno', kwargs={'pk': self.alumno.pk})
+        )
+        self.assertContains(
+            response_alumno,
+            reverse('ver-foto-perfil', kwargs={'pk': self.alumno.pk}),
+        )
+        self.assertNotContains(response_alumno, 'X-Amz-Signature')
+
+        self.client.force_login(self.tutor)
+        self._subir_foto(self.tutor)
+        response_tutor = self.client.get(
+            reverse('perfil-tutor', kwargs={'pk': self.tutor.pk})
+        )
+        self.assertContains(
+            response_tutor,
+            reverse('ver-foto-perfil', kwargs={'pk': self.tutor.pk}),
+        )
+        self.assertNotContains(response_tutor, 'X-Amz-Signature')
+
+    def _subir_foto(self, usuario):
+        response = self.client.post(reverse('cambiar-foto-perfil'), {
+            'foto': SimpleUploadedFile(
+                'foto.jpg', self.imagen_jpeg(), content_type='image/jpeg'
+            ),
+        })
+        self.assertEqual(response.status_code, 302)
+        usuario.refresh_from_db()
 
 
 @override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")

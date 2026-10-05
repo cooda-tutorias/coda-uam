@@ -1,12 +1,16 @@
 from typing import Any, Mapping
 from django import forms
+from django.conf import settings
 from django.utils import timezone
 from django.core.files.base import File
 from django.db.models.base import Model
 from django.forms.utils import ErrorList
-from .models import Tutor, Alumno, Cordinador, Usuario, Documento, HorarioTutor
+from .models import Tutor, Alumno, Cordinador, Usuario, Documento, HorarioTutor, TrayectoriaVersion
 from .constants import ALUMNO, TUTOR, COORDINADOR, CODA, CARRERAS, ESTADOS_ALUMNO, SEXOS
 from django.contrib.auth.forms import UserCreationForm
+from .imagenes import validar_imagen
+
+ACCEPT_IMAGENES = 'image/jpeg,image/png,image/webp,image/heic,image/heif,image/avif,.heic,.heif,.avif'
 
 
 class PerfilTutorForm(forms.ModelForm):
@@ -18,18 +22,39 @@ class PerfilTutorForm(forms.ModelForm):
         widgets = {
             "cubiculo": forms.TextInput(attrs={"class": "form-control"}),
             "foto": forms.FileInput(attrs={
-                "class": "form-control", "accept": "image/jpeg,image/png,image/webp",
+                "class": "form-control", "accept": ACCEPT_IMAGENES,
             }),
         }
-        help_texts = {"foto": "Opcional. JPG, PNG o WebP, máximo 5 MB."}
+        help_texts = {"foto": "Opcional. JPG, PNG, WebP, HEIC o AVIF, máximo 5 MB."}
 
     def clean_foto(self):
         foto = self.cleaned_data.get("foto")
         if foto and "foto" in self.files:
             if foto.size > 5 * 1024 * 1024:
                 raise forms.ValidationError("La imagen no debe superar los 5 MB.")
-            if foto.image.format not in {"JPEG", "PNG", "WEBP"}:
-                raise forms.ValidationError("Selecciona una imagen JPG, PNG o WebP.")
+            validar_imagen(foto)
+        return foto
+
+class AvatarUploadForm(forms.ModelForm):
+    class Meta:
+        model = Usuario
+        fields = ['foto']
+        widgets = {
+            'foto': forms.FileInput(attrs={
+                'class': 'form-control',
+                'accept': ACCEPT_IMAGENES,
+            }),
+        }
+
+    def clean_foto(self):
+        foto = self.cleaned_data.get('foto')
+        if not foto:
+            raise forms.ValidationError('Selecciona una imagen.')
+
+        max_size = int(getattr(settings, 'AVATAR_MAX_UPLOAD_SIZE', 5 * 1024 * 1024))
+        if foto.size > max_size:
+            raise forms.ValidationError('La imagen no debe superar los 5 MB.')
+        validar_imagen(foto)
         return foto
 
 
@@ -157,6 +182,36 @@ class DocumentoForm(forms.ModelForm):
             except forms.ValidationError as error:
                 self.add_error('archivo', error)
         return datos
+
+
+class TrayectoriaUploadForm(forms.ModelForm):
+    class Meta:
+        model = TrayectoriaVersion
+        fields = ['archivo']
+        widgets = {
+            'archivo': forms.FileInput(attrs={
+                'class': 'form-control',
+                'accept': 'application/pdf,.pdf',
+            }),
+        }
+
+    def clean_archivo(self):
+        archivo = self.cleaned_data.get('archivo')
+        if not archivo:
+            raise forms.ValidationError('Selecciona un archivo PDF.')
+
+        max_size = int(getattr(settings, 'TRAYECTORIA_MAX_UPLOAD_SIZE', 100 * 1024 * 1024))
+        if archivo.size > max_size:
+            raise forms.ValidationError('El PDF excede el tamaño máximo permitido.')
+        if not archivo.name.lower().endswith('.pdf'):
+            raise forms.ValidationError('Solo se permiten archivos PDF.')
+
+        header = archivo.read(1024)
+        archivo.seek(0)
+        if b'%PDF-' not in header:
+            raise forms.ValidationError('El archivo no tiene un encabezado PDF válido.')
+
+        return archivo
 
 # Este formulario es para editar un usuario tipo alumno
 class FormAlumnoUpdate(forms.ModelForm):
