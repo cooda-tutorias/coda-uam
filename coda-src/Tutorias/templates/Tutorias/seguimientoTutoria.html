@@ -100,7 +100,7 @@
                 <div class="reporte-header mb-3">
                   <div class="d-flex justify-content-between align-items-center gap-2 mb-2 flex-wrap">
                     <h3 class="text-primary text-title-bold mb-0">{{ titulo_reporte }}</h3>
-                    <a href="{% url 'Tutorias-historial' %}"
+                    <a href="{% url 'Panel-tutorias-tutor' %}?tab=historial"
                        class="btn btn-outline-secondary btn-sm"
                        id="header-back-link">Regresar</a>
                   </div>
@@ -302,6 +302,22 @@
                       novalidate>
                   {% csrf_token %}
                   <input type="hidden" name="edit_confirmed" id="edit-confirmed" value="false">
+                  <input type="hidden" name="save_confirmed" id="save-confirmed" value="false">
+                  {% if form.errors %}
+                    <div id="form-errors" class="alert alert-danger" role="alert" tabindex="-1">
+                      <p class="fw-semibold mb-2">No se pudo guardar el reporte. Revisa estos campos:</p>
+                      <ul class="mb-0">
+                        {% for field in form %}
+                          {% for error in field.errors %}
+                            <li>{{ field.label }}: {{ error }}</li>
+                          {% endfor %}
+                        {% endfor %}
+                        {% for error in form.non_field_errors %}
+                          <li>{{ error }}</li>
+                        {% endfor %}
+                      </ul>
+                    </div>
+                  {% endif %}
 
                   <div class="row g-3 mb-3">
                     <div class="col-12 col-md-6">
@@ -347,6 +363,9 @@
                       </div>
                     </div>
                   </fieldset>
+                  <div id="no-attendance-notice" class="alert alert-warning py-2" role="status" aria-live="polite" hidden>
+                    No se puede guardar el reporte mientras la asistencia esté marcada como “No”. Si la tutoría debe cerrarse, usa “Cancelar tutoría”.
+                  </div>
 
                   <div id="extra-fields">
                     <div class="mb-3 section-box">
@@ -883,6 +902,7 @@
     <script>
     document.addEventListener('DOMContentLoaded', function () {
         const asistenciaInputs = document.querySelectorAll("input[name='asistencia']");
+        const noAttendanceNotice = document.getElementById('no-attendance-notice');
         const firmaBecaInputs = document.querySelectorAll("input[name='firma_documentos_beca']");
         const asesoriaInputs = document.querySelectorAll("input[name='asesoria_especializada']");
 
@@ -897,6 +917,7 @@
         const cancelForm = document.getElementById('cancelar-form');
         const seguimientoForm = document.getElementById('seguimiento-form');
         const editConfirmedInput = document.getElementById('edit-confirmed');
+        const saveConfirmedInput = document.getElementById('save-confirmed');
         const floatingBackBtn = document.getElementById('floating-back-btn');
         const headerBackLink = document.getElementById('header-back-link');
         const topNavigation = document.querySelector('nav');
@@ -907,7 +928,7 @@
         const dialogCancelBtn = document.getElementById('neutral-dialog-cancel');
         const dialogConfirmBtn = document.getElementById('neutral-dialog-confirm');
         const leaveMessage = 'Los cambios no guardados se perderán. ¿Desea continuar?';
-        const fallbackUrl = "{% url 'Tutorias-historial' %}";
+        const fallbackUrl = "{% url 'Panel-tutorias-tutor' %}?tab=historial";
 
         let allowPageExit = false;
         let resolveDialog = null;
@@ -994,7 +1015,7 @@
             try {
                 const previous = new URL(document.referrer);
                 const current = new URL(window.location.href);
-                if (previous.origin !== current.origin) {
+                if (previous.origin !== current.origin || previous.pathname !== new URL(fallbackUrl, current.origin).pathname) {
                     return null;
                 }
                 if (previous.pathname === current.pathname && previous.search === current.search) {
@@ -1066,7 +1087,13 @@
         }
 
         const seguimientoCompletado = guardarBtn.dataset.seguimientoCompletado === 'true';
-        let editingUnlocked = !seguimientoCompletado;
+        const confirmacionPrevia = seguimientoCompletado
+          && new URLSearchParams(window.location.search).get('confirmacion_previa') === '1';
+        let editingUnlocked = !seguimientoCompletado || confirmacionPrevia;
+        if (confirmacionPrevia) {
+          editConfirmedInput.value = 'true';
+          guardarBtn.textContent = 'Guardar cambios';
+        }
 
         function getCheckedValue(name) {
             const checked = document.querySelector("input[name='" + name + "']:checked");
@@ -1113,6 +1140,7 @@
         function toggleAsistencia() {
             const asistencia = getCheckedValue('asistencia');
             const noAsistio = asistencia === 'False';
+          noAttendanceNotice.hidden = !noAsistio || (seguimientoCompletado && !editingUnlocked);
 
             if (seguimientoCompletado && !editingUnlocked) {
                 setFormReadOnly(true);
@@ -1137,13 +1165,7 @@
             input.addEventListener('change', toggleAsistencia);
         });
 
-        guardarBtn.addEventListener('click', function (event) {
-            if (!seguimientoCompletado || editingUnlocked) {
-                editConfirmedInput.value = editingUnlocked ? 'true' : 'false';
-                return;
-            }
-
-            event.preventDefault();
+        function confirmarEdicionReporte() {
             showConfirmDialog({
                 title: 'Confirmar edición',
                 message: 'Los cambios se enviarán por correo al alumno y quedarán en historial. ¿Continuar con la edición?',
@@ -1160,7 +1182,64 @@
                 setFormReadOnly(false);
                 toggleAsistencia();
             });
-        });
+        }
+
+        function confirmarGuardarCambios() {
+            showConfirmDialog({
+              title: 'Guardar cambios',
+              message: '¿Confirmas guardar los cambios del reporte y actualizar su historial?',
+              cancelLabel: 'Seguir editando',
+              confirmLabel: 'Guardar cambios',
+            }).then(function (guardarCambios) {
+              if (!guardarCambios) return;
+              saveConfirmedInput.value = 'true';
+              allowPageExit = true;
+              seguimientoForm.requestSubmit(guardarBtn);
+            });
+        }
+
+        function confirmarGuardarReporte() {
+            showConfirmDialog({
+              title: 'Guardar reporte',
+              message: '¿Confirmas guardar el reporte de seguimiento y enviar la notificación al alumno?',
+              cancelLabel: 'Seguir revisando',
+              confirmLabel: 'Guardar reporte',
+            }).then(function (confirmacion) {
+              if (!confirmacion) {
+                return;
+              }
+
+              saveConfirmedInput.value = 'true';
+              allowPageExit = true;
+              seguimientoForm.requestSubmit(guardarBtn);
+            });
+        }
+
+        function mostrarCampoRequerido(control) {
+          const fieldset = control.closest('fieldset');
+          const legend = fieldset ? fieldset.querySelector('legend') : null;
+          const section = control.closest('.section-box');
+          const label = control.labels && control.labels.length
+            ? control.labels[0]
+            : (section ? section.querySelector('label') : null);
+          const fieldName = (legend ? legend.textContent : (label ? label.textContent : control.name))
+            .replace(/\s+/g, ' ')
+            .trim();
+
+          showConfirmDialog({
+            title: 'Campo pendiente',
+            message: 'Falta completar: ' + fieldName + '.',
+            cancelLabel: 'Seguir revisando',
+            confirmLabel: 'Ir al campo',
+          }).then(function (irAlCampo) {
+            if (!irAlCampo) {
+              return;
+            }
+
+            control.focus();
+            control.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          });
+        }
 
         firmaBecaInputs.forEach(function (input) {
             input.addEventListener('change', toggleBecaField);
@@ -1189,11 +1268,38 @@
             });
         }
 
-        if (seguimientoForm) {
-            seguimientoForm.addEventListener('submit', function () {
+        seguimientoForm.addEventListener('submit', function (event) {
+          if (!seguimientoForm.checkValidity()) {
+            event.preventDefault();
+            mostrarCampoRequerido(seguimientoForm.querySelector('input:invalid, select:invalid, textarea:invalid'));
+            return;
+          }
+
+            if (!seguimientoCompletado) {
+                if (saveConfirmedInput.value !== 'true') {
+                    event.preventDefault();
+                    confirmarGuardarReporte();
+                    return;
+                }
+
                 allowPageExit = true;
-            });
-        }
+                return;
+            }
+
+            if (editConfirmedInput.value !== 'true') {
+                event.preventDefault();
+                confirmarEdicionReporte();
+                return;
+            }
+
+            if (saveConfirmedInput.value !== 'true') {
+                event.preventDefault();
+                confirmarGuardarCambios();
+                return;
+            }
+
+            allowPageExit = true;
+        });
 
         if (floatingBackBtn) {
             floatingBackBtn.addEventListener('click', function () {
