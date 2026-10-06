@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 from datetime import datetime, time, timedelta
+import tempfile
 from urllib import response
 import json
 import random
@@ -7,6 +8,7 @@ from unittest.mock import Mock, patch
 from requests.exceptions import ConnectionError as RequestsConnectionError
 
 from django.test import RequestFactory, TestCase, SimpleTestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from django.test import override_settings
 from django.core import mail
@@ -14,7 +16,7 @@ from django.core.exceptions import PermissionDenied
 from django.utils import timezone
 from django.contrib.auth.models import AnonymousUser
 
-from Usuarios.models import Coda, Cordinador, Tutor, Alumno, HorarioTutor, PushDevice
+from Usuarios.models import Coda, Cordinador, Tutor, Alumno, HorarioTutor, PushDevice, TrayectoriaVersion
 from webpush.models import PushInformation, SubscriptionInfo
 from pywebpush import WebPushException
 from Tutorias.models import Tutoria, HistorialCambioTutoria
@@ -361,6 +363,27 @@ class PanelTutoriasAlumnoTests(TestCase):
             "Tutorias/panel_tutorias_alumno.html",
         )
 
+    def test_solicitud_muestra_estado_academico_y_trayectoria_vigente(self):
+        with tempfile.TemporaryDirectory() as media_root:
+            with override_settings(MEDIA_ROOT=media_root):
+                version = TrayectoriaVersion.objects.create(
+                    alumno=self.alumno,
+                    archivo=SimpleUploadedFile(
+                        'trayectoria.pdf', b'%PDF-1.4 prueba', content_type='application/pdf'
+                    ),
+                    original_filename='trayectoria_A10001_2030-01-01T10-00.pdf',
+                    size_bytes=15,
+                    sha256='a' * 64,
+                    uploaded_by=self.alumno,
+                )
+
+                response = self.client.get(reverse('Tutorias-create'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Estado académico actual')
+        self.assertContains(response, 'Consultar trayectoria vigente')
+        self.assertContains(response, f'version_id={version.pk}')
+
     def test_cambio_sugerido_de_agendada_vuelve_a_pendiente(self):
         tutoria = self.crear_tutoria(ACEPTADO)
         nueva_fecha = self.siguiente_fecha_con_dia(0, hora=12).replace(minute=30)
@@ -676,6 +699,11 @@ class PanelTutoriasAlumnoTests(TestCase):
         url_modal = reverse("Tutorias-update-modal", args=[tutoria.pk])
         self.assertContains(response, f'data-url="{url_modal}"')
         self.assertContains(response, "js-abrir-editar-tutoria")
+        self.assertContains(response, 'title="Editar tema y descripción"')
+        self.assertContains(response, 'title="Cambiar fecha sugerida"')
+        self.assertContains(response, 'title="Cancelar solicitud"')
+        self.assertContains(response, 'data-bs-placement="top"')
+        self.assertContains(response, "delay: { show: 500, hide: 100 }")
 
     def test_aceptada_muestra_boton_del_modal_de_edicion(self):
         tutoria = self.crear_tutoria(ACEPTADO)
@@ -934,10 +962,165 @@ class MatrizTransicionesTutoriaIntegrationTests(TestCase):
             },
         )
 
-        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(
+            response,
+            f"{reverse('Panel-tutorias-tutor')}?tab=historial&highlight={self.tutoria.pk}",
+            fetch_redirect_response=False,
+        )
         self.tutoria.refresh_from_db()
         self.assertIsNotNone(self.tutoria.fecha_reporte)
         self.assert_en_pestana('historial', REPORTADA)
+
+    def test_seguimiento_regresar_y_atras_apuntan_al_panel_nuevo(self):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.fecha = timezone.now() - timedelta(minutes=1)
+        self.tutoria.save(update_fields=['estado', 'fecha'])
+        self.client.force_login(self.tutor)
+
+        response = self.client.get(reverse('save_seguimiento', args=[self.tutoria.pk]))
+        panel_url = f"{reverse('Panel-tutorias-tutor')}?tab=historial"
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'novalidate')
+        self.assertContains(response, f'href="{panel_url}"')
+        self.assertContains(response, f'const fallbackUrl = "{panel_url}"')
+        self.assertContains(response, "message: 'Falta completar: ' + fieldName + '.'")
+        self.assertContains(response, "mostrarCampoRequerido(seguimientoForm.querySelector('input:invalid, select:invalid, textarea:invalid'))")
+        self.assertContains(response, '¿Confirmas guardar el reporte de seguimiento y enviar la notificación al alumno?')
+        self.assertContains(response, 'confirmarGuardarReporte();')
+        self.assertContains(
+            response,
+            'previous.pathname !== new URL(fallbackUrl, current.origin).pathname',
+        )
+
+    def test_seguimiento_muestra_errores_de_validacion_del_servidor(self):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.fecha = timezone.now() - timedelta(minutes=1)
+        self.tutoria.save(update_fields=['estado', 'fecha'])
+        self.client.force_login(self.tutor)
+        datos = self._datos_edicion_seguimiento()
+        datos.pop('impacto_tutoria')
+
+        response = self.client.post(reverse('save_seguimiento', args=[self.tutoria.pk]), datos)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="form-errors"')
+        self.assertContains(response, 'Selecciona un nivel de impacto antes de guardar el reporte.')
+
+    def test_seguimiento_explica_por_que_no_puede_guardarse_sin_asistencia(self):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.fecha = timezone.now() - timedelta(minutes=1)
+        self.tutoria.save(update_fields=['estado', 'fecha'])
+        self.client.force_login(self.tutor)
+
+        response = self.client.get(reverse('save_seguimiento', args=[self.tutoria.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="no-attendance-notice"')
+        self.assertContains(response, 'No se puede guardar el reporte mientras la asistencia esté marcada como “No”.')
+        self.assertContains(response, 'noAttendanceNotice.hidden = !noAsistio')
+
+    def _datos_edicion_seguimiento(self, edit_confirmed=None, save_confirmed=None):
+        datos = {
+            'estado_alumno_actual': 1,
+            'asistencia': True,
+            'duracion': '2',
+            'firma_documentos_beca': False,
+            'asesoria_especializada': False,
+            'impacto_tutoria': 4,
+            'observaciones': 'Observación editada',
+            'resultados_tutoria': 'Resultado editado',
+        }
+        if edit_confirmed is not None:
+            datos['edit_confirmed'] = edit_confirmed
+        if save_confirmed is not None:
+            datos['save_confirmed'] = save_confirmed
+        return datos
+
+    def test_panel_tutor_enlaza_el_reporte_completo(self):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.fecha = timezone.now() - timedelta(minutes=1)
+        self.tutoria.fecha_reporte = None
+        self.tutoria.save(update_fields=['estado', 'fecha', 'fecha_reporte'])
+        self.client.force_login(self.tutor)
+        url_reporte = reverse('save_seguimiento', args=[self.tutoria.pk])
+
+        respuesta = self.client.get(reverse('Panel-tutorias-tutor'))
+
+        self.assertContains(respuesta, f'href="{url_reporte}"')
+        self.assertContains(respuesta, 'title="Realizar reporte">')
+        self.assertContains(respuesta, '<span>Realizar reporte</span>')
+        self.assertNotContains(respuesta, 'class="btn btn-outline-primary seguimiento-reporte-btn js-confirm-editar-seguimiento"')
+
+        self.tutoria.fecha_reporte = timezone.now()
+        self.tutoria.save(update_fields=['fecha_reporte'])
+        respuesta = self.client.get(reverse('Panel-tutorias-tutor'))
+
+        self.assertContains(respuesta, f'href="{url_reporte}"')
+        self.assertContains(respuesta, 'class="btn btn-outline-primary seguimiento-reporte-btn js-confirm-editar-seguimiento"')
+        self.assertContains(respuesta, 'title="Editar reporte">')
+        self.assertContains(respuesta, '<span>Editar reporte</span>')
+        self.assertContains(respuesta, 'id="neutral-confirm-dialog"')
+
+    def test_editar_reporte_completado_requiere_confirmacion(self):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.fecha = timezone.now() - timedelta(minutes=1)
+        self.tutoria.fecha_reporte = timezone.now() - timedelta(minutes=1)
+        self.tutoria.observaciones = 'Observación original'
+        self.tutoria.save(update_fields=['estado', 'fecha', 'fecha_reporte', 'observaciones'])
+        self.client.force_login(self.tutor)
+
+        respuesta = self.client.post(
+            reverse('save_seguimiento', args=[self.tutoria.pk]),
+            self._datos_edicion_seguimiento(),
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.observaciones, 'Observación original')
+        self.assertFalse(self.tutoria.historial_cambios.exists())
+
+    def test_edicion_desbloqueada_requiere_confirmar_guardado(self):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.fecha = timezone.now() - timedelta(minutes=1)
+        self.tutoria.fecha_reporte = timezone.now() - timedelta(minutes=1)
+        self.tutoria.observaciones = 'Observación original'
+        self.tutoria.save(update_fields=['estado', 'fecha', 'fecha_reporte', 'observaciones'])
+        self.client.force_login(self.tutor)
+
+        respuesta = self.client.post(
+            reverse('save_seguimiento', args=[self.tutoria.pk]),
+            self._datos_edicion_seguimiento(edit_confirmed='true'),
+        )
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.observaciones, 'Observación original')
+        self.assertFalse(self.tutoria.historial_cambios.exists())
+
+    def test_edicion_confirmada_guarda_y_registra_auditoria(self):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.fecha = timezone.now() - timedelta(minutes=1)
+        self.tutoria.fecha_reporte = timezone.now() - timedelta(minutes=1)
+        self.tutoria.observaciones = 'Observación original'
+        self.tutoria.save(update_fields=['estado', 'fecha', 'fecha_reporte', 'observaciones'])
+        self.client.force_login(self.tutor)
+
+        respuesta = self.client.post(
+            reverse('save_seguimiento', args=[self.tutoria.pk]),
+            self._datos_edicion_seguimiento(
+                edit_confirmed='true',
+                save_confirmed='true',
+            ),
+        )
+
+        self.assertEqual(respuesta.status_code, 302)
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.observaciones, 'Observación editada')
+        cambio = self.tutoria.historial_cambios.latest('fecha_cambio')
+        self.assertIn('Observaciones', cambio.cambios_realizados)
+        self.assertIn('Observación original', cambio.cambios_realizados)
+        self.assertIn('Observación editada', cambio.cambios_realizados)
 
     def test_caso_16_solicitud_pendiente_vence(self):
         self.tutoria.fecha = timezone.now() - timedelta(minutes=1)
@@ -954,7 +1137,6 @@ class MatrizTransicionesTutoriaIntegrationTests(TestCase):
             'fecha_propuesta_1',
             'fecha_propuesta_2',
         ])
-
         self.assert_en_pestana('solicitadas', VENCIDA)
 
 
@@ -1475,6 +1657,21 @@ class PropuestasFechaTutoriaTests(TestCase):
         response = self.enviar_propuestas(propuesta, propuesta)
 
         self.assert_propuesta_rechazada(response, 'deben ser diferentes')
+
+    def test_rechaza_propuesta_que_ocupa_otra_tutoria(self):
+        self.client.force_login(self.tutor)
+        propuesta = self.fecha_habil_futura()
+        Tutoria.objects.create(
+            tutor=self.tutor,
+            alumno=self.alumno,
+            tema=['BEC'],
+            fecha=propuesta,
+            estado=ACEPTADO,
+        )
+
+        response = self.enviar_propuestas(propuesta)
+
+        self.assert_propuesta_rechazada(response, 'ya está ocupada')
 
     def test_reagendacion_rechaza_dos_propuestas_iguales(self):
         self.tutoria.estado = ACEPTADO
@@ -2337,6 +2534,18 @@ class NotificacionesTutoriaTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ['alumno@example.com'])
 
+    def test_edicion_muestra_selector_de_agenda_y_fecha_sugerida(self):
+        self.client.force_login(self.tutor)
+
+        response = self.client.get(reverse('Tutorias-update', args=[self.tutoria.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="btnAbrirModalCita"')
+        self.assertContains(response, 'id="modalAgendarCita"')
+        self.assertContains(response, 'name="horario_tutor"')
+        self.assertContains(response, 'name="franja_seleccionada"')
+        self.assertContains(response, 'name="fecha_sugerida"')
+
     def test_editar_fecha_guarda_el_cambio(self):
         self.client.force_login(self.tutor)
         nueva_fecha = '2030-01-01T10:30'
@@ -2352,6 +2561,135 @@ class NotificacionesTutoriaTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 302)
+
+    def _crear_horario_futuro(self, dia_semana=2, tutor=None):
+        fecha = timezone.localdate() + timedelta(days=1)
+        while fecha.weekday() != dia_semana:
+            fecha += timedelta(days=1)
+        horario = HorarioTutor.objects.create(
+            tutor=tutor or self.tutor,
+            dia_semana=dia_semana,
+            hora_inicio=time(10, 0),
+            hora_fin=time(11, 0),
+            activo=True,
+        )
+        return horario, fecha
+
+    def test_editar_tutoria_agenda_una_franja_disponible(self):
+        self.client.force_login(self.tutor)
+        horario, fecha = self._crear_horario_futuro()
+        fecha_iso = f'{fecha.isoformat()}T10:00:00'
+
+        response = self.client.post(
+            reverse('Tutorias-update', args=[self.tutoria.pk]),
+            {
+                'tema': [self.tema_codigo],
+                'descripcion': 'Fecha seleccionada en agenda',
+                'horario_tutor': horario.pk,
+                'franja_seleccionada': fecha_iso,
+                'fecha_sugerida': '',
+                'fecha': fecha_iso[:16],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.tutoria.refresh_from_db()
+        self.assertEqual(
+            timezone.localtime(self.tutoria.fecha),
+            timezone.make_aware(datetime.combine(fecha, time(10, 0))),
+        )
+        self.assertIn(
+            'Fecha y Hora',
+            self.tutoria.historial_cambios.latest('fecha_cambio').cambios_realizados,
+        )
+
+    def test_edicion_rechaza_slot_de_otro_tutor(self):
+        self.client.force_login(self.tutor)
+        horario, fecha = self._crear_horario_futuro(tutor=self.otro_tutor)
+
+        response = self.client.post(
+            reverse('Tutorias-update', args=[self.tutoria.pk]),
+            {
+                'tema': [self.tema_codigo],
+                'descripcion': 'No debe guardarse',
+                'horario_tutor': horario.pk,
+                'franja_seleccionada': f'{fecha.isoformat()}T10:00:00',
+                'fecha_sugerida': '',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('horario_tutor', response.context['form'].errors)
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.descripcion, 'Prueba notificaciones')
+
+    def test_edicion_rechaza_franja_ocupada(self):
+        self.client.force_login(self.tutor)
+        horario, fecha = self._crear_horario_futuro()
+        otra_tutoria = Tutoria.objects.create(
+            alumno=self.alumno,
+            tutor=self.tutor,
+            tema=[self.tema_codigo],
+            fecha=timezone.make_aware(datetime.combine(fecha, time(10, 0))),
+            descripcion='Fecha ya ocupada',
+            estado=ACEPTADO,
+        )
+
+        response = self.client.post(
+            reverse('Tutorias-update', args=[self.tutoria.pk]),
+            {
+                'tema': [self.tema_codigo],
+                'descripcion': 'No debe guardarse',
+                'horario_tutor': horario.pk,
+                'franja_seleccionada': f'{fecha.isoformat()}T10:00:00',
+                'fecha_sugerida': '',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('Ese horario ya está ocupado', str(response.context['form'].non_field_errors()))
+        self.tutoria.refresh_from_db()
+        self.assertNotEqual(self.tutoria.fecha, otra_tutoria.fecha)
+
+    def test_panel_distingue_reporte_legacy_y_muestra_confirmacion_al_editar(self):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.fecha = timezone.now() - timedelta(days=1)
+        self.tutoria.fecha_reporte = None
+        self.tutoria.save(update_fields=['estado', 'fecha', 'fecha_reporte'])
+        self.client.force_login(self.tutor)
+        url_reporte = reverse('save_seguimiento', args=[self.tutoria.pk])
+
+        respuesta = self.client.get(reverse('Panel-tutorias-tutor'))
+
+        self.assertContains(respuesta, 'class="btn btn-primary seguimiento-reporte-btn"')
+        self.assertContains(respuesta, f'href="{url_reporte}"')
+        self.assertContains(respuesta, 'title="Realizar reporte">')
+        self.assertContains(respuesta, '<span>Realizar reporte</span>')
+        self.assertContains(respuesta, 'bi-clipboard2-check')
+        self.assertContains(respuesta, 'width: 142px;')
+        self.assertContains(respuesta, 'height: 34px;')
+        self.assertContains(respuesta, 'white-space: nowrap;')
+
+        self.tutoria.duracion = 2
+        self.tutoria.observaciones = 'Reporte legacy con seguimiento capturado'
+        self.tutoria.save(update_fields=['duracion', 'observaciones'])
+        respuesta = self.client.get(reverse('Panel-tutorias-tutor'))
+
+        self.assertContains(respuesta, 'class="btn btn-outline-primary seguimiento-reporte-btn js-confirm-editar-seguimiento"')
+        self.assertContains(respuesta, f'href="{url_reporte}"')
+        self.assertContains(respuesta, 'title="Editar reporte">')
+        self.assertContains(respuesta, '<span>Editar reporte</span>')
+        self.assertContains(respuesta, 'bi-pencil-square')
+        self.assertContains(respuesta, 'id="neutral-confirm-dialog"')
+        self.assertContains(respuesta, 'Confirmar edición')
+        self.assertContains(respuesta, 'confirmacion_previa')
+
+        respuesta_reporte = self.client.get(f'{url_reporte}?confirmacion_previa=1')
+        self.assertEqual(respuesta_reporte.status_code, 200)
+        self.assertContains(respuesta_reporte, "editConfirmedInput.value = 'true'")
+        self.assertContains(respuesta_reporte, 'id="save-confirmed"')
+        self.assertContains(respuesta_reporte, 'function confirmarGuardarCambios()')
+        self.assertContains(respuesta_reporte, "saveConfirmedInput.value = 'true'")
 
     def test_guardar_seguimiento_registra_el_informe(self):
         self.client.force_login(self.tutor)

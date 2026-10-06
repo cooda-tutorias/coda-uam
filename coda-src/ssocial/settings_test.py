@@ -42,7 +42,7 @@ DATABASES = {
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # Disable S3 storage for testing
-DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
+DEFAULT_FILE_STORAGE = 'custom_storages.PrivateFileSystemStorage'
 
 # Disable migrations and use syncdb instead
 class DisableMigrations:

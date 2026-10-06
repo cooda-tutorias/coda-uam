@@ -15,9 +15,27 @@ from .services.importacion_tutores import (
     validar_y_normalizar_dataset_tutores,
 )
 
-from .models import Usuario, Tutor, Alumno, Coda, Cordinador, Documento
+from .models import Usuario, Tutor, Alumno, Coda, Cordinador, Documento, TrayectoriaVersion
 
 #admin.site.register(Usuario, BaseUserAdmin)
+@admin.register(TrayectoriaVersion)
+class TrayectoriaVersionAdmin(admin.ModelAdmin):
+    list_display = ('alumno', 'original_filename', 'size_bytes', 'is_active', 'created_at')
+    list_filter = ('is_active', 'created_at')
+    list_select_related = ('alumno',)
+    search_fields = ('alumno__matricula', 'original_filename', 'sha256')
+
+    # Consulta únicamente: cargar y borrar pasa por las vistas del perfil, que validan permisos y limpian el almacenamiento.
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
 @admin.register(Documento)
 class DocumentoAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'tipo', 'activa', 'clave_sistema')
