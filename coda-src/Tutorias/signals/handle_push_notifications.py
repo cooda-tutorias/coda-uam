@@ -90,8 +90,8 @@ PUSH_EVENT_INFO: dict[EventoTutoria, dict[str, object]] = {
     },
     EventoTutoria.ALU_SOL_CAMBIO_FECHA_SUG: {
         "recipients": ("tutor",),
-        "head": "🔄 Cambio de fecha solicitado",
-        "body": "{actor} sugirió otra fecha para la tutoría.",
+        "head": "🔄 Cambio de horario por aprobar",
+        "body": "{actor} solicitó cambiar el horario de la tutoría.",
         "url": {"tutor": ("Panel-tutorias-tutor", "solicitadas")},
     },
     EventoTutoria.ALU_SOL_CAMBIO_FECHA_AGEN: {

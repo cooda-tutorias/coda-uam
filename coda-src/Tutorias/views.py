@@ -825,11 +825,26 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
 
     def get_context_data(self, **kwargs: Any) -> Dict[str, Any]:
         context = super().get_context_data(**kwargs)
-        context["historial_cambios"] = self.object.historial_cambios.all()[:20]
+        historial_cambios = self.object.historial_cambios.all()
+        context["historial_cambios"] = historial_cambios
+        context["historial_cambios_total"] = historial_cambios.count()
+        context["estados_alumno"] = ESTADOS_ALUMNO[1:]
         context['tutor'] = self.object.tutor
         context['tiene_horarios'] = HorarioTutor.objects.filter(
             tutor=self.object.tutor, activo=True
         ).exists()
+        user_is_alumno = self.request.user.has_role("ALU")
+        context['trayectoria_edicion'] = (
+            self.object.trayectoria_version
+            or self.object.alumno.trayectoria_versiones.filter(is_active=True).first()
+            if user_is_alumno
+            else self.object.trayectoria_version
+        )
+        context['incluir_trayectoria'] = (
+            self.request.POST.get('incluir_trayectoria') == 'on'
+            if self.request.method == 'POST'
+            else bool(self.object.trayectoria_version_id)
+        )
         context['titulo_formulario'] = 'Cambiar fecha de tutoría'
         context['subtitulo_modal'] = (
             'Selecciona un horario disponible o sugiere una fecha hábil.'
@@ -874,11 +889,43 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
 
     def form_valid(self, form: BaseModelForm) -> HttpResponse:
         original = self.get_object()
+        trayectoria_original_id = original.trayectoria_version_id
+        trayectoria_cambio = False
+        if self.request.user.has_role("ALU"):
+            if self.request.POST.get('incluir_trayectoria') == 'on':
+                form.instance.trayectoria_version = (
+                    original.trayectoria_version
+                    or original.alumno.trayectoria_versiones.filter(is_active=True).first()
+                )
+            else:
+                form.instance.trayectoria_version = None
+            trayectoria_cambio = (
+                form.instance.trayectoria_version_id != trayectoria_original_id
+            )
+
         horario_id = self.request.POST.get('horario_tutor', '').strip()
         franja_seleccionada = self.request.POST.get('franja_seleccionada', '').strip()
         fecha_sugerida = self.request.POST.get('fecha_sugerida', '').strip()
         fecha_directa = form.cleaned_data.get('fecha')
-        fecha_directa_cambiada = fecha_directa is not None and fecha_directa != original.fecha
+        fecha_directa_local = None
+        if fecha_directa is not None:
+            if timezone.is_naive(fecha_directa):
+                fecha_directa = timezone.make_aware(
+                    fecha_directa,
+                    timezone.get_current_timezone(),
+                )
+            fecha_directa_local = timezone.localtime(fecha_directa).replace(
+                second=0,
+                microsecond=0,
+            )
+        fecha_original_local = timezone.localtime(original.fecha).replace(
+            second=0,
+            microsecond=0,
+        )
+        fecha_directa_cambiada = (
+            fecha_directa_local is not None
+            and fecha_directa_local != fecha_original_local
+        )
 
         if horario_id or fecha_sugerida or fecha_directa_cambiada:
             try:
@@ -917,12 +964,23 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
         changed_fields = [
             field for field in form.changed_data
             if field not in {'horario_tutor', 'fecha_sugerida'}
+            and (field != 'fecha' or fecha_directa_cambiada)
         ]
-        if form.instance.fecha != original.fecha and 'fecha' not in changed_fields:
+        if fecha_directa_cambiada and 'fecha' not in changed_fields:
             changed_fields.append('fecha')
         fecha_changed_by_tutor = self.request.user.has_role("TUT") and "fecha" in changed_fields
+        fecha_changed_by_alumno = self.request.user.has_role("ALU") and "fecha" in changed_fields
         estado_changed_by_tutor = False
         estado_notification_event = None
+
+        if fecha_changed_by_alumno:
+            form.instance.estado = PENDIENTE
+            form.instance.fecha_propuesta_1 = None
+            form.instance.fecha_propuesta_2 = None
+            form.instance.reagendacion_pendiente = False
+            form.cleaned_data['estado'] = PENDIENTE
+            if original.estado != PENDIENTE and 'estado' not in changed_fields:
+                changed_fields.append('estado')
 
         if self.request.user.has_role("TUT"):
             nuevo_estado_tutoria = self.request.POST.get("estado_tutoria")
@@ -932,9 +990,28 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
                 if "estado" not in changed_fields:
                     changed_fields.append("estado")
                 estado_changed_by_tutor = True
-                estado_notification_event = "aceptada" if nuevo_estado_tutoria == ACEPTADO else "rechazada"
+                estado_notification_event = (
+                    EventoTutoria.TUT_ACEPTA_SOLICITUD
+                    if nuevo_estado_tutoria == ACEPTADO
+                    else EventoTutoria.TUT_RECHAZA_SOLICITUD
+                )
+
+        if fecha_changed_by_tutor and form.instance.estado != ACEPTADO:
+            form.add_error(
+                None,
+                'Para cambiar el horario desde esta edición, selecciona “Aceptar tutoría”.',
+            )
+            return self.form_invalid(form)
 
         change_summary = self._build_change_summary(original, form, changed_fields) if changed_fields else "Sin cambios detectados"
+        trayectoria_incluida = trayectoria_cambio and bool(form.instance.trayectoria_version_id)
+        if trayectoria_incluida:
+            trayectoria_summary = 'Historial académico: incluido'
+            change_summary = (
+                trayectoria_summary
+                if change_summary == "Sin cambios detectados"
+                else f'{change_summary} | {trayectoria_summary}'
+            )
         actor = self.request.user
 
         # Manejar cambio de estado histórico si viene en el POST y el usuario tiene permiso
@@ -956,49 +1033,59 @@ class TutoriaUpdateView(BaseAccessMixin, UpdateView):
             except (ValueError, TypeError):
                 pass
 
-        if self.request.user.has_role("TUT"):
-            recipient = Alumno.objects.filter(pk=self.get_object().alumno_id)
-        elif self.request.user.has_role("ALU"):
-            recipient = Tutor.objects.filter(pk=self.get_object().tutor_id)
-        else:
-            recipient = Tutor.objects.none()
-
-        # TODO: ajustar el manejador del canal de correo porque el evento ahora se llama diferente.
-        # tutoria_notification_requested.send(
-        #     sender=self.__class__,
-        #     event="tutoria_modificada",
-        #     tutoria=self.object,
-        #     actor=actor,
-        #     recipient=recipient,
-        #     verb="Tutoria Modificada",
-        # )
         response = super().form_valid(form)
 
-        # TODO: esta llamada ya no es necesaria porque el tutor no puede cambiar la info de
-        # la tutoría (temas y descripción).
-        # if fecha_changed_by_tutor:
-        #     tutoria_notification_requested.send(
-        #         sender=self.__class__,
-        #         event="cita_programada",
-        #         tutoria=self.object,
-        #         actor=actor,
-        #     )
+        notification_event = None
+        notification_recipient = None
+        if fecha_changed_by_alumno:
+            notification_event = EventoTutoria.ALU_SOL_CAMBIO_FECHA_SUG
+            notification_recipient = self.object.tutor
+        elif fecha_changed_by_tutor:
+            notification_event = (
+                EventoTutoria.TUT_REAGENDA_1_FECHA
+                if original.estado_efectivo == ACEPTADO
+                else EventoTutoria.TUT_PROPONE_1_FECHA
+            )
+            notification_recipient = self.object.alumno
+        elif estado_changed_by_tutor and estado_notification_event:
+            notification_event = estado_notification_event
+            notification_recipient = self.object.alumno
 
-        # TODO: esta llamada ya no es necesaria porque el tutor no puede cambiar la info de
-        # la tutoría (temas y descripción).
-        # if estado_changed_by_tutor and estado_notification_event:
-        #     tutoria_notification_requested.send(
-        #         sender=self.__class__,
-        #         event=estado_notification_event,
-        #         tutoria=self.object,
-        #         actor=actor,
-        #     )
+        if notification_event:
+            tutoria_notification_requested.send(
+                sender=self.__class__,
+                event=notification_event,
+                tutoria=self.object,
+                actor=actor,
+                recipient=notification_recipient,
+            )
 
-        HistorialCambioTutoria.objects.create(
-            tutoria=self.object,
-            correo_editor=actor.email,
-            cambios_realizados=change_summary,
+        registrar_historial = not (
+            trayectoria_cambio
+            and not form.instance.trayectoria_version_id
+            and not changed_fields
         )
+        if registrar_historial:
+            HistorialCambioTutoria.objects.create(
+                tutoria=self.object,
+                correo_editor=actor.email,
+                cambios_realizados=change_summary,
+            )
+
+        if fecha_changed_by_alumno:
+            messages.success(
+                self.request,
+                'El cambio de horario se envió al tutor y queda pendiente de aprobación.',
+            )
+            return redirect(
+                f"{reverse('Tutorias-alumno')}?tab=solicitadas&highlight={self.object.pk}"
+            )
+        if fecha_changed_by_tutor:
+            messages.success(self.request, 'Se actualizó el horario y se notificó al alumno.')
+            pestaña = 'agendadas' if self.object.estado == ACEPTADO else 'solicitadas'
+            return redirect(
+                f"{reverse('Panel-tutorias-tutor')}?tab={pestaña}&highlight={self.object.pk}"
+            )
 
         return response
     
@@ -1286,6 +1373,11 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
             if alumno else None
         )
         context['trayectoria_reciente'] = trayectoria_reciente
+        context['incluir_trayectoria'] = (
+            self.request.POST.get('incluir_trayectoria') == 'on'
+            if self.request.method == 'POST'
+            else bool(trayectoria_reciente)
+        )
         context['trayectoria_actualizada_en'] = getattr(
             trayectoria_reciente, 'created_at', None
         )
@@ -1344,6 +1436,12 @@ class TutoriaCreateView(AlumnoViewMixin, CreateView):
 
         form.instance.alumno = alumno
         form.instance.tutor = tutor
+        if self.request.user.has_role("ALU"):
+            form.instance.trayectoria_version = (
+                alumno.trayectoria_versiones.filter(is_active=True).first()
+                if self.request.POST.get('incluir_trayectoria') == 'on'
+                else None
+            )
 
         # Snapshot del estado del alumno al momento de crear la tutoría
         if not form.instance.estado_alumno_historico:
@@ -2475,10 +2573,43 @@ class RealizarSeguimientoView(TutorViewMixin, UpdateView):
 
         tutorias_recientes = list(tutorias_alumno_qs[:10])
         historial_cambios_actual = list(tutoria_actual.historial_cambios.all()[:10])
-        asesorias_recientes = list(
-            Asesoria.objects.filter(alumno=alumno)
+        asesorias_recientes = [
+            {
+                'tema': asesoria.tema,
+                'fecha': asesoria.fecha,
+                'tutor': asesoria.tutor,
+                'descripcion': asesoria.descripcion,
+                'resultados': '',
+            }
+            for asesoria in Asesoria.objects.filter(alumno=alumno)
             .select_related('tutor')
-            .order_by('-fecha')[:10]
+        ]
+        asesorias_recientes.extend(
+            {
+                'tema': ', '.join(tutoria.get_tema_display()),
+                'fecha': tutoria.fecha,
+                'tutor': tutoria.tutor,
+                'descripcion': tutoria.observaciones,
+                'resultados': tutoria.resultados_tutoria,
+            }
+            for tutoria in tutorias_alumno_qs.filter(asesoria_especializada=True)
+        )
+        asesorias_recientes.sort(key=lambda asesoria: asesoria['fecha'], reverse=True)
+        asesorias_recientes = asesorias_recientes[:10]
+        trayectoria_reporte = tutoria_actual.trayectoria_version
+        trayectoria_version_id = tutoria_actual.trayectoria_version_id
+        trayectoria_view_url = reverse('ver-trayectoria', args=[alumno.pk])
+        if trayectoria_version_id:
+            trayectoria_view_url += f'?version_id={trayectoria_version_id}'
+        trayectoria_download_url = (
+            f'{trayectoria_view_url}&download=1'
+            if trayectoria_version_id
+            else f'{trayectoria_view_url}?download=1'
+        )
+        trayectoria_file_name = (
+            trayectoria_reporte.original_filename
+            if trayectoria_reporte
+            else ''
         )
 
         # Contador por tema para mostrar un resumen util al tutor.
@@ -2518,6 +2649,10 @@ class RealizarSeguimientoView(TutorViewMixin, UpdateView):
             'resumen_temas': resumen_temas,
             'historial_cambios_actual': historial_cambios_actual,
             'asesorias_recientes': asesorias_recientes,
+            'trayectoria_reporte': trayectoria_reporte,
+            'trayectoria_view_url': trayectoria_view_url,
+            'trayectoria_download_url': trayectoria_download_url,
+            'trayectoria_file_name': trayectoria_file_name,
             'becas_registradas': becas_registradas,
             'promedio_impacto': promedio_impacto,
             'total_tutorias_alumno': total_tutorias,

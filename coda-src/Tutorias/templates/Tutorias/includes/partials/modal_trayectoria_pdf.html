@@ -1,0 +1,37 @@
+<div class="trayectoria-dialog-backdrop" id="trayectoria-dialog" aria-hidden="true">
+  <section class="trayectoria-dialog-panel" role="dialog" aria-modal="true" aria-labelledby="trayectoria-dialog-title" tabindex="-1">
+    <header class="trayectoria-dialog-header">
+      <div>
+        <h2 id="trayectoria-dialog-title" class="h6 mb-1">Trayectoria académica</h2>
+        <p class="small text-muted mb-0" id="trayectoria-dialog-file-name"></p>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <details class="trayectoria-options">
+          <summary class="btn btn-outline-secondary btn-sm" aria-label="Opciones del PDF">
+            <i class="bi bi-three-dots-vertical" aria-hidden="true"></i>
+            <span class="visually-hidden">Opciones</span>
+          </summary>
+          <div class="trayectoria-options-menu">
+            <a id="trayectoria-download-link" href="#" download><i class="bi bi-download me-2" aria-hidden="true"></i>Descargar</a>
+            <a id="trayectoria-new-tab-link" href="#" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right me-2" aria-hidden="true"></i>Abrir en otra pestaña</a>
+          </div>
+        </details>
+        <button type="button" class="btn-close" id="trayectoria-dialog-close" aria-label="Cerrar visor"></button>
+      </div>
+    </header>
+    <div class="trayectoria-pdf-viewer" id="trayectoria-pdf-viewer">
+      <div class="trayectoria-pdf-toolbar" aria-label="Controles de vista previa PDF">
+        <button type="button" class="trayectoria-pdf-control" id="trayectoria-pdf-previous" aria-label="Página anterior" disabled><i class="bi bi-chevron-left" aria-hidden="true"></i></button>
+        <span class="trayectoria-pdf-page" id="trayectoria-pdf-page" aria-live="polite">Página — de —</span>
+        <button type="button" class="trayectoria-pdf-control" id="trayectoria-pdf-next" aria-label="Página siguiente" disabled><i class="bi bi-chevron-right" aria-hidden="true"></i></button>
+        <span class="trayectoria-pdf-toolbar-divider" aria-hidden="true"></span>
+        <button type="button" class="trayectoria-pdf-control" id="trayectoria-pdf-zoom-out" aria-label="Alejar" disabled><i class="bi bi-dash-lg" aria-hidden="true"></i></button>
+        <button type="button" class="trayectoria-pdf-control" id="trayectoria-pdf-zoom-in" aria-label="Acercar" disabled><i class="bi bi-plus-lg" aria-hidden="true"></i></button>
+      </div>
+      <div class="trayectoria-pdf-canvas-wrap" id="trayectoria-pdf-canvas-wrap">
+        <canvas id="trayectoria-pdf-canvas" aria-label="Página del PDF"></canvas>
+      </div>
+      <p class="trayectoria-pdf-status" id="trayectoria-pdf-status" role="status" aria-live="polite">La vista previa se cargará al abrir el diálogo.</p>
+    </div>
+  </section>
+</div>
