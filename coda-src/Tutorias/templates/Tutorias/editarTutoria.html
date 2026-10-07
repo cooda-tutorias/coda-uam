@@ -77,9 +77,9 @@
                   <span class="sol-pdf-card-icon" aria-hidden="true"><i class="bi bi-file-earmark-pdf"></i></span>
                   <div class="sol-pdf-card-body">
                     <p class="sol-pdf-card-title">{% if object.trayectoria_version_id %}PDF asociado a esta tutoría{% else %}PDF académico vigente disponible{% endif %}</p>
-                    <p class="sol-pdf-card-meta">{{ trayectoria_edicion.original_filename }}</p>
+                    <p class="sol-pdf-card-meta">Actualizado el {{ trayectoria_edicion.created_at|date:'d/m/Y H:i' }}</p>
                   </div>
-                  <a class="sol-pdf-preview-btn" target="_blank" rel="noopener" href="{% url 'ver-trayectoria' object.alumno.pk %}?version_id={{ trayectoria_edicion.pk }}"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span>Abrir PDF</span></a>
+                  <button type="button" class="sol-pdf-preview-btn open-trayectoria-version" id="open-trayectoria-dialog" aria-haspopup="dialog" aria-controls="trayectoria-dialog" aria-label="Vista previa de la trayectoria académica" data-view-url="{% url 'ver-trayectoria' object.alumno.pk %}?version_id={{ trayectoria_edicion.pk }}" data-download-url="{% url 'ver-trayectoria' object.alumno.pk %}?version_id={{ trayectoria_edicion.pk }}&amp;download=1" data-file-name="{{ trayectoria_edicion.original_filename }}"><i class="bi bi-eye" aria-hidden="true"></i><span>Ver PDF</span></button>
                 </div>
                 <div class="trajectory-toggle-actions">
                   <button type="button" class="trajectory-toggle-btn" data-trajectory-toggle data-next-value=""><i class="bi bi-x-lg" aria-hidden="true"></i><span>Quitar</span></button>
@@ -100,8 +100,8 @@
           {% elif object.trayectoria_version_id %}
             <div class="sol-pdf-card">
               <span class="sol-pdf-card-icon" aria-hidden="true"><i class="bi bi-file-earmark-pdf"></i></span>
-              <div class="sol-pdf-card-body"><p class="sol-pdf-card-title">PDF académico asociado a esta tutoría</p><p class="sol-pdf-card-meta">{{ object.trayectoria_version.original_filename }}</p></div>
-              <a class="sol-pdf-preview-btn" target="_blank" rel="noopener" href="{% url 'ver-trayectoria' object.alumno.pk %}?version_id={{ object.trayectoria_version_id }}"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i><span>Abrir PDF</span></a>
+              <div class="sol-pdf-card-body"><p class="sol-pdf-card-title">PDF académico asociado a esta tutoría</p><p class="sol-pdf-card-meta">Actualizado el {{ object.trayectoria_version.created_at|date:'d/m/Y H:i' }}</p></div>
+              <button type="button" class="sol-pdf-preview-btn open-trayectoria-version" id="open-trayectoria-dialog" aria-haspopup="dialog" aria-controls="trayectoria-dialog" aria-label="Vista previa de la trayectoria académica" data-view-url="{% url 'ver-trayectoria' object.alumno.pk %}?version_id={{ object.trayectoria_version_id }}" data-download-url="{% url 'ver-trayectoria' object.alumno.pk %}?version_id={{ object.trayectoria_version_id }}&amp;download=1" data-file-name="{{ object.trayectoria_version.original_filename }}"><i class="bi bi-eye" aria-hidden="true"></i><span>Ver PDF</span></button>
             </div>
           {% else %}
             <div class="sol-alert sol-alert-warn" role="status"><i class="bi bi-info-circle" aria-hidden="true"></i><span>Esta tutoría no tiene un PDF académico asociado.</span></div>
@@ -191,6 +191,9 @@
 </section>
 
 {% include "Tutorias/includes/partials/modal_agendar_cita.html" %}
+{% if trayectoria_edicion %}
+  {% include "Tutorias/includes/partials/modal_trayectoria_pdf.html" %}
+{% endif %}
 
 
 <style>
@@ -341,6 +344,7 @@
 
 {% block scripts %}
   <script src="{% static 'Tutorias/js/trayectoria_tutoria_toggle.js' %}"></script>
+  {% if trayectoria_edicion %}<script src="{% static 'Tutorias/js/trayectoria_pdf_viewer.js' %}"></script>{% endif %}
   <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://npmcdn.com/flatpickr/dist/l10n/es.js"></script>
   <script src="{% static 'Tutorias/js/selector_fecha_tutoria.js' %}"></script>

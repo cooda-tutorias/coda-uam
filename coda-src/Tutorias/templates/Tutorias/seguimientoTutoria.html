@@ -102,8 +102,8 @@
                   <div class="sol-pdf-card seguimiento-pdf-card">
                     <span class="sol-pdf-card-icon" aria-hidden="true"><i class="bi bi-file-earmark-pdf"></i></span>
                     <div class="sol-pdf-card-body">
-                      <p class="sol-pdf-card-title">{% if tutoria.trayectoria_version_id %}PDF asociado a esta tutoría{% else %}Trayectoria académica del alumno{% endif %}</p>
-                      {% if trayectoria_reporte %}<p class="sol-pdf-card-meta">{{ trayectoria_reporte.original_filename }}</p>{% endif %}
+                      <p class="sol-pdf-card-title">PDF asociado a esta tutoría</p>
+                      <p class="sol-pdf-card-meta">Actualizado el {{ trayectoria_reporte.created_at|date:'d/m/Y H:i' }}</p>
                     </div>
                     <button type="button" class="sol-pdf-preview-btn open-trayectoria-version" id="open-trayectoria-dialog" aria-haspopup="dialog" aria-controls="trayectoria-dialog" aria-label="Vista previa de la trayectoria académica" data-view-url="{{ trayectoria_view_url }}" data-download-url="{{ trayectoria_download_url }}" data-file-name="{{ trayectoria_file_name }}"><i class="bi bi-eye" aria-hidden="true"></i><span>Ver PDF</span></button>
                   </div>
