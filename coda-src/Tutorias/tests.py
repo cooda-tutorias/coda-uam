@@ -19,7 +19,7 @@ from django.contrib.auth.models import AnonymousUser
 from Usuarios.models import Coda, Cordinador, Tutor, Alumno, HorarioTutor, PushDevice, TrayectoriaVersion
 from webpush.models import PushInformation, SubscriptionInfo
 from pywebpush import WebPushException
-from Tutorias.models import Tutoria, HistorialCambioTutoria
+from Tutorias.models import Asesoria, Tutoria, HistorialCambioTutoria
 from Tutorias.views import HistorialTutoriasGenerateView
 from Tutorias.forms import FormSeguimiento
 from Tutorias.services.docx_reportes import _tutoria_es_reportable
@@ -380,9 +380,80 @@ class PanelTutoriasAlumnoTests(TestCase):
                 response = self.client.get(reverse('Tutorias-create'))
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<h1 class="sol-title">Nueva solicitud de tutoría</h1>')
+        self.assertContains(response, 'Historial académico (PDF)')
         self.assertContains(response, 'Estado académico actual')
         self.assertContains(response, 'Consultar trayectoria vigente')
+        self.assertContains(response, 'data-trajectory-value')
+        self.assertContains(response, 'data-trajectory-toggle data-next-value=""')
+        self.assertContains(response, 'data-trajectory-toggle data-next-value="on"')
+        self.assertContains(response, 'PDF académico no incluido')
+        self.assertContains(response, 'Tutorias/js/trayectoria_tutoria_toggle.js')
+        self.assertTrue(response.context['incluir_trayectoria'])
+        self.assertContains(response, 'id="trayectoria-dialog"')
+        self.assertContains(response, 'id="trayectoria-pdf-canvas"')
+        self.assertContains(response, 'id="trayectoria-pdf-previous"')
+        self.assertContains(response, 'id="trayectoria-pdf-zoom-in"')
+        self.assertContains(response, 'Abrir en otra pestaña')
+        self.assertContains(response, 'id="sol-chip-search"')
+        self.assertContains(response, 'new Intl.Collator("es", { sensitivity: "base" })')
+        self.assertContains(response, 'class="sol-section-block"')
+        self.assertContains(response, 'formularios_tutoria.css?v=3')
+        self.assertContains(response, 'id="otro-campo-container" class="sol-otro-wrap" style="display:none"')
+        self.assertContains(response, 'otroCampo.style.display = otroMarcado ? "block" : "none";')
+        self.assertContains(response, 'id="sol-validation-dialog"')
+        self.assertContains(response, 'id="sol-confirm-dialog"')
+        self.assertContains(response, 'class="neutral-dialog-panel"')
+        self.assertContains(response, 'class="neutral-dialog-btn neutral-dialog-btn-primary"')
+        self.assertContains(response, 'confirmacion_formularios.js?v=3')
+        self.assertContains(response, 'data-confirm-cancel')
+        self.assertContains(response, 'data-confirm-submit-title="Enviar solicitud"')
+        self.assertNotContains(response, 'sol-confirm-panel')
+        self.assertContains(response, 'data-confirm-cancel')
+        self.assertContains(response, 'novalidate')
         self.assertContains(response, f'version_id={version.pk}')
+
+    def test_solicitud_respeta_si_el_alumno_incluye_o_excluye_su_trayectoria(self):
+        with tempfile.TemporaryDirectory() as media_root:
+            with override_settings(MEDIA_ROOT=media_root):
+                version = TrayectoriaVersion.objects.create(
+                    alumno=self.alumno,
+                    archivo=SimpleUploadedFile('trayectoria.pdf', b'%PDF-1.4', content_type='application/pdf'),
+                    original_filename='trayectoria_vigente.pdf',
+                    size_bytes=8,
+                    sha256='d' * 64,
+                    uploaded_by=self.alumno,
+                )
+                fechas = []
+                dia = timezone.localdate() + timedelta(days=1)
+                for indice, incluir in enumerate((True, False)):
+                    while dia.weekday() >= 5:
+                        dia += timedelta(days=1)
+                    descripcion = f'Solicitud con trayectoria {indice}'
+                    datos = {
+                        'tema': ['BEC'],
+                        'descripcion': descripcion,
+                        'fecha_sugerida': f'{dia.isoformat()}T10:00',
+                    }
+                    if incluir:
+                        datos['incluir_trayectoria'] = 'on'
+                    response = self.client.post(reverse('Tutorias-create'), datos)
+                    self.assertEqual(response.status_code, 302)
+                    fechas.append(Tutoria.objects.get(descripcion=descripcion))
+                    dia += timedelta(days=1)
+
+        self.assertEqual(fechas[0].trayectoria_version_id, version.pk)
+        self.assertIsNone(fechas[1].trayectoria_version_id)
+        self.assertTrue(TrayectoriaVersion.objects.filter(pk=version.pk).exists())
+
+    def test_solicitud_invalida_muestra_campos_faltantes_en_dialogo(self):
+        response = self.client.post(reverse('Tutorias-create'), {})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="sol-server-validation-errors"')
+        self.assertContains(response, 'data-validation-field="fecha"')
+        self.assertContains(response, 'data-validation-field="tema"')
+        self.assertContains(response, 'data-validation-field="descripcion"')
 
     def test_cambio_sugerido_de_agendada_vuelve_a_pendiente(self):
         tutoria = self.crear_tutoria(ACEPTADO)
@@ -691,28 +762,28 @@ class PanelTutoriasAlumnoTests(TestCase):
         self.assertEqual(response.context["tutorias_agendadas"], [])
         self.assertEqual(response.context["tutorias_historial"], [])
 
-    def test_pendiente_muestra_boton_del_modal_de_edicion(self):
+    def test_pendiente_enlaza_al_formulario_completo_de_edicion(self):
         tutoria = self.crear_tutoria(PENDIENTE)
 
         response = self.client.get(self.url)
 
-        url_modal = reverse("Tutorias-update-modal", args=[tutoria.pk])
-        self.assertContains(response, f'data-url="{url_modal}"')
-        self.assertContains(response, "js-abrir-editar-tutoria")
-        self.assertContains(response, 'title="Editar tema y descripción"')
+        url_edicion = reverse("Tutorias-update", args=[tutoria.pk])
+        self.assertContains(response, f'href="{url_edicion}"')
+        self.assertContains(response, 'aria-label="Editar tutoría completa"')
+        self.assertNotContains(response, "js-abrir-editar-tutoria")
         self.assertContains(response, 'title="Cambiar fecha sugerida"')
         self.assertContains(response, 'title="Cancelar solicitud"')
         self.assertContains(response, 'data-bs-placement="top"')
         self.assertContains(response, "delay: { show: 500, hide: 100 }")
 
-    def test_aceptada_muestra_boton_del_modal_de_edicion(self):
+    def test_aceptada_enlaza_al_formulario_completo_de_edicion(self):
         tutoria = self.crear_tutoria(ACEPTADO)
 
         response = self.client.get(self.url)
 
         self.assertContains(
             response,
-            reverse("Tutorias-update-modal", args=[tutoria.pk]),
+            reverse("Tutorias-update", args=[tutoria.pk]),
         )
 
 
@@ -1016,9 +1087,194 @@ class MatrizTransicionesTutoriaIntegrationTests(TestCase):
         response = self.client.get(reverse('save_seguimiento', args=[self.tutoria.pk]))
 
         self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'formularios_tutoria.css?v=5')
+        self.assertContains(response, 'seguimiento-report-body')
+        self.assertContains(response, 'class="sol-header seguimiento-report-header mb-3"')
+        self.assertContains(response, 'seguimiento-card-label')
+        self.assertContains(response, '<h1 class="sol-title">Reporte de seguimiento</h1>')
+        self.assertContains(response, 'Consulta los datos generales y registra el seguimiento de esta tutoría.')
+        self.assertContains(response, 'Tutor asignado a esta tutoría')
+        self.assertContains(response, self.tutoria.tutor.get_full_name())
+        self.assertContains(response, '.impact-option:has(input:checked)')
+        self.assertContains(response, 'class="impact-option" for="impacto-1"')
+        self.assertContains(response, 'class="form-check-input visually-hidden"')
+        self.assertContains(response, '#seguimiento-form .section-box > legend.form-label')
+        self.assertContains(response, 'Historial académico (PDF)')
+        self.assertContains(response, 'Esta tutoría no tiene un PDF académico asociado.')
         self.assertContains(response, 'id="no-attendance-notice"')
         self.assertContains(response, 'No se puede guardar el reporte mientras la asistencia esté marcada como “No”.')
+        self.assertContains(response, "confirmTone: 'danger'")
         self.assertContains(response, 'noAttendanceNotice.hidden = !noAsistio')
+
+    def test_reporte_muestra_la_trayectoria_asociada_a_la_tutoria(self):
+        contenido_pdf = b'%PDF-1.4 trayectoria de prueba'
+        with tempfile.TemporaryDirectory() as media_root:
+            with override_settings(MEDIA_ROOT=media_root):
+                version = TrayectoriaVersion.objects.create(
+                    alumno=self.tutoria.alumno,
+                    archivo=SimpleUploadedFile('trayectoria.pdf', contenido_pdf, content_type='application/pdf'),
+                    original_filename='trayectoria_alumno_2026-10-06.pdf',
+                    size_bytes=len(contenido_pdf),
+                    sha256='b' * 64,
+                    uploaded_by=self.tutoria.alumno,
+                )
+                self.tutoria.trayectoria_version = version
+                self.tutoria.save(update_fields=['trayectoria_version'])
+                self.client.force_login(self.tutor)
+
+                response = self.client.get(reverse('save_seguimiento', args=[self.tutoria.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Historial académico (PDF)')
+        self.assertContains(response, 'PDF asociado a esta tutoría')
+        self.assertContains(response, 'sol-pdf-card seguimiento-pdf-card')
+        self.assertContains(response, '<span>Ver PDF</span>')
+        self.assertContains(response, f'version_id={version.pk}')
+        self.assertContains(response, 'aria-controls="trayectoria-dialog"')
+        self.assertContains(response, 'id="trayectoria-pdf-canvas"')
+        self.assertContains(response, 'Tutorias/js/trayectoria_pdf_viewer.js')
+
+    def test_reporte_no_muestra_trayectoria_activa_si_no_esta_asociada_a_la_tutoria(self):
+        contenido_pdf = b'%PDF-1.4 trayectoria vigente'
+        with tempfile.TemporaryDirectory() as media_root:
+            with override_settings(MEDIA_ROOT=media_root):
+                version = TrayectoriaVersion.objects.create(
+                    alumno=self.tutoria.alumno,
+                    archivo=SimpleUploadedFile('trayectoria.pdf', contenido_pdf, content_type='application/pdf'),
+                    original_filename='trayectoria_vigente.pdf',
+                    size_bytes=len(contenido_pdf),
+                    sha256='c' * 64,
+                    uploaded_by=self.tutoria.alumno,
+                )
+                self.client.force_login(self.tutor)
+
+                response = self.client.get(reverse('save_seguimiento', args=[self.tutoria.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Esta tutoría no tiene un PDF académico asociado.')
+        self.assertNotContains(response, 'Trayectoria académica del alumno')
+        self.assertNotContains(response, 'trayectoria_vigente.pdf')
+        self.assertNotContains(response, 'id="open-trayectoria-dialog"')
+        self.assertTrue(TrayectoriaVersion.objects.filter(pk=version.pk).exists())
+
+    def test_alumno_puede_quitar_y_volver_a_incluir_trayectoria_al_editar(self):
+        with tempfile.TemporaryDirectory() as media_root:
+            with override_settings(MEDIA_ROOT=media_root):
+                version = TrayectoriaVersion.objects.create(
+                    alumno=self.alumno,
+                    archivo=SimpleUploadedFile('trayectoria.pdf', b'%PDF-1.4', content_type='application/pdf'),
+                    original_filename='trayectoria_vigente.pdf',
+                    size_bytes=8,
+                    sha256='e' * 64,
+                    uploaded_by=self.alumno,
+                )
+                self.tutoria.trayectoria_version = version
+                self.tutoria.save(update_fields=['trayectoria_version'])
+                self.client.force_login(self.alumno)
+                url = reverse('Tutorias-update', args=[self.tutoria.pk])
+
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, 'data-trajectory-value')
+                self.assertContains(response, 'data-trajectory-toggle data-next-value=""')
+                self.assertContains(response, 'PDF académico no incluido')
+                self.assertContains(response, 'Tutorias/js/trayectoria_tutoria_toggle.js')
+
+                datos = {
+                    'tema': ['BEC'],
+                    'descripcion': self.tutoria.descripcion,
+                    'fecha': timezone.localtime(self.tutoria.fecha).strftime('%Y-%m-%d %H:%M:%S'),
+                    'incluir_trayectoria': '',
+                }
+                response = self.client.post(url, datos)
+                self.assertEqual(response.status_code, 302)
+                self.tutoria.refresh_from_db()
+                self.assertIsNone(self.tutoria.trayectoria_version_id)
+                self.assertTrue(TrayectoriaVersion.objects.filter(pk=version.pk).exists())
+                self.assertFalse(HistorialCambioTutoria.objects.filter(tutoria=self.tutoria).exists())
+
+                datos['incluir_trayectoria'] = 'on'
+                response = self.client.post(url, datos)
+                self.assertEqual(response.status_code, 302)
+                self.tutoria.refresh_from_db()
+                self.assertEqual(self.tutoria.trayectoria_version_id, version.pk)
+                historial = HistorialCambioTutoria.objects.filter(tutoria=self.tutoria)
+                self.assertEqual(historial.count(), 1)
+                self.assertEqual(historial.get().cambios_realizados, 'Historial académico: incluido')
+
+    def test_tutor_no_puede_cambiar_la_trayectoria_asociada_en_edicion(self):
+        with tempfile.TemporaryDirectory() as media_root:
+            with override_settings(MEDIA_ROOT=media_root):
+                version = TrayectoriaVersion.objects.create(
+                    alumno=self.alumno,
+                    archivo=SimpleUploadedFile('trayectoria.pdf', b'%PDF-1.4', content_type='application/pdf'),
+                    original_filename='trayectoria_vigente.pdf',
+                    size_bytes=8,
+                    sha256='f' * 64,
+                    uploaded_by=self.alumno,
+                )
+                self.tutoria.estado = ACEPTADO
+                self.tutoria.save(update_fields=['estado'])
+                self.client.force_login(self.tutor)
+                response_get = self.client.get(reverse('Tutorias-update', args=[self.tutoria.pk]))
+                self.assertEqual(response_get.status_code, 200)
+                self.assertNotContains(response_get, 'data-trajectory-value')
+
+                response = self.client.post(
+                    reverse('Tutorias-update', args=[self.tutoria.pk]),
+                    {
+                        'tema': ['BEC'],
+                        'descripcion': self.tutoria.descripcion,
+                        'fecha': timezone.localtime(self.tutoria.fecha).strftime('%Y-%m-%dT%H:%M'),
+                        'incluir_trayectoria': 'on',
+                    },
+                )
+
+        self.assertEqual(response.status_code, 302)
+        self.tutoria.refresh_from_db()
+        self.assertIsNone(self.tutoria.trayectoria_version_id)
+        self.assertTrue(TrayectoriaVersion.objects.filter(pk=version.pk).exists())
+
+    def test_reporte_muestra_detalle_expandible_de_asesoria_especializada(self):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.fecha = timezone.now() - timedelta(minutes=1)
+        self.tutoria.save(update_fields=['estado', 'fecha'])
+        Asesoria.objects.create(
+            alumno=self.tutoria.alumno,
+            tutor=self.tutoria.tutor,
+            tema='Canalización académica',
+            fecha=timezone.now() - timedelta(days=1),
+            descripcion='Se revisaron opciones de regularización.',
+        )
+        self.client.force_login(self.tutor)
+
+        response = self.client.get(reverse('save_seguimiento', args=[self.tutoria.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Asesorías especializadas registradas')
+        self.assertContains(response, '<details class="asesoria-detail">')
+        self.assertContains(response, 'Canalización académica')
+        self.assertContains(response, 'Se revisaron opciones de regularización.')
+        self.assertContains(response, 'Ver detalle')
+
+    def test_reporte_muestra_asesorias_registradas_en_tutorias_previas(self):
+        Tutoria.objects.create(
+            alumno=self.tutoria.alumno,
+            tutor=self.tutoria.tutor,
+            tema=['SS'],
+            fecha=timezone.now() - timedelta(days=1),
+            asesoria_especializada=True,
+            observaciones='Se revisó su plan de regularización.',
+            resultados_tutoria='Se acordó dar seguimiento el próximo trimestre.',
+        )
+        self.client.force_login(self.tutor)
+
+        response = self.client.get(reverse('save_seguimiento', args=[self.tutoria.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Servicio social')
+        self.assertContains(response, 'Se revisó su plan de regularización.')
+        self.assertContains(response, 'Se acordó dar seguimiento el próximo trimestre.')
 
     def _datos_edicion_seguimiento(self, edit_confirmed=None, save_confirmed=None):
         datos = {
@@ -2486,6 +2742,12 @@ class NotificacionesTutoriaTests(TestCase):
             estado=PENDIENTE,
         )
 
+    def _fecha_habil_futura(self, dia_semana, hora):
+        fecha = timezone.localdate() + timedelta(days=1)
+        while fecha.weekday() != dia_semana:
+            fecha += timedelta(days=1)
+        return timezone.make_aware(datetime.combine(fecha, time(hora, 0)))
+
     def test_rechaza_si_tutor_no_es_propietario(self):
         self.client.force_login(self.otro_tutor)
 
@@ -2540,11 +2802,52 @@ class NotificacionesTutoriaTests(TestCase):
         response = self.client.get(reverse('Tutorias-update', args=[self.tutoria.pk]))
 
         self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['estados_alumno'])
+        self.assertContains(response, '<h1 class="sol-title">Editar tutoría</h1>')
+        self.assertContains(response, 'Modifica los campos y guarda los cambios.')
+        self.assertContains(response, 'class="sol-card"')
+        self.assertContains(response, 'formularios_tutoria.css?v=3')
+        self.assertContains(response, 'id="sol-chip-search"')
+        self.assertContains(response, 'new Intl.Collator("es", { sensitivity: "base" })')
         self.assertContains(response, 'id="btnAbrirModalCita"')
         self.assertContains(response, 'id="modalAgendarCita"')
+        self.assertContains(response, 'id="sol-confirm-dialog"')
+        self.assertContains(response, 'class="neutral-dialog-panel"')
+        self.assertNotContains(response, 'sol-confirm-panel')
+        self.assertContains(response, 'data-confirm-cancel')
+        self.assertContains(response, 'Al guardar este cambio de horario se notificará al alumno.')
         self.assertContains(response, 'name="horario_tutor"')
         self.assertContains(response, 'name="franja_seleccionada"')
         self.assertContains(response, 'name="fecha_sugerida"')
+
+    def test_historial_de_edicion_cuenta_todas_las_ediciones_y_pagina_de_cinco(self):
+        HistorialCambioTutoria.objects.bulk_create([
+            HistorialCambioTutoria(
+                tutoria=self.tutoria,
+                correo_editor=self.tutor.email,
+                cambios_realizados=f'Cambio {numero}',
+            )
+            for numero in range(1, 24)
+        ])
+        self.client.force_login(self.tutor)
+
+        response = self.client.get(reverse('Tutorias-update', args=[self.tutoria.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['historial_cambios_total'], 23)
+        self.assertContains(response, 'id="sol-history-panel" data-total="23" hidden')
+        self.assertContains(response, 'class="sol-history-row', count=23)
+        self.assertContains(response, 'data-history-index="23" hidden')
+        self.assertContains(response, 'Mostrar 5 más')
+
+    def test_edicion_del_alumno_indica_que_el_cambio_de_fecha_requiere_aprobacion(self):
+        self.client.force_login(self.alumno)
+
+        response = self.client.get(reverse('Tutorias-update', args=[self.tutoria.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'El tutor deberá aprobar este cambio de horario antes de confirmar la tutoría.')
+        self.assertContains(response, 'Solicitar aprobación')
 
     def test_editar_fecha_guarda_el_cambio(self):
         self.client.force_login(self.tutor)
@@ -2557,10 +2860,71 @@ class NotificacionesTutoriaTests(TestCase):
                 'fecha': nueva_fecha,
                 'descripcion': 'Se agenda cita',
                 'fecha_sugerida': nueva_fecha,
+                'estado_tutoria': ACEPTADO,
             },
         )
 
         self.assertEqual(response.status_code, 302)
+
+    @patch('Tutorias.views.tutoria_notification_requested.send')
+    def test_alumno_cambia_horario_desde_edicion_y_requiere_aprobacion(self, enviar_notificacion):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.fecha = self._fecha_habil_futura(1, 10)
+        self.tutoria.save(update_fields=['estado', 'fecha'])
+        self.client.force_login(self.alumno)
+        nueva_fecha = self._fecha_habil_futura(3, 12)
+
+        response = self.client.post(
+            reverse('Tutorias-update', args=[self.tutoria.pk]),
+            {
+                'tema': [self.tema_codigo],
+                'descripcion': 'Cambio de horario solicitado',
+                'fecha': nueva_fecha.strftime('%Y-%m-%dT%H:%M'),
+                'fecha_sugerida': nueva_fecha.strftime('%Y-%m-%dT%H:%M'),
+                'horario_tutor': '',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, PENDIENTE)
+        self.assertEqual(timezone.localtime(self.tutoria.fecha), nueva_fecha)
+        self.assertRedirects(
+            response,
+            f"{reverse('Tutorias-alumno')}?tab=solicitadas&highlight={self.tutoria.pk}",
+            fetch_redirect_response=False,
+        )
+        enviar_notificacion.assert_called_once()
+        self.assertEqual(enviar_notificacion.call_args.kwargs['event'], EventoTutoria.ALU_SOL_CAMBIO_FECHA_SUG)
+        self.assertEqual(enviar_notificacion.call_args.kwargs['recipient'], self.tutor)
+
+    @patch('Tutorias.views.tutoria_notification_requested.send')
+    def test_tutor_reagenda_desde_edicion_y_notifica_al_alumno(self, enviar_notificacion):
+        self.tutoria.estado = ACEPTADO
+        self.tutoria.fecha = self._fecha_habil_futura(1, 10)
+        self.tutoria.save(update_fields=['estado', 'fecha'])
+        self.client.force_login(self.tutor)
+        nueva_fecha = self._fecha_habil_futura(3, 12)
+
+        response = self.client.post(
+            reverse('Tutorias-update', args=[self.tutoria.pk]),
+            {
+                'tema': [self.tema_codigo],
+                'descripcion': 'Tutor reprograma la tutoría',
+                'fecha': nueva_fecha.strftime('%Y-%m-%dT%H:%M'),
+                'fecha_sugerida': nueva_fecha.strftime('%Y-%m-%dT%H:%M'),
+                'horario_tutor': '',
+                'estado_tutoria': ACEPTADO,
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.tutoria.refresh_from_db()
+        self.assertEqual(self.tutoria.estado, ACEPTADO)
+        self.assertEqual(timezone.localtime(self.tutoria.fecha), nueva_fecha)
+        enviar_notificacion.assert_called_once()
+        self.assertEqual(enviar_notificacion.call_args.kwargs['event'], EventoTutoria.TUT_REAGENDA_1_FECHA)
+        self.assertEqual(enviar_notificacion.call_args.kwargs['recipient'], self.alumno)
 
     def _crear_horario_futuro(self, dia_semana=2, tutor=None):
         fecha = timezone.localdate() + timedelta(days=1)
@@ -2589,6 +2953,7 @@ class NotificacionesTutoriaTests(TestCase):
                 'franja_seleccionada': fecha_iso,
                 'fecha_sugerida': '',
                 'fecha': fecha_iso[:16],
+                'estado_tutoria': ACEPTADO,
             },
         )
 
