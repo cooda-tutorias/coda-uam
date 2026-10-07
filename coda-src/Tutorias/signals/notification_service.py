@@ -91,8 +91,8 @@ EMAIL_EVENT_CONFIG: dict[str, dict[str, Any]] = {
     },
     EventoTutoria.ALU_SOL_CAMBIO_FECHA_SUG: {
         "template": ACTION_TEMPLATE, "recipients": ("tutor",),
-        "subject": "Solicitud de cambio de fecha", "title": "El alumno solicitó cambiar la fecha",
-        "message": "Revisa la nueva fecha sugerida y responde la solicitud.",
+        "subject": "Solicitud de cambio de horario", "title": "El alumno solicita cambiar el horario",
+        "message": "Revisa y aprueba el nuevo horario solicitado.",
         "action_type": "responder_cambio_fecha", "action_text": "Revisar solicitud",
         "action_url_name": "Panel-tutorias-tutor", "action_tab": "solicitadas",
     },
