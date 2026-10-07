@@ -1127,6 +1127,10 @@ class MatrizTransicionesTutoriaIntegrationTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Historial académico (PDF)')
         self.assertContains(response, 'PDF asociado a esta tutoría')
+        self.assertContains(
+            response,
+            f"<p class=\"sol-pdf-card-meta\">Actualizado el {timezone.localtime(version.created_at).strftime('%d/%m/%Y %H:%M')}</p>",
+        )
         self.assertContains(response, 'sol-pdf-card seguimiento-pdf-card')
         self.assertContains(response, '<span>Ver PDF</span>')
         self.assertContains(response, f'version_id={version.pk}')
@@ -1201,6 +1205,36 @@ class MatrizTransicionesTutoriaIntegrationTests(TestCase):
                 historial = HistorialCambioTutoria.objects.filter(tutoria=self.tutoria)
                 self.assertEqual(historial.count(), 1)
                 self.assertEqual(historial.get().cambios_realizados, 'Historial académico: incluido')
+
+    def test_edicion_usa_el_modal_pdf_compartido_para_alumno_y_tutor(self):
+        with tempfile.TemporaryDirectory() as media_root:
+            with override_settings(MEDIA_ROOT=media_root):
+                version = TrayectoriaVersion.objects.create(
+                    alumno=self.alumno,
+                    archivo=SimpleUploadedFile('trayectoria.pdf', b'%PDF-1.4', content_type='application/pdf'),
+                    original_filename='trayectoria_vigente.pdf',
+                    size_bytes=8,
+                    sha256='a' * 64,
+                    uploaded_by=self.alumno,
+                )
+                self.tutoria.trayectoria_version = version
+                self.tutoria.save(update_fields=['trayectoria_version'])
+
+                for usuario in (self.alumno, self.tutor):
+                    self.client.force_login(usuario)
+                    response = self.client.get(reverse('Tutorias-update', args=[self.tutoria.pk]))
+
+                    self.assertEqual(response.status_code, 200)
+                    self.assertContains(response, 'id="open-trayectoria-dialog"')
+                    self.assertContains(response, 'aria-controls="trayectoria-dialog"')
+                    self.assertContains(
+                        response,
+                        f"<p class=\"sol-pdf-card-meta\">Actualizado el {timezone.localtime(version.created_at).strftime('%d/%m/%Y %H:%M')}</p>",
+                    )
+                    self.assertContains(response, 'data-file-name="trayectoria_vigente.pdf"')
+                    self.assertContains(response, 'id="trayectoria-dialog"')
+                    self.assertContains(response, 'id="trayectoria-pdf-canvas"')
+                    self.assertContains(response, 'Tutorias/js/trayectoria_pdf_viewer.js')
 
     def test_tutor_no_puede_cambiar_la_trayectoria_asociada_en_edicion(self):
         with tempfile.TemporaryDirectory() as media_root:
