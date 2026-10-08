@@ -417,6 +417,47 @@ class PanelTutoriasAlumnoTests(TestCase):
             Tutoria.objects.filter(descripcion="Solicitud en fin de semana").exists()
         )
 
+    @override_settings(
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+        TUTORIAS_SITE_URL="https://tutorias.test",
+    )
+    @patch("Tutorias.signals.handle_push_notifications._enviar_notificacion_push")
+    def test_solicitud_real_notifica_al_tutor_por_los_tres_canales(self, push_mock):
+        descripcion = "Solicitud con notificaciones integradas"
+        fecha_sugerida = self.siguiente_fecha_con_dia(1)
+
+        response = self.client.post(
+            reverse("Tutorias-create"),
+            {
+                "tema": ["BEC"],
+                "descripcion": descripcion,
+                "fecha_sugerida": fecha_sugerida.strftime("%Y-%m-%dT%H:%M"),
+            },
+        )
+
+        tutoria = Tutoria.objects.get(descripcion=descripcion)
+        self.assertRedirects(
+            response,
+            f"{reverse('Tutorias-alumno')}?tab=solicitadas&highlight={tutoria.pk}",
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(tutoria.estado, PENDIENTE)
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.tutor,
+                verb="solicitó una tutoría",
+                description="Nueva solicitud de tutoría",
+            ).exists()
+        )
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].subject, "Nueva solicitud de tutoría")
+        self.assertIn(self.tutor.email, mail.outbox[0].to)
+        push_mock.assert_called_once_with(
+            event=EventoTutoria.ALU_SOLICITA_TUTORIA,
+            tutoria=tutoria,
+            actor=self.alumno,
+        )
+
     def test_cambio_a_horario_libre_queda_agendado(self):
         tutoria = self.crear_tutoria(PENDIENTE)
         dia = timezone.localdate() + timedelta(days=1)
@@ -2299,7 +2340,8 @@ class NotificacionesTutoriaTests(TestCase):
         self.assertEqual(self.tutoria.estado, PENDIENTE)
 
     @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
-    def test_aceptar_envia_notificacion_y_correo_a_ambos(self):
+    @patch("Tutorias.signals.handle_push_notifications._enviar_notificacion_push")
+    def test_aceptar_envia_notificacion_correo_y_push_al_alumno(self, push_mock):
         self.client.force_login(self.tutor)
 
         response = self.client.post(reverse('aceptar_tutoria', args=[self.tutoria.pk]))
@@ -2324,6 +2366,11 @@ class NotificacionesTutoriaTests(TestCase):
             sorted(mail.outbox[0].to),
             sorted(['alumno@example.com', 'alumno.personal@example.com'])
         )
+        push_mock.assert_called_once()
+        push_event = push_mock.call_args.kwargs
+        self.assertEqual(push_event['event'], EventoTutoria.TUT_ACEPTA_SOLICITUD)
+        self.assertEqual(push_event['tutoria'], self.tutoria)
+        self.assertEqual(push_event['actor'].pk, self.tutor.pk)
 
     @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
     def test_correos_duplicados_se_envian_una_sola_vez(self):
