@@ -1,129 +1,199 @@
 {% extends "Usuarios/HeaderAndFooterFachada.html" %}
+{% load static %}
 
 {% block title %} Editar Tutoría {% endblock %}
 
+{% block styles %}
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/material_blue.css">
+  <link rel="stylesheet" href="{% static 'Tutorias/css/selector_fecha_tutoria.css' %}">
+  <link rel="stylesheet" href="{% static 'Tutorias/css/formularios_tutoria.css' %}?v=3">
+{% endblock %}
+
 {% block body %}
-<section id="section" style="background-color: #eee;">
-  <div class="container py-5">
-    <div class="row justify-content-center">
-      <div class="col-lg-8 col-xl-6 mb-5">
-        <div class="card border-top border-bottom border-4" style="border-color: #F08200 !important;">
+{% load widget_tweaks custom_filters %}
+<section class="sol-section py-4 py-lg-5">
+  <div class="container sol-container">
+    <div class="sol-card">
+      <header class="sol-header">
+        <span class="sol-header-icon" aria-hidden="true"><i class="bi bi-pencil-square"></i></span>
+        <div>
+          <h1 class="sol-title">Editar tutoría</h1>
+          <p class="sol-subtitle">Modifica los campos y guarda los cambios.</p>
+        </div>
+      </header>
 
-          {% load widget_tweaks custom_filters %}
-          <form method="post">{% csrf_token %}
-            <div class="card-body py-4 px-4 text-body">
-              <h3 class="mb-4 text-primary text-title-bold">Editar Tutoría</h3>
+      <form method="post" id="sol-form" class="sol-form" data-confirm-submit data-confirm-submit-title="Actualizar tutoría" data-confirm-submit-message="¿Confirmas guardar los cambios de esta tutoría?" data-confirm-submit-accept="Actualizar tutoría" data-confirm-date-title="Confirmar cambio de horario" data-confirm-date-message="{% if user|has_role:'ALU' %}El tutor deberá aprobar este cambio de horario antes de confirmar la tutoría.{% else %}Al guardar este cambio de horario se notificará al alumno.{% endif %}" data-confirm-date-accept="{% if user|has_role:'ALU' %}Solicitar aprobación{% else %}Guardar y notificar{% endif %}">{% csrf_token %}
+        {% if form.non_field_errors %}<div class="sol-alert sol-alert-error" role="alert">{{ form.non_field_errors }}</div>{% endif %}
 
-              <!-- Sección de Estados del Alumno -->
-              <div class="form-group mb-4">
-                <label class="mb-2 text-body-bold text-muted">Estado del Alumno</label>
-                <ul class="list-unstyled text-body mb-2">
-                  <li><span class="text-muted">Estado actual (en el sistema):</span> {{ object.alumno.get_estado_display }}</li>
-                  <li><span class="text-muted">Estado guardado (en la solicitud de la tutoría):</span> {{ object.get_estado_alumno_historico_display }}</li>
-                </ul>
-                {% if user|has_role:"TUT" or user|has_role:"COORDINADOR" or user|has_role:"CODA" %}
-                <select id="estado-select" name="estado_alumno_historico" class="form-select">
-                  <option value="1" {% if object.estado_alumno_historico == 1 %}selected{% endif %}>Activo</option>
-                  <option value="2" {% if object.estado_alumno_historico == 2 %}selected{% endif %}>No reinscrito</option>
-                  <option value="10" {% if object.estado_alumno_historico == 10 %}selected{% endif %}>Inscrito sin carga académica</option>
-                </select>
-                {% endif %}
-              </div>
+        <section class="sol-section-block" aria-labelledby="sol-estado-alumno-title">
+          <h2 class="sol-section-label" id="sol-estado-alumno-title"><i class="bi bi-mortarboard" aria-hidden="true"></i> Estado del alumno</h2>
+          <div class="sol-info-rows">
+            <div class="sol-info-row"><span class="sol-info-label">Estado actual (en el sistema)</span><span class="sol-info-value">{{ object.alumno.get_estado_display }}</span></div>
+            <div class="sol-info-row"><span class="sol-info-label">Estado guardado en la solicitud</span><span class="sol-info-value">{{ object.get_estado_alumno_historico_display|default:"Sin registro" }}</span></div>
+          </div>
+          {% if user|has_role:"TUT" or user|has_role:"COORDINADOR" or user|has_role:"CODA" %}
+            <div class="sol-field-group mt-3">
+              <label class="sol-label" for="estado-select">Actualizar estado</label>
+              <select id="estado-select" name="estado_alumno_historico" class="sol-input">
+                {% for estado_codigo, estado_nombre in estados_alumno %}
+                  <option value="{{ estado_codigo }}" {% if object.estado_alumno_historico == estado_codigo %}selected{% endif %}>{{ estado_nombre }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          {% endif %}
+        </section>
 
-              <div class="form-group mb-4">
-                <label class="mb-2 text-body-bold text-muted">Tema(s) de la tutoría.</label>
-                <p class="text-muted">Selecciona al menos un tema para tratar en la tutoría</p>
-                <div class="row">
-                  {% for checkbox in form.tema %}
-                  <div class="col-6 mb-2">
-                    <label class="form-check-label">{{ checkbox.tag }} {{ checkbox.choice_label }}</label>
+        <section class="sol-section-block" aria-labelledby="sol-estado-tutoria-title">
+          <h2 class="sol-section-label" id="sol-estado-tutoria-title"><i class="bi bi-check2-square" aria-hidden="true"></i> Estado de la tutoría</h2>
+          {% if object.estado == "ACE" %}
+            <span class="sol-status-chip">ACEPTADA</span>
+          {% elif object.estado == "REJ" %}
+            <span class="sol-status-chip">RECHAZADA</span>
+          {% elif object.estado == "CAN" %}
+            <span class="sol-status-chip">CANCELADA</span>
+          {% else %}
+            <span class="sol-status-chip">PENDIENTE</span>
+          {% endif %}
+          {% if user|has_role:"TUT" %}
+            <div class="sol-field-group mt-3">
+              <label class="sol-label" for="estado_tutoria">Decisión del tutor</label>
+              <select id="estado_tutoria" name="estado_tutoria" class="sol-input">
+                <option value="ACE" {% if object.estado == "ACE" %}selected{% endif %}>Aceptar tutoría</option>
+                <option value="REJ" {% if object.estado == "REJ" %}selected{% endif %}>Rechazar tutoría</option>
+              </select>
+              <p class="sol-field-hint mt-2">Puedes cambiar tu decisión aunque la tutoría ya haya sido aceptada o rechazada.</p>
+            </div>
+          {% endif %}
+        </section>
+
+        <section class="sol-section-block" aria-labelledby="sol-trayectoria-title">
+          <h2 class="sol-section-label" id="sol-trayectoria-title"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i> Historial académico</h2>
+          {% if user|has_role:"ALU" %}
+            {% if trayectoria_edicion %}
+              <input type="hidden" name="incluir_trayectoria" value="{% if incluir_trayectoria %}on{% endif %}" data-trajectory-value>
+              <div data-trajectory-included {% if not incluir_trayectoria %}hidden{% endif %}>
+                <div class="sol-pdf-card">
+                  <span class="sol-pdf-card-icon" aria-hidden="true"><i class="bi bi-file-earmark-pdf"></i></span>
+                  <div class="sol-pdf-card-body">
+                    <p class="sol-pdf-card-title">{% if object.trayectoria_version_id %}PDF asociado a esta tutoría{% else %}PDF académico vigente disponible{% endif %}</p>
+                    <p class="sol-pdf-card-meta">Actualizado el {{ trayectoria_edicion.created_at|date:'d/m/Y H:i' }}</p>
                   </div>
-                  {% endfor %}
+                  <button type="button" class="sol-pdf-preview-btn open-trayectoria-version" id="open-trayectoria-dialog" aria-haspopup="dialog" aria-controls="trayectoria-dialog" aria-label="Vista previa de la trayectoria académica" data-view-url="{% url 'ver-trayectoria' object.alumno.pk %}?version_id={{ trayectoria_edicion.pk }}" data-download-url="{% url 'ver-trayectoria' object.alumno.pk %}?version_id={{ trayectoria_edicion.pk }}&amp;download=1" data-file-name="{{ trayectoria_edicion.original_filename }}"><i class="bi bi-eye" aria-hidden="true"></i><span>Ver PDF</span></button>
                 </div>
-
-                <div id="otro-campo-container" class="mt-3" style="display: none;">
-                  <label for="otro" class="form-label">Especifica el tema:</label>
-                  <input type="text" class="form-control" name="otro_tema" id="otro" placeholder="Describe el tema..." value="{{ form.initial.otro_tema }}">
+                <div class="trajectory-toggle-actions">
+                  <button type="button" class="trajectory-toggle-btn" data-trajectory-toggle data-next-value=""><i class="bi bi-x-lg" aria-hidden="true"></i><span>Quitar</span></button>
                 </div>
               </div>
-
-              <div class="row mb-4">
-                <div class="col">
-                  {% render_field form.fecha class="form-select" id="fecha" %}
-                  <label class="form-label" for="fecha">Fecha y Hora</label>
+              <div data-trajectory-excluded {% if incluir_trayectoria %}hidden{% endif %}>
+                <div class="sol-alert sol-alert-info" role="status" aria-live="polite"><i class="bi bi-info-circle" aria-hidden="true"></i><span>PDF académico no incluido</span></div>
+                <div class="trajectory-toggle-actions">
+                  <button type="button" class="trajectory-toggle-btn trajectory-toggle-btn--add" data-trajectory-toggle data-next-value="on"><i class="bi bi-plus-lg" aria-hidden="true"></i><span>Agregar historial</span></button>
                 </div>
               </div>
-
-              <div class="form-group mb-4">
-                <label class="mb-2 text-body-bold text-muted">Estado de la Tutoría</label>
-                <div class="status-container">
-                  {% if object.estado == "ACE" %}
-                    <span class="status-chip status-chip--aceptada">ACEPTADA</span>
-                  {% elif object.estado == "REJ" %}
-                    <span class="status-chip status-chip--rechazada">RECHAZADA</span>
-                  {% elif object.estado == "CAN" %}
-                    <span class="status-chip status-chip--cancelada">CANCELADA</span>
-                  {% else %}
-                    <span class="status-chip status-chip--pendiente">PENDIENTE</span>
-                  {% endif %}
-                </div>
+            {% else %}
+              <div class="sol-alert sol-alert-warn" role="status">
+                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                <span>No tienes una trayectoria vigente. Puedes <a href="{% url 'perfil-alumno' object.alumno.pk %}">agregarla desde tu perfil</a>.</span>
               </div>
+            {% endif %}
+          {% elif object.trayectoria_version_id %}
+            <div class="sol-pdf-card">
+              <span class="sol-pdf-card-icon" aria-hidden="true"><i class="bi bi-file-earmark-pdf"></i></span>
+              <div class="sol-pdf-card-body"><p class="sol-pdf-card-title">PDF académico asociado a esta tutoría</p><p class="sol-pdf-card-meta">Actualizado el {{ object.trayectoria_version.created_at|date:'d/m/Y H:i' }}</p></div>
+              <button type="button" class="sol-pdf-preview-btn open-trayectoria-version" id="open-trayectoria-dialog" aria-haspopup="dialog" aria-controls="trayectoria-dialog" aria-label="Vista previa de la trayectoria académica" data-view-url="{% url 'ver-trayectoria' object.alumno.pk %}?version_id={{ object.trayectoria_version_id }}" data-download-url="{% url 'ver-trayectoria' object.alumno.pk %}?version_id={{ object.trayectoria_version_id }}&amp;download=1" data-file-name="{{ object.trayectoria_version.original_filename }}"><i class="bi bi-eye" aria-hidden="true"></i><span>Ver PDF</span></button>
+            </div>
+          {% else %}
+            <div class="sol-alert sol-alert-warn" role="status"><i class="bi bi-info-circle" aria-hidden="true"></i><span>Esta tutoría no tiene un PDF académico asociado.</span></div>
+          {% endif %}
+        </section>
 
-              {% if user|has_role:"TUT" %}
-              <div class="form-group mb-4">
-                <label class="mb-2 text-body-bold text-muted" for="estado_tutoria">Decisión del Tutor</label>
-                <select id="estado_tutoria" name="estado_tutoria" class="form-select">
-                  <option value="ACE" {% if object.estado == "ACE" %}selected{% endif %}>Aceptar tutoría</option>
-                  <option value="REJ" {% if object.estado == "REJ" %}selected{% endif %}>Rechazar tutoría</option>
-                </select>
-                <small class="text-muted">Puedes cambiar tu decisión aunque la tutoría ya haya sido aceptada o rechazada.</small>
-              </div>
-              {% endif %}
+        <section class="sol-section-block" aria-labelledby="sol-temas-title">
+          <h2 class="sol-section-label" id="sol-temas-title"><i class="bi bi-list-check" aria-hidden="true"></i> Temas a tratar</h2>
+          <p class="sol-field-hint">Busca y selecciona los temas de la tutoría.</p>
+          <label class="sol-chip-search-wrap" for="sol-chip-search"><i class="bi bi-search" aria-hidden="true"></i><input type="search" class="sol-chip-search-input" id="sol-chip-search" placeholder="Buscar tema..." aria-label="Buscar tema" autocomplete="off"></label>
+          <div class="sol-chips" id="sol-chips-wrap">
+            {% for checkbox in form.tema %}<label class="sol-chip" data-label="{{ checkbox.choice_label|lower }}">{{ checkbox.tag }}<span>{{ checkbox.choice_label }}</span></label>{% endfor %}
+          </div>
+          <p class="sol-chip-empty" id="sol-chip-empty" hidden>No se encontraron temas con ese nombre.</p>
+          <div id="otro-campo-container" class="sol-otro-wrap" style="display:none">
+            <label class="sol-label" for="id_otro_tema">Especifica el tema</label>
+            {% render_field form.otro_tema class="sol-input" id="id_otro_tema" placeholder="Describe brevemente el tema..." %}
+          </div>
+        </section>
 
+        <section class="sol-section-block" aria-labelledby="sol-agenda-title">
+          <h2 class="sol-section-label" id="sol-agenda-title"><i class="bi bi-calendar2-week" aria-hidden="true"></i> Fecha y hora</h2>
+          <p class="sol-field-hint">Fecha actual: {{ object.fecha|date:'d/m/Y H:i' }}. Puedes cambiarla desde la agenda.</p>
+          {{ form.fecha.as_hidden }}
+          {{ form.horario_tutor.as_hidden }}
+          {{ form.fecha_sugerida.as_hidden }}
+          <input type="hidden" id="id_fecha_seleccionada" name="fecha_seleccionada">
+          <input type="hidden" id="id_franja_seleccionada" name="franja_seleccionada">
+          <button type="button" id="btnAbrirModalCita" class="sol-date-btn" data-tutor-id="{{ object.tutor_id }}"><i class="bi bi-calendar-plus" aria-hidden="true"></i> Cambiar fecha y hora</button>
+          <div class="sol-alert sol-alert-info mt-3" id="resumenCita" role="status" aria-live="polite">No has seleccionado una nueva fecha.</div>
+          {% if form.fecha.errors %}<div class="sol-field-error" role="alert">{{ form.fecha.errors }}</div>{% endif %}
+        </section>
 
-              <div class="form-group mb-4">
-                {% render_field form.descripcion class="form-control" id="descripcion" rows="3" %}
-                <label class="form-label" for="descripcion">Observaciones</label>
-              </div>
+        <section class="sol-section-block" aria-labelledby="sol-observaciones-title">
+          <h2 class="sol-section-label" id="sol-observaciones-title"><i class="bi bi-chat-left-text" aria-hidden="true"></i> Observaciones</h2>
+          {% render_field form.descripcion class="sol-textarea" id="descripcion" rows="4" placeholder="Notas, observaciones o comentarios adicionales..." %}
+          {% if form.descripcion.errors %}<div class="sol-field-error" role="alert">{{ form.descripcion.errors }}</div>{% endif %}
+        </section>
 
+        <div class="sol-actions">
+          {% if user|has_role:"ALU" %}
+            <a class="sol-cancel-btn" href="{% url 'Tutorias-alumno' %}?tab={% if object.estado_efectivo == 'ACE' %}agendadas{% else %}solicitadas{% endif %}" data-confirm-cancel data-confirm-cancel-title="Cancelar edición" data-confirm-cancel-message="¿Quieres salir? Los cambios no guardados se perderán.">Cancelar</a>
+          {% else %}
+            <a class="sol-cancel-btn" href="{% url 'Panel-tutorias-tutor' %}?tab={% if object.estado_efectivo == 'ACE' %}agendadas{% else %}solicitadas{% endif %}" data-confirm-cancel data-confirm-cancel-title="Cancelar edición" data-confirm-cancel-message="¿Quieres salir? Los cambios no guardados se perderán.">Cancelar</a>
+          {% endif %}
+          <button type="submit" value="Save" class="sol-submit-btn"><i class="bi bi-check2-circle me-1" aria-hidden="true"></i> Actualizar tutoría</button>
+        </div>
 
-              <button type="submit" value="Save" class="btn btn-primary btn-block mb-4 text-title">Actualizar Tutoría</button>
-
-              <hr>
-              <h5 class="mt-4 mb-3 text-primary text-title-bold">Historial de cambios</h5>
-
-              {% if historial_cambios %}
-              <div class="table-responsive{% if historial_cambios|length > 5 %} historial-scroll{% endif %}">
-                <table class="table table-striped table-sm mb-0">
-                  <thead class="table-light sticky-top">
-                    <tr>
-                      <th>Fecha</th>
-                      <th>Correo</th>
-                      <th>Cambios</th>
-                    </tr>
-                  </thead>
+        <section class="sol-section-block border-bottom-0" aria-labelledby="sol-historial-title">
+          <button type="button" class="sol-history-toggle" id="sol-history-toggle" aria-controls="sol-history-panel" aria-expanded="false">
+            <span class="sol-history-heading"><i class="bi bi-clock-history" aria-hidden="true"></i><span id="sol-historial-title">Historial de cambios</span></span>
+            <span class="sol-history-count" aria-label="Total de ediciones">{{ historial_cambios_total }}</span>
+            <i class="bi bi-chevron-down sol-history-chevron" aria-hidden="true"></i>
+          </button>
+          <div class="sol-history-panel" id="sol-history-panel" data-total="{{ historial_cambios_total }}" hidden>
+            {% if historial_cambios %}
+              <p class="sol-history-status" id="sol-history-status" role="status" aria-live="polite">Mostrando <span id="sol-history-shown">{% if historial_cambios_total > 5 %}5{% else %}{{ historial_cambios_total }}{% endif %}</span> de {{ historial_cambios_total }} ediciones</p>
+              <div class="table-responsive sol-history-table-wrap">
+                <table class="table table-striped table-sm mb-0 sol-history-table">
+                  <thead class="table-light"><tr><th>Fecha</th><th>Correo</th><th>Cambios</th></tr></thead>
                   <tbody>
                     {% for cambio in historial_cambios %}
-                    <tr>
-                      <td class="text-nowrap">{{ cambio.fecha_cambio|date:"d/m/Y H:i" }}</td>
-                      <td>{{ cambio.correo_editor }}</td>
-                      <td>{{ cambio.cambios_realizados }}</td>
-                    </tr>
+                      <tr class="sol-history-row{% if forloop.counter > 5 %} sol-history-extra-row{% endif %}" data-history-index="{{ forloop.counter }}"{% if forloop.counter > 5 %} hidden{% endif %}>
+                        <td class="text-nowrap" data-label="Fecha">{{ cambio.fecha_cambio|date:"d/m/Y H:i" }}</td>
+                        <td class="text-break" data-label="Correo">{{ cambio.correo_editor }}</td>
+                        <td class="text-break" data-label="Cambios">{{ cambio.cambios_realizados }}</td>
+                      </tr>
                     {% endfor %}
                   </tbody>
                 </table>
               </div>
-              {% else %}
-              <p class="text-muted mb-0">Sin cambios registrados.</p>
-              {% endif %}
-            </div>
-          </form>
-
-        </div>
-      </div>
+            {% else %}
+              <p class="sol-history-status mb-0">Sin cambios registrados.</p>
+            {% endif %}
+            {% if historial_cambios_total > 5 %}
+              <div class="sol-history-actions">
+                <button type="button" class="sol-cancel-btn" id="sol-history-less" hidden>Mostrar menos</button>
+                <button type="button" class="sol-submit-btn" id="sol-history-more">Mostrar 5 más</button>
+              </div>
+            {% endif %}
+          </div>
+        </section>
+      </form>
+      {% include "Tutorias/includes/partials/modal_confirmacion_formulario.html" %}
     </div>
   </div>
 </section>
+
+{% include "Tutorias/includes/partials/modal_agendar_cita.html" %}
+{% if trayectoria_edicion %}
+  {% include "Tutorias/includes/partials/modal_trayectoria_pdf.html" %}
+{% endif %}
 
 
 <style>
@@ -192,4 +262,92 @@
     toggleOtro();
   });
 </script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const search = document.getElementById("sol-chip-search");
+    const chips = Array.from(document.querySelectorAll(".sol-chip"));
+    const chipContainer = document.getElementById("sol-chips-wrap");
+    const emptyMessage = document.getElementById("sol-chip-empty");
+    const spanishCollator = new Intl.Collator("es", { sensitivity: "base" });
+
+    chips.sort(function (first, second) {
+      const firstLabel = first.querySelector("span").textContent.trim();
+      const secondLabel = second.querySelector("span").textContent.trim();
+      return spanishCollator.compare(firstLabel, secondLabel);
+    });
+    chips.forEach(function (chip) { chipContainer.appendChild(chip); });
+
+    if (!search) return;
+
+    search.addEventListener("input", function () {
+      const query = search.value.trim().toLocaleLowerCase("es");
+      let visibleCount = 0;
+      chips.forEach(function (chip) {
+        const matches = (chip.dataset.label || "").includes(query);
+        chip.hidden = !matches;
+        if (matches) visibleCount += 1;
+      });
+      emptyMessage.hidden = visibleCount > 0;
+    });
+  });
+</script>
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const toggle = document.getElementById("sol-history-toggle");
+    const panel = document.getElementById("sol-history-panel");
+    if (!toggle || !panel) return;
+
+    const rows = Array.from(panel.querySelectorAll(".sol-history-row"));
+    const total = Number(panel.dataset.total || 0);
+    const shown = document.getElementById("sol-history-shown");
+    const status = document.getElementById("sol-history-status");
+    const showMore = document.getElementById("sol-history-more");
+    const showLess = document.getElementById("sol-history-less");
+    const pageSize = 5;
+    let visibleCount = Math.min(pageSize, total);
+
+    function renderHistory() {
+      rows.forEach(function (row) {
+        row.hidden = Number(row.dataset.historyIndex) > visibleCount;
+      });
+      if (shown) shown.textContent = visibleCount;
+      if (showMore) {
+        const remaining = total - visibleCount;
+        showMore.hidden = remaining <= 0;
+        showMore.textContent = 'Mostrar ' + Math.min(pageSize, remaining) + ' más';
+      }
+      if (showLess) showLess.hidden = visibleCount <= pageSize;
+      if (status && total) status.setAttribute('aria-label', 'Mostrando ' + visibleCount + ' de ' + total + ' ediciones');
+    }
+
+    toggle.addEventListener('click', function () {
+      const expanded = toggle.getAttribute('aria-expanded') === 'true';
+      toggle.setAttribute('aria-expanded', String(!expanded));
+      panel.hidden = expanded;
+      if (!expanded) renderHistory();
+    });
+
+    showMore?.addEventListener('click', function () {
+      visibleCount = Math.min(total, visibleCount + pageSize);
+      renderHistory();
+    });
+
+    showLess?.addEventListener('click', function () {
+      visibleCount = Math.min(pageSize, total);
+      renderHistory();
+    });
+
+    renderHistory();
+  });
+</script>
+{% endblock %}
+
+{% block scripts %}
+  <script src="{% static 'Tutorias/js/trayectoria_tutoria_toggle.js' %}"></script>
+  {% if trayectoria_edicion %}<script src="{% static 'Tutorias/js/trayectoria_pdf_viewer.js' %}"></script>{% endif %}
+  <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+  <script src="https://npmcdn.com/flatpickr/dist/l10n/es.js"></script>
+  <script src="{% static 'Tutorias/js/selector_fecha_tutoria.js' %}"></script>
+  <script src="{% static 'Tutorias/js/editar_tutoria_agenda.js' %}"></script>
+  <script src="{% static 'Tutorias/js/confirmacion_formularios.js' %}?v=3"></script>
 {% endblock %}

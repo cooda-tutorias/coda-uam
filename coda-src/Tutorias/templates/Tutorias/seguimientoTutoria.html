@@ -1,7 +1,12 @@
 {% extends "Usuarios/HeaderAndFooterFachada.html" %}
 {% load widget_tweaks %}
+{% load static %}
 
 {% with titulo_reporte="Reporte de Tutoría" %}
+  {% block styles %}
+    <link rel="stylesheet" href="{% static 'Tutorias/css/formularios_tutoria.css' %}?v=5">
+  {% endblock %}
+
   {% block title %}{{ titulo_reporte }}{% endblock %}
 
   {% block body %}
@@ -18,9 +23,9 @@
       <div class="container-fluid px-2 px-md-4 px-xl-5">
         <div class="row g-3 g-xl-4 align-items-start">
           <div class="col-12 col-xl-4 order-1">
-            <div class="card border-0 shadow-sm mb-3">
+            <div class="card seguimiento-card mb-3">
               <div class="card-body p-3 p-md-4">
-                <h4 class="text-title-bold mb-3">Ficha del alumno</h4>
+                <div class="seguimiento-card-label"><i class="bi bi-person-vcard" aria-hidden="true"></i> Ficha del alumno</div>
                 <dl class="row mb-0 small student-info-list">
                   <dt class="col-5 text-muted">Nombre</dt>
                   <dd class="col-7 mb-2">
@@ -50,9 +55,9 @@
               </div>
             </div>
 
-            <div class="card border-0 shadow-sm mb-3">
+            <div class="card seguimiento-card mb-3">
               <div class="card-body p-3 p-md-4">
-                <h5 class="text-title-bold mb-3">Métricas rápidas</h5>
+                <div class="seguimiento-card-label"><i class="bi bi-graph-up" aria-hidden="true"></i> Métricas rápidas</div>
                 <div class="row g-2">
                   <div class="col-6">
                     <div class="metric-box">
@@ -82,30 +87,56 @@
               </div>
             </div>
 
-            <div class="card border-0 shadow-sm">
+            <div class="card seguimiento-card">
               <div class="card-body p-3 p-md-4">
-                <h5 class="text-title-bold mb-3">Estado del alumno</h5>
-                <div class="alert alert-info mb-0" role="alert">
-                  <p class="mb-2"><strong>Estado guardado:</strong> {{ tutoria.get_estado_alumno_historico_display }}</p>
-                  <p class="mb-0"><strong>Estado actual:</strong> {{ tutoria.alumno.get_estado_display }}</p>
-                </div>
+                <div class="seguimiento-card-label"><i class="bi bi-mortarboard" aria-hidden="true"></i> Estado del alumno</div>
+                <div class="sol-info-row"><span class="sol-info-label">Estado guardado</span><span class="sol-info-value">{{ tutoria.get_estado_alumno_historico_display|default:"Sin registro" }}</span></div>
+                <div class="sol-info-row"><span class="sol-info-label">Estado actual</span><span class="sol-info-value">{{ tutoria.alumno.get_estado_display|default:"Sin registro" }}</span></div>
+              </div>
+            </div>
+
+            <div class="card seguimiento-card mt-3">
+              <div class="card-body p-3 p-md-4">
+                <div class="seguimiento-card-label"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i> Historial académico (PDF)</div>
+                {% if tutoria.trayectoria_version_id %}
+                  <div class="sol-pdf-card seguimiento-pdf-card">
+                    <span class="sol-pdf-card-icon" aria-hidden="true"><i class="bi bi-file-earmark-pdf"></i></span>
+                    <div class="sol-pdf-card-body">
+                      <p class="sol-pdf-card-title">PDF asociado a esta tutoría</p>
+                      <p class="sol-pdf-card-meta">Actualizado el {{ trayectoria_reporte.created_at|date:'d/m/Y H:i' }}</p>
+                    </div>
+                    <button type="button" class="sol-pdf-preview-btn open-trayectoria-version" id="open-trayectoria-dialog" aria-haspopup="dialog" aria-controls="trayectoria-dialog" aria-label="Vista previa de la trayectoria académica" data-view-url="{{ trayectoria_view_url }}" data-download-url="{{ trayectoria_download_url }}" data-file-name="{{ trayectoria_file_name }}"><i class="bi bi-eye" aria-hidden="true"></i><span>Ver PDF</span></button>
+                  </div>
+                {% else %}
+                  <div class="sol-alert sol-alert-warn mb-0" role="status">
+                    <i class="bi bi-info-circle" aria-hidden="true"></i>
+                    <span>Esta tutoría no tiene un PDF académico asociado.</span>
+                  </div>
+                {% endif %}
               </div>
             </div>
           </div>
 
           <div class="col-12 col-xl-8 order-2">
-            <div class="card border-top border-bottom border-4 shadow-sm"
-                 style="border-color: #f08200 !important">
-              <div class="card-body p-3 p-md-4 p-xl-5 text-body">
+            <div class="card seguimiento-card seguimiento-card--main">
+              <div class="card-body p-3 p-md-4 p-xl-5 text-body seguimiento-report-body">
                 <div class="reporte-header mb-3">
-                  <div class="d-flex justify-content-between align-items-center gap-2 mb-2 flex-wrap">
-                    <h3 class="text-primary text-title-bold mb-0">{{ titulo_reporte }}</h3>
-                    <a href="{% url 'Tutorias-historial' %}"
+                  <div class="sol-header seguimiento-report-header mb-3">
+                    <span class="sol-header-icon" aria-hidden="true"><i class="bi bi-clipboard2-check"></i></span>
+                    <div class="seguimiento-report-header-text">
+                      <h1 class="sol-title">Reporte de seguimiento</h1>
+                      <p class="sol-subtitle">Consulta los datos generales y registra el seguimiento de esta tutoría.</p>
+                    </div>
+                    <a href="{% url 'Panel-tutorias-tutor' %}?tab=historial"
                        class="btn btn-outline-secondary btn-sm"
                        id="header-back-link">Regresar</a>
                   </div>
                   <div class="reporte-header-meta">
                     <p class="reporte-header-meta-title mb-2">Datos de la tutoría</p>
+                    <div class="reporte-header-meta-row">
+                      <span class="reporte-header-meta-label">Tutor asignado a esta tutoría</span>
+                      <span class="reporte-header-meta-value">{{ tutoria.tutor.get_full_name }}</span>
+                    </div>
                     <div class="reporte-header-meta-row">
                       <span class="reporte-header-meta-label">Fecha y hora programada en tutoría</span>
                       <span class="reporte-header-meta-value">{{ tutoria.fecha|date:'l d/m/Y H:i' }}</span>
@@ -207,12 +238,12 @@
 
                   <div class="accordion-item">
                     <h2 class="accordion-header" id="headingAsesorias">
-                      <button class="accordion-button collapsed"
+                            <button class="accordion-button collapsed"
                               type="button"
                               data-bs-toggle="collapse"
                               data-bs-target="#collapseAsesorias"
                               aria-expanded="false"
-                              aria-controls="collapseAsesorias">Asesorías registradas</button>
+                              aria-controls="collapseAsesorias">Asesorías especializadas registradas</button>
                     </h2>
                     <div id="collapseAsesorias"
                          class="accordion-collapse collapse"
@@ -223,8 +254,23 @@
                           <ul class="list-group list-group-flush">
                             {% for asesoria in asesorias_recientes %}
                               <li class="list-group-item px-0">
-                                <p class="mb-1"><strong>{{ asesoria.tema }}</strong></p>
-                                <p class="mb-0 small text-muted">{{ asesoria.fecha|date:'d/m/Y H:i' }} | {{ asesoria.tutor.first_name }} {{ asesoria.tutor.last_name }}</p>
+                                    <details class="asesoria-detail">
+                                      <summary class="d-flex flex-wrap justify-content-between align-items-start gap-2">
+                                        <span>
+                                          <strong>{{ asesoria.tema }}</strong>
+                                          <span class="d-block small text-muted">{{ asesoria.fecha|date:'d/m/Y H:i' }} | {{ asesoria.tutor.get_full_name }}</span>
+                                        </span>
+                                        <span class="small text-primary details-label details-label--closed">Ver detalle</span>
+                                        <span class="small text-primary details-label details-label--open">Ocultar detalle</span>
+                                      </summary>
+                                      <div class="pt-3 small">
+                                        <dl class="row mb-0">
+                                          <dt class="col-sm-4">Descripción</dt>
+                                          {% if asesoria.descripcion %}<dd class="col-sm-8">{{ asesoria.descripcion }}</dd>{% endif %}
+                                          {% if asesoria.resultados %}<dt class="col-sm-4">Resultados</dt><dd class="col-sm-8">{{ asesoria.resultados }}</dd>{% endif %}
+                                        </dl>
+                                      </div>
+                                    </details>
                               </li>
                             {% endfor %}
                           </ul>
@@ -302,6 +348,22 @@
                       novalidate>
                   {% csrf_token %}
                   <input type="hidden" name="edit_confirmed" id="edit-confirmed" value="false">
+                  <input type="hidden" name="save_confirmed" id="save-confirmed" value="false">
+                  {% if form.errors %}
+                    <div id="form-errors" class="alert alert-danger" role="alert" tabindex="-1">
+                      <p class="fw-semibold mb-2">No se pudo guardar el reporte. Revisa estos campos:</p>
+                      <ul class="mb-0">
+                        {% for field in form %}
+                          {% for error in field.errors %}
+                            <li>{{ field.label }}: {{ error }}</li>
+                          {% endfor %}
+                        {% endfor %}
+                        {% for error in form.non_field_errors %}
+                          <li>{{ error }}</li>
+                        {% endfor %}
+                      </ul>
+                    </div>
+                  {% endif %}
 
                   <div class="row g-3 mb-3">
                     <div class="col-12 col-md-6">
@@ -347,6 +409,9 @@
                       </div>
                     </div>
                   </fieldset>
+                  <div id="no-attendance-notice" class="alert alert-warning py-2" role="status" aria-live="polite" hidden>
+                    No se puede guardar el reporte mientras la asistencia esté marcada como “No”. Si la tutoría debe cerrarse, usa “Cancelar tutoría”.
+                  </div>
 
                   <div id="extra-fields">
                     <div class="mb-3 section-box">
@@ -429,64 +494,64 @@
                       <legend class="form-label mb-2">Nivel de impacto en desempeño académico (1-5)</legend>
                       <div class="row row-cols-2 row-cols-sm-3 row-cols-md-5 g-2">
                         <div class="col">
-                          <div class="impact-option">
-                            <input class="form-check-input"
+                          <label class="impact-option" for="impacto-1">
+                            <input class="form-check-input visually-hidden"
                                    type="radio"
                                    name="impacto_tutoria"
                                    value="1"
                                    id="impacto-1"
                                    {% if tutoria.impacto_tutoria == 1 %}checked{% endif %}
                                    required>
-                            <label for="impacto-1">1</label>
-                          </div>
+                            <span>1</span>
+                          </label>
                         </div>
                         <div class="col">
-                          <div class="impact-option">
-                            <input class="form-check-input"
+                          <label class="impact-option" for="impacto-2">
+                            <input class="form-check-input visually-hidden"
                                    type="radio"
                                    name="impacto_tutoria"
                                    value="2"
                                    id="impacto-2"
                                    {% if tutoria.impacto_tutoria == 2 %}checked{% endif %}
                                    required>
-                            <label for="impacto-2">2</label>
-                          </div>
+                            <span>2</span>
+                          </label>
                         </div>
                         <div class="col">
-                          <div class="impact-option">
-                            <input class="form-check-input"
+                          <label class="impact-option" for="impacto-3">
+                            <input class="form-check-input visually-hidden"
                                    type="radio"
                                    name="impacto_tutoria"
                                    value="3"
                                    id="impacto-3"
                                    {% if tutoria.impacto_tutoria == 3 %}checked{% endif %}
                                    required>
-                            <label for="impacto-3">3</label>
-                          </div>
+                            <span>3</span>
+                          </label>
                         </div>
                         <div class="col">
-                          <div class="impact-option">
-                            <input class="form-check-input"
+                          <label class="impact-option" for="impacto-4">
+                            <input class="form-check-input visually-hidden"
                                    type="radio"
                                    name="impacto_tutoria"
                                    value="4"
                                    id="impacto-4"
                                    {% if tutoria.impacto_tutoria == 4 %}checked{% endif %}
                                    required>
-                            <label for="impacto-4">4</label>
-                          </div>
+                            <span>4</span>
+                          </label>
                         </div>
                         <div class="col">
-                          <div class="impact-option">
-                            <input class="form-check-input"
+                          <label class="impact-option" for="impacto-5">
+                            <input class="form-check-input visually-hidden"
                                    type="radio"
                                    name="impacto_tutoria"
                                    value="5"
                                    id="impacto-5"
                                    {% if tutoria.impacto_tutoria == 5 %}checked{% endif %}
                                    required>
-                            <label for="impacto-5">5</label>
-                          </div>
+                            <span>5</span>
+                          </label>
                         </div>
                       </div>
                     </fieldset>
@@ -529,6 +594,11 @@
         </div>
       </div>
     </section>
+
+    {% if tutoria.trayectoria_version_id %}
+      {% include "Tutorias/includes/partials/modal_trayectoria_pdf.html" %}
+      <script src="{% static 'Tutorias/js/trayectoria_pdf_viewer.js' %}"></script>
+    {% endif %}
 
     <div id="neutral-confirm-dialog"
          class="neutral-dialog"
@@ -650,8 +720,39 @@
     }
 
     .seguimiento-page {
-        background: linear-gradient(180deg, #fff9f2 0%, #f4f6f8 45%, #eef2f5 100%);
+      background: #f1f5f9;
         min-height: calc(100vh - 70px);
+    }
+
+    .seguimiento-card {
+      overflow: hidden;
+      border: 1px solid #e1e6eb;
+      border-top: 4px solid #f08200;
+      border-bottom: 4px solid #f08200;
+      border-radius: 8px;
+      background: #fff;
+      box-shadow: 0 2px 16px rgba(15, 23, 42, 0.08);
+    }
+
+    .seguimiento-card-label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.9rem;
+      color: #65717d;
+      font-size: 0.82rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .seguimiento-card-label i {
+      color: #bd6300;
+      font-size: 1rem;
+    }
+
+    .seguimiento-report-header-text {
+      min-width: 0;
+      flex: 1;
     }
 
     .section-box {
@@ -659,6 +760,16 @@
         border: 1px solid #e8edf1;
         border-radius: 0.75rem;
         padding: 1rem;
+    }
+
+    #seguimiento-form .section-box > legend.form-label {
+      display: block;
+      width: 100%;
+      margin-bottom: 0.65rem !important;
+      color: #46515d;
+      font-size: 1rem;
+      font-weight: 600;
+      line-height: 1.4;
     }
 
     .seguimiento-page .container-fluid {
@@ -693,19 +804,68 @@
         border: 1px solid #ffd4a5;
     }
 
+    .asesoria-detail summary {
+      cursor: pointer;
+      list-style: none;
+    }
+
+    .asesoria-detail summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .details-label--open,
+    .asesoria-detail[open] .details-label--closed {
+      display: none;
+    }
+
+    .asesoria-detail[open] .details-label--open {
+      display: inline;
+    }
+
     .impact-option {
+      position: relative;
         border: 1px solid #d5dce2;
-        border-radius: 0.65rem;
+      border-radius: 999px;
         min-height: 48px;
         display: flex;
         justify-content: center;
         align-items: center;
         gap: 0.5rem;
-        background-color: #ffffff;
+      padding: 0 0.75rem;
+        background-color: #f5f6f7;
+        color: #4a5159;
+      cursor: pointer;
+      transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
     }
 
-    .impact-option label {
-        margin: 0;
+    .impact-option:hover {
+        border-color: #f0a54e;
+    }
+
+    .impact-option:focus-within {
+        outline: 2px solid rgba(240, 130, 0, 0.35);
+      outline-offset: 2px;
+    }
+
+    .impact-option:has(input:checked) {
+      border-color: #f08200;
+        background-color: #f08200;
+        color: #ffffff;
+    }
+
+    .impact-option input {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
+      .impact-option span {
         font-weight: 600;
     }
 
@@ -883,6 +1043,7 @@
     <script>
     document.addEventListener('DOMContentLoaded', function () {
         const asistenciaInputs = document.querySelectorAll("input[name='asistencia']");
+        const noAttendanceNotice = document.getElementById('no-attendance-notice');
         const firmaBecaInputs = document.querySelectorAll("input[name='firma_documentos_beca']");
         const asesoriaInputs = document.querySelectorAll("input[name='asesoria_especializada']");
 
@@ -897,6 +1058,7 @@
         const cancelForm = document.getElementById('cancelar-form');
         const seguimientoForm = document.getElementById('seguimiento-form');
         const editConfirmedInput = document.getElementById('edit-confirmed');
+        const saveConfirmedInput = document.getElementById('save-confirmed');
         const floatingBackBtn = document.getElementById('floating-back-btn');
         const headerBackLink = document.getElementById('header-back-link');
         const topNavigation = document.querySelector('nav');
@@ -907,7 +1069,7 @@
         const dialogCancelBtn = document.getElementById('neutral-dialog-cancel');
         const dialogConfirmBtn = document.getElementById('neutral-dialog-confirm');
         const leaveMessage = 'Los cambios no guardados se perderán. ¿Desea continuar?';
-        const fallbackUrl = "{% url 'Tutorias-historial' %}";
+        const fallbackUrl = "{% url 'Panel-tutorias-tutor' %}?tab=historial";
 
         let allowPageExit = false;
         let resolveDialog = null;
@@ -994,7 +1156,7 @@
             try {
                 const previous = new URL(document.referrer);
                 const current = new URL(window.location.href);
-                if (previous.origin !== current.origin) {
+                if (previous.origin !== current.origin || previous.pathname !== new URL(fallbackUrl, current.origin).pathname) {
                     return null;
                 }
                 if (previous.pathname === current.pathname && previous.search === current.search) {
@@ -1066,7 +1228,13 @@
         }
 
         const seguimientoCompletado = guardarBtn.dataset.seguimientoCompletado === 'true';
-        let editingUnlocked = !seguimientoCompletado;
+        const confirmacionPrevia = seguimientoCompletado
+          && new URLSearchParams(window.location.search).get('confirmacion_previa') === '1';
+        let editingUnlocked = !seguimientoCompletado || confirmacionPrevia;
+        if (confirmacionPrevia) {
+          editConfirmedInput.value = 'true';
+          guardarBtn.textContent = 'Guardar cambios';
+        }
 
         function getCheckedValue(name) {
             const checked = document.querySelector("input[name='" + name + "']:checked");
@@ -1113,6 +1281,7 @@
         function toggleAsistencia() {
             const asistencia = getCheckedValue('asistencia');
             const noAsistio = asistencia === 'False';
+          noAttendanceNotice.hidden = !noAsistio || (seguimientoCompletado && !editingUnlocked);
 
             if (seguimientoCompletado && !editingUnlocked) {
                 setFormReadOnly(true);
@@ -1137,13 +1306,7 @@
             input.addEventListener('change', toggleAsistencia);
         });
 
-        guardarBtn.addEventListener('click', function (event) {
-            if (!seguimientoCompletado || editingUnlocked) {
-                editConfirmedInput.value = editingUnlocked ? 'true' : 'false';
-                return;
-            }
-
-            event.preventDefault();
+        function confirmarEdicionReporte() {
             showConfirmDialog({
                 title: 'Confirmar edición',
                 message: 'Los cambios se enviarán por correo al alumno y quedarán en historial. ¿Continuar con la edición?',
@@ -1160,7 +1323,64 @@
                 setFormReadOnly(false);
                 toggleAsistencia();
             });
-        });
+        }
+
+        function confirmarGuardarCambios() {
+            showConfirmDialog({
+              title: 'Guardar cambios',
+              message: '¿Confirmas guardar los cambios del reporte y actualizar su historial?',
+              cancelLabel: 'Seguir editando',
+              confirmLabel: 'Guardar cambios',
+            }).then(function (guardarCambios) {
+              if (!guardarCambios) return;
+              saveConfirmedInput.value = 'true';
+              allowPageExit = true;
+              seguimientoForm.requestSubmit(guardarBtn);
+            });
+        }
+
+        function confirmarGuardarReporte() {
+            showConfirmDialog({
+              title: 'Guardar reporte',
+              message: '¿Confirmas guardar el reporte de seguimiento y enviar la notificación al alumno?',
+              cancelLabel: 'Seguir revisando',
+              confirmLabel: 'Guardar reporte',
+            }).then(function (confirmacion) {
+              if (!confirmacion) {
+                return;
+              }
+
+              saveConfirmedInput.value = 'true';
+              allowPageExit = true;
+              seguimientoForm.requestSubmit(guardarBtn);
+            });
+        }
+
+        function mostrarCampoRequerido(control) {
+          const fieldset = control.closest('fieldset');
+          const legend = fieldset ? fieldset.querySelector('legend') : null;
+          const section = control.closest('.section-box');
+          const label = control.labels && control.labels.length
+            ? control.labels[0]
+            : (section ? section.querySelector('label') : null);
+          const fieldName = (legend ? legend.textContent : (label ? label.textContent : control.name))
+            .replace(/\s+/g, ' ')
+            .trim();
+
+          showConfirmDialog({
+            title: 'Campo pendiente',
+            message: 'Falta completar: ' + fieldName + '.',
+            cancelLabel: 'Seguir revisando',
+            confirmLabel: 'Ir al campo',
+          }).then(function (irAlCampo) {
+            if (!irAlCampo) {
+              return;
+            }
+
+            control.focus();
+            control.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          });
+        }
 
         firmaBecaInputs.forEach(function (input) {
             input.addEventListener('change', toggleBecaField);
@@ -1178,6 +1398,7 @@
                     message: '¿Estás seguro de que deseas cancelar esta tutoría?',
                     cancelLabel: 'No cancelar',
                     confirmLabel: 'Sí, cancelar',
+                    confirmTone: 'danger',
                 }).then(function (confirmacion) {
                     if (!confirmacion) {
                         return;
@@ -1189,11 +1410,38 @@
             });
         }
 
-        if (seguimientoForm) {
-            seguimientoForm.addEventListener('submit', function () {
+        seguimientoForm.addEventListener('submit', function (event) {
+          if (!seguimientoForm.checkValidity()) {
+            event.preventDefault();
+            mostrarCampoRequerido(seguimientoForm.querySelector('input:invalid, select:invalid, textarea:invalid'));
+            return;
+          }
+
+            if (!seguimientoCompletado) {
+                if (saveConfirmedInput.value !== 'true') {
+                    event.preventDefault();
+                    confirmarGuardarReporte();
+                    return;
+                }
+
                 allowPageExit = true;
-            });
-        }
+                return;
+            }
+
+            if (editConfirmedInput.value !== 'true') {
+                event.preventDefault();
+                confirmarEdicionReporte();
+                return;
+            }
+
+            if (saveConfirmedInput.value !== 'true') {
+                event.preventDefault();
+                confirmarGuardarCambios();
+                return;
+            }
+
+            allowPageExit = true;
+        });
 
         if (floatingBackBtn) {
             floatingBackBtn.addEventListener('click', function () {

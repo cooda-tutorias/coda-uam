@@ -41,7 +41,7 @@
                       </td>
                       <td class="text-end">
                         {% if documento.es_sistema %}<a href="{% url 'ejemplo-plantilla' documento.clave_sistema %}">Descargar</a>
-        {% else %}<a href="{{ documento.archivo.url }}" download>Descargar</a>{% endif %}
+        {% else %}<a href="{% url 'descargar-documento' documento.pk %}">Descargar</a>{% endif %}
                         <a class="ms-3 ver-vista-previa"
                            href="{% url 'vista-previa-plantilla' documento.pk %}"
                            data-bs-toggle="modal" data-bs-target="#modal-vista-previa"

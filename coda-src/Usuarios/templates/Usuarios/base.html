@@ -142,7 +142,16 @@
                role="button"
                data-mdb-toggle="dropdown"
                aria-expanded="false">
-              <i class="bi bi-person-circle fs-3 ms-2"></i>
+              {% if request.user.is_authenticated and request.user.foto %}
+                <img src="{% url 'ver-foto-perfil' request.user.pk %}"
+                     class="rounded-circle ms-2"
+                     width="36"
+                     height="36"
+                     style="object-fit: cover;"
+                     alt="Foto de perfil">
+              {% else %}
+                <i class="bi bi-person-circle fs-3 ms-2" aria-hidden="true"></i>
+              {% endif %}
             </a>
             <ul class="dropdown-menu dropdown-menu-end"
                 aria-labelledby="navbarDropdownMenuAvatar">

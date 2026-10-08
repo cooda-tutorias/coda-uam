@@ -1,9 +1,11 @@
 from django.urls import path, re_path, include
 from django.contrib import admin
 from . import views
+from . import views_private_media
 import notifications.urls
 from django.conf import settings
 from django.conf.urls.static import static
+from . import views_trayectoria
 
 urlpatterns = [
     path('plantillas/<int:pk>/vista-previa/', views.VistaPreviaPlantillaView.as_view(), name='vista-previa-plantilla'),
@@ -12,6 +14,8 @@ urlpatterns = [
     path('', views.UsuarioLoginView.as_view(), name='login'),
     #path('perfil-test/', views.perfil_view_test, name='perfil-test'),
     path('perfil-alumno/<int:pk>/', views.PerfilAlumnoView.as_view(), name='perfil-alumno'),
+    path('perfil/cambiar-foto/', views.CambiarFotoPerfilView.as_view(), name='cambiar-foto-perfil'),
+    path('perfil/foto/<int:pk>/', views.VerFotoPerfilView.as_view(), name='ver-foto-perfil'),
     path('mi-tutor/', views.redirect_perfil_tutor, name='perfil-tutor-alumno'),
     path('perfil-tutor/<int:pk>/', views.PerfilTutorView.as_view(), name='perfil-tutor'),
     path('perfil-coordinador/<int:pk>/', views.PerfilCordinadorView.as_view(), name='perfil-coordinador'),
@@ -42,6 +46,8 @@ urlpatterns = [
     path('cargar_plantilla/', views.CargarPlantilla.as_view(), name='cargar_plantilla'),
     path('eliminar-documento/<int:pk>/', views.eliminar_documento, name='eliminar_documento'),
     path('ver_plantilla/<int:documento_id>/', views.VerPlantilla.as_view(), name='ver_plantilla'),
+    path('documentos/<int:pk>/descargar/', views.DescargarDocumentoView.as_view(), name='descargar-documento'),
+    path('archivos/privados/<path:nombre>', views_private_media.ArchivoPrivadoView.as_view(), name='archivo-privado'),
 
     # Agregado por Antonio LJ para tutorías in-situ.
     path("mi-qr/", views.VerQRView.as_view(), name="ver_qr_tutor"),
@@ -57,6 +63,26 @@ urlpatterns = [
     path("configuracion_app/notificaciones/dispositivos/<int:device_id>/eliminar/", views.delete_push_device, name="delete_push_device"),
     path("configuracion_app/notificaciones/dispositivos/<int:device_id>/prueba/", views.test_push_device, name="test_push_device"),
     path('webpush/save_information/', views.save_information, name='save_webpush_info'),
+    path(
+        'perfil-alumno/<int:pk>/trayectoria/subir/',
+        views_trayectoria.SubirTrayectoriaView.as_view(),
+        name='subir-trayectoria',
+    ),
+    path(
+        'perfil-alumno/<int:pk>/trayectoria/ver/',
+        views_trayectoria.VerTrayectoriaView.as_view(),
+        name='ver-trayectoria',
+    ),
+    path(
+        'perfil-alumno/<int:pk>/trayectoria/eliminar-activa/',
+        views_trayectoria.EliminarTrayectoriaActivaView.as_view(),
+        name='eliminar-trayectoria-activa',
+    ),
+    path(
+        'perfil-alumno/<int:pk>/trayectoria/eliminar-version/<int:version_id>/',
+        views_trayectoria.EliminarVersionTrayectoriaView.as_view(),
+        name='eliminar-version-trayectoria',
+    ),
     # ... (other existing URL patterns)    
 ]
 
