@@ -82,6 +82,34 @@
             color: #721c24;
             cursor: pointer;
         }
+
+          .login-form-outline .form-control {
+            border: 1px solid #ced4da !important;
+            background: #fff !important;
+          }
+
+          .login-form-outline .form-control:focus {
+            border-color: #f08200 !important;
+            box-shadow: 0 0 0 0.2rem rgba(240, 130, 0, 0.2) !important;
+          }
+
+          .login-form-outline .form-label {
+            top: 50% !important;
+            background: #fff;
+            padding: 0 0.35rem !important;
+            line-height: 1.2;
+            transform: translateY(-50%) !important;
+          }
+
+          .login-form-outline .form-control:focus ~ .form-label,
+          .login-form-outline .form-control.active ~ .form-label {
+            top: 0 !important;
+            transform: translateY(-1rem) translateY(0.1rem) scale(0.8) !important;
+          }
+
+          .login-form-outline .form-notch {
+            display: none !important;
+          }
     </style>
   </head>
 
@@ -144,12 +172,12 @@
 
                         <h1 class="fw-normal mb-3 pb-3 text-title h-1">Sistema de tutorías de la DCNI</h1>
 
-                        <div class="form-outline mb-4 text-body">
+                        <div class="form-outline login-form-outline mb-4 text-body">
                           {% render_field form.username id="form2Example17" class="form-control form-control-lg" %}
                           <label class="form-label" for="form2Example17">Email</label>
                         </div>
 
-                        <div class="form-outline mb-1 text-body">
+                        <div class="form-outline login-form-outline mb-1 text-body">
                           {% render_field form.password id="form2Example27" class="form-control form-control-lg" %}
                           <label class="form-label" for="form2Example27">Contraseña</label>
                         </div>
