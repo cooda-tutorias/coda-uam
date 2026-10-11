@@ -120,6 +120,13 @@ class Tutoria(models.Model):
     
     # Estado del alumno al momento de crear la tutoría (snapshot histórico)
     estado_alumno_historico = models.IntegerField(choices=ESTADOS_ALUMNO, blank=True, null=True)
+    trayectoria_version = models.ForeignKey(
+        'Usuarios.TrayectoriaVersion',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='tutorias_relacionadas',
+    )
 
     def __str__(self) -> str:
         string_tutoria = f'{self.alumno.first_name} {self.alumno.last_name}: tutoria {self.pk}'

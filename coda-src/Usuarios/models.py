@@ -267,6 +267,42 @@ class Alumno(Usuario):
         verbose_name = 'Alumno'
         verbose_name_plural = 'Alumnos'
 
+
+def trayectoria_version_path(instance, filename):
+    return f'Usuarios/trayectorias/alumno_{instance.alumno.matricula}/{filename}'
+
+
+class TrayectoriaVersion(models.Model):
+    alumno = models.ForeignKey(Alumno, on_delete=models.CASCADE, related_name='trayectoria_versiones')
+    archivo = models.FileField(upload_to=trayectoria_version_path)
+    original_filename = models.CharField(max_length=255)
+    size_bytes = models.BigIntegerField(default=0)
+    sha256 = models.CharField(max_length=64)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+    )
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Versión de trayectoria'
+        verbose_name_plural = 'Versiones de trayectoria'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['alumno'],
+                condition=models.Q(is_active=True),
+                name='unique_active_trayectoria_per_alumno',
+            )
+        ]
+
+    def __str__(self):
+        return f'{self.alumno.matricula} - {self.original_filename}'
+
+
 class DocumentoQuerySet(models.QuerySet):
     def delete(self):
         from django.core.exceptions import ValidationError

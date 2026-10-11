@@ -1,10 +1,11 @@
 from typing import Any, Mapping
 from django import forms
+from django.conf import settings
 from django.utils import timezone
 from django.core.files.base import File
 from django.db.models.base import Model
 from django.forms.utils import ErrorList
-from .models import Tutor, Alumno, Cordinador, Usuario, Documento, HorarioTutor
+from .models import Tutor, Alumno, Cordinador, Usuario, Documento, HorarioTutor, TrayectoriaVersion
 from .constants import ALUMNO, TUTOR, COORDINADOR, CODA, CARRERAS, ESTADOS_ALUMNO, SEXOS
 from django.contrib.auth.forms import UserCreationForm
 
@@ -157,6 +158,36 @@ class DocumentoForm(forms.ModelForm):
             except forms.ValidationError as error:
                 self.add_error('archivo', error)
         return datos
+
+
+class TrayectoriaUploadForm(forms.ModelForm):
+    class Meta:
+        model = TrayectoriaVersion
+        fields = ['archivo']
+        widgets = {
+            'archivo': forms.FileInput(attrs={
+                'class': 'form-control',
+                'accept': 'application/pdf,.pdf',
+            }),
+        }
+
+    def clean_archivo(self):
+        archivo = self.cleaned_data.get('archivo')
+        if not archivo:
+            raise forms.ValidationError('Selecciona un archivo PDF.')
+
+        max_size = int(getattr(settings, 'TRAYECTORIA_MAX_UPLOAD_SIZE', 100 * 1024 * 1024))
+        if archivo.size > max_size:
+            raise forms.ValidationError('El PDF excede el tamaño máximo permitido.')
+        if not archivo.name.lower().endswith('.pdf'):
+            raise forms.ValidationError('Solo se permiten archivos PDF.')
+
+        header = archivo.read(1024)
+        archivo.seek(0)
+        if b'%PDF-' not in header:
+            raise forms.ValidationError('El archivo no tiene un encabezado PDF válido.')
+
+        return archivo
 
 # Este formulario es para editar un usuario tipo alumno
 class FormAlumnoUpdate(forms.ModelForm):
