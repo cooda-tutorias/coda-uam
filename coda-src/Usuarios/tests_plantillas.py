@@ -11,6 +11,7 @@ from Usuarios.forms import DocumentoForm
 from Tutorias.forms import FormLoteAsignacion, FormReporteDeTutorias, FormReporteTutoriasMasivo
 
 
+@override_settings(DEFAULT_FILE_STORAGE='custom_storages.PrivateFileSystemStorage')
 class PlantillasDocumentoTests(TestCase):
     def setUp(self):
         Documento.objects.update(activa=False)
@@ -30,6 +31,42 @@ class PlantillasDocumentoTests(TestCase):
     def documento(self, nombre, tipo, activa=False):
         return Documento.objects.create(nombre=nombre, tipo=tipo, activa=activa,
             archivo=ContentFile(self.contenido(tipo or 'alumno'), name=nombre + '.docx'))
+
+    def test_descarga_de_plantilla_usa_vista_privada_solo_para_coda(self):
+        documento = self.documento('Plantilla privada', 'alumno')
+        url_descarga = reverse('descargar-documento', kwargs={'pk': documento.pk})
+        self.assertEqual(
+            documento.archivo.url,
+            reverse('archivo-privado', kwargs={'nombre': documento.archivo.name}),
+        )
+
+        respuesta = self.client.get(url_descarga)
+
+        self.assertEqual(respuesta.status_code, 200)
+        self.assertEqual(b''.join(respuesta.streaming_content), self.contenido('alumno'))
+        self.assertEqual(respuesta['Cache-Control'], 'private, no-store')
+
+        self.client.force_login(Tutor.objects.create_user(
+            email='descarga.tutor@example.com',
+            matricula='DESCARGA01',
+            password='password123',
+            coordinacion='COM',
+        ))
+        self.assertEqual(self.client.get(url_descarga).status_code, 403)
+
+        self.client.logout()
+        self.assertEqual(self.client.get(url_descarga).status_code, 302)
+
+    def test_ajustes_no_renderiza_url_firmada_de_documento(self):
+        documento = self.documento('Plantilla privada', 'alumno')
+
+        respuesta = self.client.get(reverse('ajustes'))
+
+        self.assertContains(
+            respuesta,
+            reverse('descargar-documento', kwargs={'pk': documento.pk}),
+        )
+        self.assertNotContains(respuesta, 'X-Amz-Signature')
 
     def test_subida_valida_cada_tipo_y_conserva_bytes(self):
         for tipo in ('alumno', 'tutor', 'reporte'):

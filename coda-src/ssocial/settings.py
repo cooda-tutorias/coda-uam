@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.1/ref/settings/
 """
 
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
 # settings.py
 
 # TODO: mochar esto en prod
@@ -217,6 +218,77 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+
+def _env_bool(name, default=False):
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {'1', 'true', 'yes', 'on'}
+
+
+def _required_env(name):
+    value = os.getenv(name, '').strip()
+    if not value:
+        raise ImproperlyConfigured(f'La variable de entorno {name} es obligatoria.')
+    return value
+
+
+TRAYECTORIA_MAX_UPLOAD_SIZE = int(
+    os.getenv('TRAYECTORIA_MAX_UPLOAD_SIZE', str(100 * 1024 * 1024))
+)
+FILE_UPLOAD_MAX_MEMORY_SIZE = int(
+    os.getenv('FILE_UPLOAD_MAX_MEMORY_SIZE', str(2 * 1024 * 1024))
+)
+
+OBJECT_STORAGE_ENABLED = _env_bool('OBJECT_STORAGE_ENABLED', False)
+OBJECT_STORAGE_USE_TLS = _env_bool('OBJECT_STORAGE_USE_TLS', True)
+OBJECT_STORAGE_CA_BUNDLE = os.getenv('OBJECT_STORAGE_CA_BUNDLE', '').strip()
+
+if OBJECT_STORAGE_ENABLED:
+    if not OBJECT_STORAGE_USE_TLS:
+        raise ImproperlyConfigured(
+            'OBJECT_STORAGE_USE_TLS debe permanecer habilitado para el tráfico interno.'
+        )
+    object_storage_endpoint = _required_env('OBJECT_STORAGE_ENDPOINT_URL')
+    if not object_storage_endpoint.lower().startswith('https://'):
+        raise ImproperlyConfigured(
+            'OBJECT_STORAGE_ENDPOINT_URL debe usar HTTPS.'
+        )
+    if not OBJECT_STORAGE_CA_BUNDLE:
+        raise ImproperlyConfigured(
+            'OBJECT_STORAGE_CA_BUNDLE es obligatorio para validar el certificado interno.'
+        )
+    AWS_ACCESS_KEY_ID = _required_env('OBJECT_STORAGE_ACCESS_KEY')
+    AWS_SECRET_ACCESS_KEY = _required_env('OBJECT_STORAGE_SECRET_KEY')
+    AWS_STORAGE_BUCKET_NAME = _required_env('OBJECT_STORAGE_BUCKET_NAME')
+    AWS_S3_ENDPOINT_URL = object_storage_endpoint
+    AWS_S3_REGION_NAME = os.getenv('OBJECT_STORAGE_REGION', 'us-east-1')
+    AWS_S3_ADDRESSING_STYLE = os.getenv('OBJECT_STORAGE_ADDRESSING_STYLE', 'path')
+    AWS_S3_SIGNATURE_VERSION = os.getenv(
+        'OBJECT_STORAGE_SIGNATURE_VERSION', 's3v4'
+    )
+    AWS_DEFAULT_ACL = None
+    AWS_QUERYSTRING_AUTH = True
+    AWS_S3_FILE_OVERWRITE = False
+    AWS_S3_VERIFY = OBJECT_STORAGE_CA_BUNDLE
+    MEDIAFILES_LOCATION = os.getenv('OBJECT_STORAGE_MEDIA_PREFIX', 'media')
+    DEFAULT_FILE_STORAGE = 'custom_storages.MediaStorage'
+
+    if os.getenv('DJANGO_ENV', '').strip().lower() in {'prod', 'production'}:
+        if not OBJECT_STORAGE_USE_TLS:
+            raise ImproperlyConfigured(
+                'OBJECT_STORAGE_USE_TLS debe estar habilitado en producción.'
+            )
+        if (
+            AWS_ACCESS_KEY_ID == 'coda-app'
+            or AWS_SECRET_ACCESS_KEY == 'coda-app-local-only'
+        ):
+            raise ImproperlyConfigured(
+                'Las credenciales locales de ejemplo no se permiten en producción.'
+            )
+else:
+    DEFAULT_FILE_STORAGE = 'custom_storages.PrivateFileSystemStorage'
 
 LOGGING = {
     "version": 1,

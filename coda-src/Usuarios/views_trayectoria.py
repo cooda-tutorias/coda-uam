@@ -5,7 +5,10 @@ from django.core.exceptions import PermissionDenied
 from django.db import transaction
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect
+from django.utils import timezone
+from django.utils.decorators import method_decorator
 from django.views import View
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from .constants import CODA, COORDINADOR, TUTOR
 from .forms import TrayectoriaUploadForm
@@ -102,8 +105,13 @@ class SubirTrayectoriaView(TrayectoriaAccessMixin, View):
 
         archivo = form.cleaned_data['archivo']
         version = form.save(commit=False)
+        # Nombre estándar: matrícula del alumno + fecha y hora de carga.
+        marca = timezone.localtime().strftime('%Y-%m-%dT%H-%M')
+        nombre_estandar = f'trayectoria_{alumno.matricula}_{marca}.pdf'
+        archivo.name = nombre_estandar
+        version.archivo = archivo
         version.alumno = alumno
-        version.original_filename = archivo.name[:255]
+        version.original_filename = nombre_estandar
         version.size_bytes = archivo.size
         version.sha256 = _calcular_sha256(archivo)
         version.uploaded_by = request.user
@@ -121,6 +129,7 @@ class SubirTrayectoriaView(TrayectoriaAccessMixin, View):
         return redirect('perfil-alumno', pk=alumno.pk)
 
 
+@method_decorator(xframe_options_sameorigin, name='dispatch')
 class VerTrayectoriaView(TrayectoriaAccessMixin, View):
     def get(self, request, pk):
         alumno = self.get_alumno()
@@ -157,6 +166,7 @@ class VerTrayectoriaView(TrayectoriaAccessMixin, View):
             filename=nombre,
             content_type='application/pdf',
         )
+        response['Cache-Control'] = 'private, no-store'
         response['X-Content-Type-Options'] = 'nosniff'
         return response
 
