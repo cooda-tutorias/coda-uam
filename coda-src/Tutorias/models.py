@@ -136,6 +136,21 @@ class Tutoria(models.Model):
         ordering = ["-fecha"]
 
     @property
+    def seguimiento_completado(self):
+        if self.fecha_reporte is not None:
+            return True
+
+        return any((
+            self.duracion not in (None, 0),
+            self.firma_documentos_beca is True,
+            bool((self.beca_otorgada or '').strip()),
+            self.asesoria_especializada is True,
+            bool((self.observaciones or '').strip()),
+            self.impacto_tutoria not in (None, 0),
+            bool((self.resultados_tutoria or '').strip()),
+        ))
+
+    @property
     def estado_efectivo(self):
         """ 
         Regresa el estado efectivo de la tutoría al momento de la consulta, 

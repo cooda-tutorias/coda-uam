@@ -114,6 +114,51 @@
     background-color: #79bdc8;
   }
 
+  .seguimiento-reporte-btn {
+    display: inline-flex;
+    width: 142px;
+    min-width: 142px;
+    height: 34px;
+    align-items: center;
+    justify-content: center;
+    gap: .35rem;
+    padding: 0 .55rem;
+    font-size: .78rem;
+    line-height: 1.1;
+    text-transform: none;
+    white-space: nowrap;
+  }
+
+  body.seguimiento-dialog-open { overflow: hidden; }
+  .neutral-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 2000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    background: rgba(21, 26, 33, .44);
+  }
+  .neutral-dialog.is-open { display: flex; }
+  .neutral-dialog-panel {
+    width: min(92vw, 420px);
+    padding: 1rem 1rem .9rem;
+    border: 1px solid #d8dde5;
+    border-radius: .75rem;
+    background: #fff;
+    box-shadow: 0 18px 40px rgba(25, 31, 40, .2);
+    text-align: center;
+  }
+  .neutral-dialog-title { margin: 0 0 .45rem; color: #26303d; font-size: 1rem; font-weight: 700; }
+  .neutral-dialog-message { margin: 0; color: #495566; font-size: .93rem; line-height: 1.45; }
+  .neutral-dialog-actions { display: flex; justify-content: center; gap: .5rem; margin-top: .95rem; }
+  .neutral-dialog-btn { padding: .42rem .82rem; border: 1px solid transparent; border-radius: .55rem; font-size: .86rem; font-weight: 600; cursor: pointer; }
+  .neutral-dialog-btn-secondary { border-color: #c7d2e0; background: #eef2f7; color: #334155; }
+  .neutral-dialog-btn-secondary:hover, .neutral-dialog-btn-secondary:focus-visible { border-color: #afc0d6; background: #e2e8f0; }
+  .neutral-dialog-btn-primary { border-color: #2f6fcb; background: #2f6fcb; color: #fff; }
+  .neutral-dialog-btn-primary:hover, .neutral-dialog-btn-primary:focus-visible { border-color: #275ead; background: #275ead; }
+
   .badge-espera-alumno {
     color: #212529 !important;
     background-color: var(--bs-yellow) !important;
@@ -504,14 +549,24 @@
                             </td>
                             <td>{% include "Tutorias/includes/partials/badge_estado_historial.html" with tutoria=tutoria %}</td>
                             <td>
-                              {% if tutoria.estado_efectivo == 'REA' %}
-                                <button type="button"
-                                        class="btn btn-outline-primary btn-sm js-abrir-reporte"
-                                        data-url="{% url 'save_seguimiento' tutoria.pk %}">Llenar reporte</button>
-                              {% elif tutoria.estado_efectivo == 'REP' %}
-                                <button type="button"
-                                        class="btn btn-outline-primary btn-sm js-abrir-reporte"
-                                        data-url="{% url 'save_seguimiento' tutoria.pk %}">Ver/Editar</button>
+                              {% if tutoria.estado_efectivo == 'REA' or tutoria.estado_efectivo == 'REP' %}
+                                {% if tutoria.seguimiento_completado %}
+                                 <a class="btn btn-outline-primary seguimiento-reporte-btn js-confirm-editar-seguimiento"
+                                   href="{% url 'save_seguimiento' tutoria.pk %}"
+                                   aria-label="Editar reporte de seguimiento"
+                                   title="Editar reporte">
+                                    <i class="bi bi-pencil-square" aria-hidden="true"></i>
+                                    <span>Editar reporte</span>
+                                  </a>
+                                {% else %}
+                                 <a class="btn btn-primary seguimiento-reporte-btn"
+                                   href="{% url 'save_seguimiento' tutoria.pk %}"
+                                   aria-label="Llenar reporte de seguimiento"
+                                     title="Realizar reporte">
+                                    <i class="bi bi-clipboard2-check" aria-hidden="true"></i>
+                                    <span>Realizar reporte</span>
+                                  </a>
+                                {% endif %}
                               {% else %}
                                 <span class="text-muted"
                                       title="No hay acciones disponibles"
@@ -550,13 +605,66 @@
 
   <div id="contenedor-modal-editar-tutoria"></div>
   <div id="contenedor-modal-reporte"></div>
+  <div id="neutral-confirm-dialog" class="neutral-dialog" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="neutral-dialog-title">
+    <div class="neutral-dialog-panel" role="document">
+      <h5 id="neutral-dialog-title" class="neutral-dialog-title">Confirmar edición</h5>
+      <p id="neutral-dialog-message" class="neutral-dialog-message">Los cambios se enviarán por correo al alumno y quedarán en historial. ¿Continuar con la edición?</p>
+      <div class="neutral-dialog-actions">
+        <button type="button" id="neutral-dialog-cancel" class="neutral-dialog-btn neutral-dialog-btn-secondary">Cancelar</button>
+        <button type="button" id="neutral-dialog-confirm" class="neutral-dialog-btn neutral-dialog-btn-primary">Editar reporte</button>
+      </div>
+    </div>
+  </div>
 
   <script>
 document.addEventListener("DOMContentLoaded", function () {
   const contenedorModal = document.getElementById("contenedor-modal-editar-tutoria");
   const contenedorReporte = document.getElementById("contenedor-modal-reporte");
+  const confirmDialog = document.getElementById("neutral-confirm-dialog");
+  const confirmCancel = document.getElementById("neutral-dialog-cancel");
+  const confirmContinue = document.getElementById("neutral-dialog-confirm");
+  let editReportUrl = null;
+  let editReportTrigger = null;
   let modalEdicion = null;
   let modalReporte = null;
+
+  function closeEditReportDialog(confirmed) {
+    if (!editReportUrl) return;
+    confirmDialog.classList.remove("is-open");
+    confirmDialog.setAttribute("aria-hidden", "true");
+    document.body.classList.remove("seguimiento-dialog-open");
+    const targetUrl = editReportUrl;
+    editReportUrl = null;
+    if (confirmed) {
+      const destination = new URL(targetUrl, window.location.origin);
+      destination.searchParams.set("confirmacion_previa", "1");
+      window.location.assign(destination.href);
+    } else if (editReportTrigger) {
+      editReportTrigger.focus();
+    }
+    editReportTrigger = null;
+  }
+
+  document.querySelectorAll(".js-confirm-editar-seguimiento").forEach(function (link) {
+    link.addEventListener("click", function (event) {
+      event.preventDefault();
+      editReportTrigger = link;
+      editReportUrl = link.href;
+      confirmDialog.classList.add("is-open");
+      confirmDialog.setAttribute("aria-hidden", "false");
+      document.body.classList.add("seguimiento-dialog-open");
+      confirmContinue.focus();
+    });
+  });
+
+  confirmCancel.addEventListener("click", function () { closeEditReportDialog(false); });
+  confirmContinue.addEventListener("click", function () { closeEditReportDialog(true); });
+  confirmDialog.addEventListener("click", function (event) {
+    if (event.target === confirmDialog) closeEditReportDialog(false);
+  });
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && editReportUrl) closeEditReportDialog(false);
+  });
 
   document.addEventListener("click", async function (event) {
     const boton = event.target.closest(".js-abrir-reporte");
