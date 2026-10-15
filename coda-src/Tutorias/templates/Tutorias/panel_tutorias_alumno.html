@@ -282,16 +282,15 @@
                                 <div class="btn-group btn-group-sm action-group"
                                      role="group"
                                      aria-label="Acciones de tutoría">
-                                  <!-- 1. EDITAR (Abre un modal) -->
-                                  <button type="button"
-                                          class="btn action-neutral action-edit js-abrir-editar-tutoria"
-                                          data-url="{% url 'Tutorias-update-modal' pk=tutoria.pk %}"
-                                          aria-label="Editar tema y descripción"
+                                    <!-- 1. EDITAR (Abre el formulario completo) -->
+                                    <a class="btn action-neutral action-edit"
+                                      href="{% url 'Tutorias-update' pk=tutoria.pk %}"
+                                      aria-label="Editar tutoría completa"
                                           data-bs-toggle="tooltip"
                                           data-bs-placement="top"
-                                          title="Editar tema y descripción">
+                                      title="Editar tutoría completa">
                                     <i class="bi bi-pencil-square" aria-hidden="true"></i>
-                                  </button>
+                                    </a>
                                   <!-- 2. REAGENDAR (Abre un modal, FALTA) -->
                                   <button type="button"
                                           class="btn action-neutral action-reschedule js-solicitar-cambio-fecha"
@@ -414,16 +413,15 @@
                               <div class="btn-group btn-group-sm action-group"
                                    role="group"
                                    aria-label="Acciones de tutoría">
-                                <!-- 1. EDITAR (Abre modal) -->
-                                <button type="button"
-                                        class="btn action-neutral action-edit js-abrir-editar-tutoria"
-                                        data-url="{% url 'Tutorias-update-modal' pk=tutoria.pk %}"
-                                        aria-label="Editar tema y descripción"
+                                <!-- 1. EDITAR (Abre el formulario completo) -->
+                                <a class="btn action-neutral action-edit"
+                                  href="{% url 'Tutorias-update' pk=tutoria.pk %}"
+                                  aria-label="Editar tutoría completa"
                                         data-bs-toggle="tooltip"
                                         data-bs-placement="top"
-                                        title="Editar tema y descripción">
+                                  title="Editar tutoría completa">
                                   <i class="bi bi-pencil-square" aria-hidden="true"></i>
-                                </button>
+                                </a>
                                 <!-- 2. REAGENDAR (Abre Modal) -->
                                 <button type="button"
                                         class="btn action-neutral action-reschedule js-solicitar-cambio-fecha"
@@ -531,153 +529,7 @@
     {% include "Tutorias/includes/partials/modal_cancelar_alumno.html" with tutoria=tutoria %}
   {% endfor %}
 
-  <div id="contenedor-modal-editar-tutoria"></div>
   {% include "Tutorias/includes/partials/modal_solicitar_cambio_fecha.html" %}
-
-  <script>
-document.addEventListener("DOMContentLoaded", function () {
-  const contenedor = document.getElementById(
-    "contenedor-modal-editar-tutoria"
-  );
-
-  let modalActual = null;
-
-  function abrirModalDesdeHtml(html) {
-    contenedor.innerHTML = html;
-
-    const elementoModal = contenedor.querySelector(
-      "#modalEditarTutoria"
-    );
-
-    modalActual = new mdb.Modal(elementoModal);
-    modalActual.show();
-  }
-
-  // Se utiliza delegación de eventos para todos los botones Editar.
-  document.addEventListener("click", async function (event) {
-    const boton = event.target.closest(
-      ".js-abrir-editar-tutoria"
-    );
-
-    if (!boton) {
-      return;
-    }
-
-    boton.disabled = true;
-
-    try {
-      const respuesta = await fetch(boton.dataset.url, {
-        headers: {
-          "X-Requested-With": "XMLHttpRequest",
-        },
-      });
-
-      if (!respuesta.ok) {
-        throw new Error("No fue posible cargar el formulario.");
-      }
-
-      const html = await respuesta.text();
-      abrirModalDesdeHtml(html);
-
-    } catch (error) {
-      console.error(error);
-      alert("No fue posible abrir la edición de la tutoría.");
-
-    } finally {
-      boton.disabled = false;
-    }
-  });
-
-  // Procesa el formulario cargado dinámicamente.
-  contenedor.addEventListener("submit", async function (event) {
-    const formulario = event.target.closest(
-      ".js-form-editar-tutoria"
-    );
-
-    if (!formulario) {
-      return;
-    }
-
-    event.preventDefault();
-
-    const botonGuardar = formulario.querySelector(
-      'button[type="submit"]'
-    );
-
-    botonGuardar.disabled = true;
-
-    try {
-      const respuesta = await fetch(formulario.action, {
-        method: "POST",
-        body: new FormData(formulario),
-        headers: {
-          "X-Requested-With": "XMLHttpRequest",
-        },
-      });
-
-      if (respuesta.ok) {
-        const resultado = await respuesta.json();
-
-        if (resultado.ok) {
-          modalActual.hide();
-
-          const pestañaActiva = document.querySelector(
-            '#tutorias-tabs .nav-link.active'
-          );
-
-          if (pestañaActiva) {
-            sessionStorage.setItem(
-            'pestañaTutoriasActiva',
-            pestañaActiva.getAttribute('data-mdb-target')
-            );
-          }
-
-          window.location.reload();
-          return;
-        }      
-      }
-
-      if (respuesta.status === 422) {
-        const html = await respuesta.text();
-
-        /*
-         * Conserva abierto el modal y reemplaza su contenido
-         * con el formulario que contiene los errores.
-         */
-        const documentoTemporal =
-          new DOMParser().parseFromString(html, "text/html");
-
-        const contenidoNuevo =
-          documentoTemporal.querySelector(".modal-content");
-
-        const contenidoActual =
-          contenedor.querySelector(".modal-content");
-
-        if (contenidoNuevo && contenidoActual) {
-          contenidoActual.replaceWith(contenidoNuevo);
-        }
-
-        return;
-      }
-
-      throw new Error("No fue posible guardar la tutoría.");
-
-    } catch (error) {
-      console.error(error);
-      alert("Ocurrió un error al guardar los cambios.");
-
-    } finally {
-      const botonActual = contenedor.querySelector(
-        'button[type="submit"]'
-      );
-
-      if (botonActual) {
-        botonActual.disabled = false;
-      }
-    }
-  });
-});
-  </script>
 
   <script>
 document.addEventListener('DOMContentLoaded', function() {

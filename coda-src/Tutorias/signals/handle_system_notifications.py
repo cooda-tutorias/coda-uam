@@ -54,8 +54,8 @@ SYSTEM_NOTIFICATION_INFO: dict[EventoTutoria, dict[str, str]] = {
         "description": "Solicitud de tutoría rechazada",
     },
     EventoTutoria.ALU_SOL_CAMBIO_FECHA_SUG: {
-        "verb": "solicitó cambiar la fecha de tutoría pendiente",
-        "description": "Cambio de fecha en solicitud pendiente",
+        "verb": "solicitó cambiar el horario de tutoría",
+        "description": "Cambio de horario pendiente de aprobación",
     },
     EventoTutoria.ALU_SOL_CAMBIO_FECHA_AGEN: {
         "verb": "reprogramó su tutoría solicitada/agendada",

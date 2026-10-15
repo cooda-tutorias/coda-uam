@@ -11,106 +11,154 @@
         href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/material_blue.css">
   <link rel="stylesheet"
         href="{% static 'Tutorias/css/selector_fecha_tutoria.css' %}">
+    <link rel="stylesheet"
+      href="{% static 'Tutorias/css/formularios_tutoria.css' %}?v=3">
 {% endblock %}
 
 {% block body %}
-  <!--Formulario Solicitud tutoria-->
-  <section id="section" style="background-color: #eee;">
-    <div class="container py-5 h-100">
-      <div class="row d-flex justify-content-center align-items-center h-100">
-        <div class="col-lg-8 col-xl-6">
-          <div class="card border-top border-bottom border-4"
-               style="border-color: #F08200 !important">
-            <form method="post">
-              {% csrf_token %}
-              <div class="card-body py-4 px-4 text-body">
-
-                <!-- Mensaje contextual según rol 
-                {% include 'Tutorias/includes/alerta.html' %}-->
-
-                <h3 class="mb-4 text-primary text-title-bold">{{ titulo_formulario|default:"Solicitud de tutoría" }}</h3>
-
-                <section class="alert alert-light border mb-4" aria-label="Información académica del alumno">
-                  <h4 class="h6 mb-2">Estado académico actual</h4>
-                  <p class="mb-1">{{ estado_academico_actual|default:"Sin registro" }}</p>
-                  {% if trayectoria_reciente %}
-                    <a href="{% url 'ver-trayectoria' request.user.pk %}?version_id={{ trayectoria_reciente.pk }}"
-                       target="_blank" rel="noopener">Consultar trayectoria vigente</a>
-                    {% if trayectoria_actualizada_en %}
-                      <span class="small text-muted ms-2">Actualizada {{ trayectoria_actualizada_en|date:'d/m/Y' }}</span>
-                    {% endif %}
-                  {% else %}
-                    <p class="small text-muted mb-0">No hay una trayectoria vigente cargada.</p>
-                  {% endif %}
-                </section>
-
-                <!-- Bloque general de errores del formulario -->
-                {% if request.method == "POST" and form.non_field_errors %}
-                  <div class="alert alert-danger mb-4">{{ form.non_field_errors }}</div>
-                {% endif %}
-
-                <!-- Tema(s) de la tutoría  -->
-                <div class="form-group mb-4 {% if form.tema.errors %}border border-danger rounded p-2{% endif %}">
-                  <label class="mb-2 text-body-bold text-muted">Tema(s):</label>
-                  <p class="text-muted">Selecciona al menos un tema para tratar.</p>
-                  <div class="row">
-                    {% for checkbox in form.tema %}
-                      <div class="col-6 mb-2">
-                        <label class="form-check-label">{{ checkbox.tag }} {{ checkbox.choice_label }}</label>
-                      </div>
-                    {% endfor %}
-                  </div>
-
-                  <!-- Error de selección de tema -->
-                  {% if request.method == "POST" and form.tema.errors %}
-                    <div class="text-danger small mt-2">{{ form.tema.errors.as_text|linebreaksbr }}</div>
-                  {% endif %}
-                </div>
-
-                <!-- Campo “Otro (especificar)” -->
-                <div id="otro-campo-container"
-                     class="form-group mb-4 {% if form.otro_tema.errors %}border border-danger rounded p-2{% endif %}"
-                     style="display: none">
-                  <label for="id_otro_tema" class="form-label">Especifica el tema:</label>
-                  {% render_field form.otro_tema class="form-control" id="id_otro_tema" placeholder="Describe el tema..." %}
-                  {% if request.method == "POST" and form.otro_tema.errors %}
-                    <div class="text-danger small mt-2">{{ form.otro_tema.errors.as_text|linebreaksbr }}</div>
-                  {% endif %}
-                </div>
-
-                <!-- Descripción -->
-                <div class="form-group mb-4 {% if form.descripcion.errors %}border border-danger rounded p-2{% endif %}">
-                  {% render_field form.descripcion class="form-control" id="descripcion" rows="3" %}
-                  <label class="form-label" for="descripcion">{{ info_adicional|default:"Información adicional." }}</label>
-                  {% if form.descripcion.errors %}
-                    <div class="text-danger small mt-2">{{ form.descripcion.errors.as_text|linebreaksbr }}</div>
-                  {% endif %}
-                </div>
-
-                <!-- Campos ocultos para guardar selección -->
-                <input type="hidden" id="id_horario_tutor" name="horario_tutor">
-                <input type="hidden" id="id_fecha_seleccionada" name="fecha_seleccionada">
-                <input type="hidden" id="id_franja_seleccionada" name="franja_seleccionada">
-                <input type="hidden" id="id_fecha_sugerida" name="fecha_sugerida">
-
-                <!-- Botón que abre el modal -->
-                <button type="button" id="btnAbrirModalCita" class="btn btn-outline-primary">Elegir fecha cita...</button>
-
-                <!-- AQUÍ INSERTA EL RESUMEN -->
-                <div class="alert alert-info mt-3" id="resumenCita">No has seleccionado fecha aún.</div>
-
-                <!-- Botón de envío -->
-                <button type="submit" class="btn btn-primary btn-block mb-4 text-title">{{ texto_boton|default:"Enviar" }}</button>
-              </div>
-            </form>
+  <section class="sol-section py-4 py-lg-5">
+    <div class="container sol-container">
+      <div class="sol-card">
+        <header class="sol-header">
+          <span class="sol-header-icon" aria-hidden="true"><i class="bi bi-people"></i></span>
+          <div>
+            <h1 class="sol-title">Nueva solicitud de tutoría</h1>
+            <p class="sol-subtitle">Completa los campos y tu tutor recibirá la solicitud.</p>
           </div>
+        </header>
+
+        <form method="post" id="sol-form" class="sol-form" novalidate data-confirm-submit data-confirm-submit-title="Enviar solicitud" data-confirm-submit-message="¿Confirmas enviar esta solicitud de tutoría a tu tutor?" data-confirm-submit-accept="Enviar solicitud">
+          {% csrf_token %}
+          {% if form.errors %}
+            <div id="sol-server-validation-errors" hidden>
+              {% for error in form.non_field_errors %}
+                <span data-validation-field="fecha">{{ error }}</span>
+              {% endfor %}
+              {% for field in form %}
+                {% for error in field.errors %}
+                  <span data-validation-field="{{ field.name }}">{{ error }}</span>
+                {% endfor %}
+              {% endfor %}
+            </div>
+          {% endif %}
+
+          <section class="sol-section-block" aria-labelledby="sol-pdf-title">
+            <h2 class="sol-section-label" id="sol-pdf-title"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i> Historial académico (PDF)</h2>
+            {% if trayectoria_reciente %}
+              <input type="hidden" name="incluir_trayectoria" value="{% if incluir_trayectoria %}on{% endif %}" data-trajectory-value>
+              <div data-trajectory-included {% if not incluir_trayectoria %}hidden{% endif %}>
+                <div class="sol-pdf-card">
+                  <span class="sol-pdf-card-icon" aria-hidden="true"><i class="bi bi-file-earmark-pdf"></i></span>
+                  <div class="sol-pdf-card-body">
+                    <p class="sol-pdf-card-title">PDF académico más reciente</p>
+                    {% if trayectoria_actualizada_en %}<p class="sol-pdf-card-meta">Actualizado el {{ trayectoria_actualizada_en|date:'d/m/Y H:i' }}</p>{% endif %}
+                  </div>
+                  <button type="button" class="sol-pdf-preview-btn open-trayectoria-version" id="open-trayectoria-dialog" aria-haspopup="dialog" aria-controls="trayectoria-dialog" aria-label="Vista previa de la trayectoria académica" data-view-url="{% url 'ver-trayectoria' request.user.pk %}?version_id={{ trayectoria_reciente.pk }}" data-download-url="{% url 'ver-trayectoria' request.user.pk %}?version_id={{ trayectoria_reciente.pk }}&amp;download=1" data-file-name="{{ trayectoria_reciente.original_filename }}">
+                    <i class="bi bi-eye" aria-hidden="true"></i><span>Consultar trayectoria vigente</span>
+                  </button>
+                </div>
+                <div class="trajectory-toggle-actions">
+                  <button type="button" class="trajectory-toggle-btn" data-trajectory-toggle data-next-value=""><i class="bi bi-x-lg" aria-hidden="true"></i><span>Quitar</span></button>
+                </div>
+              </div>
+              <div data-trajectory-excluded {% if incluir_trayectoria %}hidden{% endif %}>
+                <div class="sol-alert sol-alert-info" role="status" aria-live="polite"><i class="bi bi-info-circle" aria-hidden="true"></i><span>PDF académico no incluido</span></div>
+                <div class="trajectory-toggle-actions">
+                  <button type="button" class="trajectory-toggle-btn trajectory-toggle-btn--add" data-trajectory-toggle data-next-value="on"><i class="bi bi-plus-lg" aria-hidden="true"></i><span>Agregar historial</span></button>
+                </div>
+              </div>
+            {% else %}
+              <div class="sol-alert sol-alert-warn" role="status">
+                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                <span>No hay una trayectoria académica vigente. Puedes <a href="{% url 'perfil-alumno' request.user.pk %}">agregarla desde tu perfil</a> o enviar la solicitud de todas formas.</span>
+              </div>
+            {% endif %}
+          </section>
+
+          <section class="sol-section-block" aria-labelledby="sol-academico-title">
+            <h2 class="sol-section-label" id="sol-academico-title"><i class="bi bi-mortarboard" aria-hidden="true"></i> Estado académico actual</h2>
+            <p class="sol-field-hint">Estado registrado actualmente en el sistema.</p>
+            <div class="sol-info-row"><span class="sol-info-label">Estado actual</span><span class="sol-info-value">{{ estado_academico_actual|default:"Sin registro" }}</span></div>
+          </section>
+
+          <section class="sol-section-block" aria-labelledby="sol-temas-title">
+            <h2 class="sol-section-label" id="sol-temas-title"><i class="bi bi-list-check" aria-hidden="true"></i> Temas a tratar</h2>
+            <p class="sol-field-hint">Selecciona al menos un tema. Puedes buscar por nombre.</p>
+            <label class="sol-chip-search-wrap" for="sol-chip-search">
+              <i class="bi bi-search" aria-hidden="true"></i>
+              <input type="search" class="sol-chip-search-input" id="sol-chip-search" placeholder="Buscar tema..." aria-label="Buscar tema" autocomplete="off">
+            </label>
+            <div class="sol-chips" id="sol-chips-wrap">
+              {% for checkbox in form.tema %}
+                <label class="sol-chip" data-label="{{ checkbox.choice_label|lower }}">{{ checkbox.tag }}<span>{{ checkbox.choice_label }}</span></label>
+              {% endfor %}
+            </div>
+            <p class="sol-chip-empty" id="sol-chip-empty" hidden>No se encontraron temas con ese nombre.</p>
+            {% if form.tema.errors %}<div class="sol-field-error" role="alert">{{ form.tema.errors.as_text|linebreaksbr }}</div>{% endif %}
+
+            <div id="otro-campo-container" class="sol-otro-wrap" style="display:none">
+              <label class="sol-label" for="id_otro_tema">Especifica el tema</label>
+              {% render_field form.otro_tema class="sol-input" id="id_otro_tema" placeholder="Describe brevemente el tema..." %}
+              {% if form.otro_tema.errors %}<div class="sol-field-error" role="alert">{{ form.otro_tema.errors.as_text|linebreaksbr }}</div>{% endif %}
+            </div>
+          </section>
+
+          <section class="sol-section-block" aria-labelledby="sol-agenda-title">
+            <h2 class="sol-section-label" id="sol-agenda-title"><i class="bi bi-calendar2-week" aria-hidden="true"></i> Fecha y hora</h2>
+            <p class="sol-field-hint">Elige un horario disponible o propone una fecha tentativa.</p>
+            <input type="hidden" id="id_horario_tutor" name="horario_tutor">
+            <input type="hidden" id="id_fecha_seleccionada" name="fecha_seleccionada">
+            <input type="hidden" id="id_franja_seleccionada" name="franja_seleccionada">
+            <input type="hidden" id="id_fecha_sugerida" name="fecha_sugerida">
+            <button type="button" id="btnAbrirModalCita" class="sol-date-btn"><i class="bi bi-calendar-plus" aria-hidden="true"></i> Elegir fecha y hora</button>
+            <div class="sol-alert sol-alert-info mt-3" id="resumenCita" role="status" aria-live="polite">No has seleccionado una fecha.</div>
+          </section>
+
+          <section class="sol-section-block" aria-labelledby="sol-descripcion-title">
+            <h2 class="sol-section-label" id="sol-descripcion-title"><i class="bi bi-chat-left-text" aria-hidden="true"></i> Información adicional</h2>
+            <p class="sol-field-hint">Comparte cualquier detalle que tu tutor deba conocer.</p>
+            {% render_field form.descripcion class="sol-textarea" id="descripcion" rows="4" placeholder="Ej. Necesito orientación sobre mi avance curricular y los próximos pasos..." %}
+            {% if form.descripcion.errors %}<div class="sol-field-error" role="alert">{{ form.descripcion.errors.as_text|linebreaksbr }}</div>{% endif %}
+          </section>
+
+          <div class="sol-actions">
+            <a class="sol-cancel-btn" href="{% url 'Tutorias-alumno' %}" data-confirm-cancel data-confirm-cancel-title="Cancelar solicitud" data-confirm-cancel-message="¿Quieres salir? La solicitud no se enviará.">Cancelar</a>
+            <button type="submit" class="sol-submit-btn">{{ texto_boton|default:"Enviar solicitud" }}</button>
+          </div>
+        </form>
+
+        {% include "Tutorias/includes/partials/modal_confirmacion_formulario.html" %}
+        <div class="sol-validation-dialog" id="sol-validation-dialog" aria-hidden="true">
+          <section class="sol-validation-panel" role="dialog" aria-modal="true" aria-labelledby="sol-validation-title" aria-describedby="sol-validation-description" tabindex="-1">
+            <header class="sol-validation-header">
+              <span class="sol-validation-icon" aria-hidden="true"><i class="bi bi-exclamation-circle"></i></span>
+              <div>
+                <h2 class="sol-validation-title" id="sol-validation-title">Faltan datos por completar</h2>
+                <p class="sol-validation-description" id="sol-validation-description">Revisa los campos indicados para enviar la solicitud.</p>
+              </div>
+              <button type="button" class="btn-close ms-auto" id="sol-validation-close" aria-label="Cerrar avisos"></button>
+            </header>
+            <ul class="sol-validation-list" id="sol-validation-list"></ul>
+            <footer class="sol-validation-actions">
+              <button type="button" class="sol-cancel-btn" id="sol-validation-stay">Seguir revisando</button>
+              <button type="button" class="sol-submit-btn" id="sol-validation-first">Ir al primer campo</button>
+            </footer>
+          </section>
         </div>
       </div>
     </div>
   </section>
 
+  {% if trayectoria_reciente %}
+    {% include "Tutorias/includes/partials/modal_trayectoria_pdf.html" %}
+  {% endif %}
+
   <!-- MODAL INCLUIDO -->
   {% include "Tutorias/includes/partials/modal_agendar_cita.html" %}
+  <script src="{% static 'Tutorias/js/trayectoria_tutoria_toggle.js' %}"></script>
+  <script src="{% static 'Tutorias/js/trayectoria_pdf_viewer.js' %}"></script>
+  <script src="{% static 'Tutorias/js/validacion_formulario_solicitud.js' %}"></script>
+  <script src="{% static 'Tutorias/js/confirmacion_formularios.js' %}?v=3"></script>
 
   <!-- Script: mostrar/ocultar campo "Otro" -->
   <script>
@@ -132,6 +180,36 @@
 
     verificarOtro();
     checkboxes.forEach(cb => cb.addEventListener("change", verificarOtro));
+  });
+  </script>
+
+  <script>
+  document.addEventListener("DOMContentLoaded", function () {
+    const search = document.getElementById("sol-chip-search");
+    const chips = Array.from(document.querySelectorAll(".sol-chip"));
+    const chipContainer = document.getElementById("sol-chips-wrap");
+    const emptyMessage = document.getElementById("sol-chip-empty");
+    const spanishCollator = new Intl.Collator("es", { sensitivity: "base" });
+
+    chips.sort(function (first, second) {
+      const firstLabel = first.querySelector("span").textContent.trim();
+      const secondLabel = second.querySelector("span").textContent.trim();
+      return spanishCollator.compare(firstLabel, secondLabel);
+    });
+    chips.forEach(function (chip) { chipContainer.appendChild(chip); });
+
+    if (!search) return;
+
+    search.addEventListener("input", function () {
+      const query = search.value.trim().toLocaleLowerCase("es");
+      let visibleCount = 0;
+      chips.forEach(function (chip) {
+        const matches = (chip.dataset.label || "").includes(query);
+        chip.hidden = !matches;
+        if (matches) visibleCount += 1;
+      });
+      emptyMessage.hidden = visibleCount > 0;
+    });
   });
   </script>
 
