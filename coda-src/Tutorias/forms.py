@@ -53,7 +53,7 @@ class FormTutorias(forms.ModelForm):
     """
 
     horario_tutor = forms.ModelChoiceField(
-        queryset=None,
+        queryset=HorarioTutor.objects.none(),
         required=False,
         label="Selecciona un horario disponible",
     )
@@ -75,19 +75,23 @@ class FormTutorias(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         
-        # Caso de ALUMNO solicitando tutoría
+        tutor = None
         if self.user and self.user.has_role("ALU"):
-            tutor = self.user.alumno.tutor_asignado
+            tutor = getattr(getattr(self.user, "alumno", None), "tutor_asignado", None)
+        elif self.user and self.user.has_role("TUT"):
+            tutor = self.user
+
+        if tutor:
             horarios = HorarioTutor.objects.filter(
                 tutor=tutor, activo=True
             ).order_by('dia_semana','hora_inicio')
             self.fields["horario_tutor"].queryset = horarios
 
-            if horarios.exists():
+            if self.user.has_role("ALU") and horarios.exists():
                 # Hay horarios → ocultamos la fecha sugerida
                 self.fields["fecha_sugerida"].widget = forms.HiddenInput()
                 self.fields["fecha_sugerida"].required = False
-            else:
+            elif self.user.has_role("ALU"):
                 # Sin horarios → ocultamos el selector de horarios
                 self.fields["horario_tutor"].widget = forms.HiddenInput()
                 self.fields["horario_tutor"].required = False
@@ -130,10 +134,11 @@ class FormTutorias(forms.ModelForm):
 
         horario = cleaned_data.get("horario_tutor")
         fecha_sugerida = cleaned_data.get("fecha_sugerida")
+        fecha_directa = cleaned_data.get("fecha")
 
         # Validación de selección
         if not getattr(self, "skip_fecha_validacion", False):
-            if not horario and not fecha_sugerida:
+            if not horario and not fecha_sugerida and not fecha_directa and not self.instance.pk:
                 raise forms.ValidationError(
                     "Debes seleccionar un horario disponible o sugerir una fecha."
                 )
