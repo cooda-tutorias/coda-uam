@@ -172,9 +172,14 @@
 
                         <h1 class="fw-normal mb-3 pb-3 text-title h-1">Sistema de tutorías de la DCNI</h1>
 
-                        <div class="form-outline login-form-outline mb-4 text-body">
-                          {% render_field form.username id="form2Example17" class="form-control form-control-lg" %}
-                          <label class="form-label" for="form2Example17">Email</label>
+                        <div class="mb-4 text-body">
+                          <div class="form-outline login-form-outline">
+                            {% render_field form.username id="form2Example17" class="form-control form-control-lg" aria-describedby="email-help" %}
+                            <label class="form-label" for="form2Example17">Correo institucional</label>
+                          </div>
+                          <small id="email-help" class="form-text text-muted d-block">
+                            Alumnado: utilicen su correo institucional con matrícula.
+                          </small>
                         </div>
 
                         <div class="form-outline login-form-outline mb-1 text-body">
